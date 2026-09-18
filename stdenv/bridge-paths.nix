@@ -34,7 +34,7 @@
   perl                   = builtins.storePath /nix/store/gasv6lvsai98i7gp16qn35aapzsf6mr5-perl-5.40.0;
 
   illumos-sysroot        = builtins.storePath /nix/store/gns4wck6hc3dd73v6ah6ig3ih1rnfhv8-illumos-sysroot-20210501-e0b4275f34-v0;
-  illumos-libc           = builtins.storePath /nix/store/xkpwpb00l5q6pjnvinc11ab9prplmm0c-illumos-libc-20210501-e0b4275f34-v0;
+  illumos-libc           = builtins.storePath /nix/store/cail5r0f1vw57kvn3j1spgq53459qxf1-illumos-libc-20210501-e0b4275f34-v0;
   illumos-ld             = builtins.storePath /nix/store/v1p0cfrwp6c3cvnnnbsinqwswb3b8jfy-illumos-ld-0-unstable-2026-09-18;
   gcc-illumos = {
     out = builtins.storePath /nix/store/mnwdr2cgka37afs1qdr6b1lq62nnll7r-gcc-illumos-14.2.0-il-1;
