@@ -32,7 +32,7 @@ Design rules this repo follows:
 
 Early. There are two generations of tools and they are built differently.
 
-**Toolchain packages** (`illumos-sysroot`, `illumos-ld`, `gcc-illumos`) are built with the older
+**Toolchain packages** (`illumos-sysroot`, `illumos-libc`, `illumos-ld`, `gcc-illumos`) are built with the older
 `illumos-recipe-v2` nixpkgs tree (system `x86_64-illumos`) until they can build themselves:
 
 ```bash
@@ -56,12 +56,20 @@ host's libc; replacing it with packages built here is the next step. Nix must re
 | Attribute | State |
 |---|---|
 | `illumos-sysroot` | the pinned sysroot as a fixed-output fetch, unpacked untouched |
+| `illumos-libc` | `illumos-sysroot` plus the header hunks of upstream illumos-gate commits, applied verbatim; what the compiler wrappers use as libc (passed as `--sysroot`, so no gcc rebuild). Currently illumos 16344: handler types `void (*)()` become `void (*)(int)`, without which anything compiled as C23 that touches signals fails. Two files differ from the sysroot. |
 | `illumos-ld` | `ld`, `libld.so.4`, `liblddbg.so.4` from illumos-gate `7db575a44a`, linked against the sysroot. Needs only libc `ILLUMOS_0.26`, has no store references, and links byte-for-byte like the platform `ld` apart from its version string. |
 | `gcc-illumos` | illumos/gcc 14.2.0-il-1, three-stage bootstrap, `--with-sysroot`. Searches no host header or library directory; the compiler, `libstdc++` and `libgcc_s` themselves need only libc `ILLUMOS_0.26`; finds `ld` on `PATH` so the nixpkgs wrappers apply. Still hard-codes GNU `as` from the older tree's binutils. |
 | `tests/toolchain.nix` | C and C++ (throw/catch) programs built by a stdenv's wrapped toolchain; asserts the interpreter, RUNPATH, libc floor and which `ld` linked them |
 | `patches/nix` | the one-line `sunos` to `solaris` system-string mapping for Nix |
 
-Known cost of the 2021 floor: its `<sys/mman.h>` hides `madvise()` from C++ (`_XOPEN_SOURCE`), so C++ code
-calling it does not compile against the sysroot. `gcc-illumos` carries a patch for its own use of it.
+Known costs of the 2021 floor:
+
+- Its `<sys/mman.h>` hides `madvise()` from C++ (`_XOPEN_SOURCE`), so C++ code calling it does not compile
+  against the sysroot. `gcc-illumos` carries a patch for its own use of it.
+- Its headers predate C23. Fixed for signals by the backport in `illumos-libc`; the matching upstream clean-up
+  of `rpc/*.h` (illumos 18214) is not backported because nothing has needed it.
+
+Verified so far, on one SmartOS host: `tests/toolchain.nix` passes, and nixpkgs `hello` builds and runs from the
+bridge, together with the xz, gnum4, zlib, gmp, perl, libxcrypt and coreutils it depends on.
 
 A flake will be added once the nixpkgs branch is published.
