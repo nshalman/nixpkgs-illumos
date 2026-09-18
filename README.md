@@ -40,7 +40,7 @@ nix-build -I nixpkgs=/path/to/nixpkgs -A illumos-sysroot
 | Attribute | State |
 |---|---|
 | `illumos-sysroot` | the pinned sysroot as a fixed-output fetch, unpacked untouched |
-| `illumos-ld` | planned: `ld`, `libld`, `liblddbg` from illumos-gate against the sysroot |
+| `illumos-ld` | `ld`, `libld.so.4`, `liblddbg.so.4` from illumos-gate `7db575a44a`, linked against the sysroot. Needs only libc `ILLUMOS_0.26`, has no store references, and links byte-for-byte like the platform `ld` apart from its version string. |
 | `patches/nix` | the one-line `sunos` to `solaris` system-string mapping for Nix |
 
 A flake will be added once there is a nixpkgs branch worth pinning as its input.
