@@ -49,6 +49,9 @@ pkgs.stdenv.mkDerivation {
     # Both dialects: autoconf 2.73 configure scripts pick gnu23 by themselves.
     $CC -std=gnu17 sig.c -o sig-gnu17 2> sig17.err || { cat sig17.err; exit 1; }
     $CC -std=gnu23 sig.c -o sig-gnu23 2> sig23.err || { cat sig23.err; exit 1; }
+    # Deliberately built without -pthread: that is how most libraries are built.
+    printf '#include <errno.h>\nint set_errno(int v) { errno = v; return errno; }\n' > e.c
+    $CC -shared -fPIC e.c -o libe.so 2> e.err || { cat e.err; exit 1; }
     $CC hello.c -o hello-c 2> c.err || { cat c.err; exit 1; }
     $CXX hello.cc -o hello-cxx 2> cxx.err || { cat cxx.err; exit 1; }
   '';
@@ -62,6 +65,11 @@ pkgs.stdenv.mkDerivation {
     check "C runs" './hello-c | grep -q "hello from C"'
     check "C++ throw/catch runs" './hello-cxx | grep -q "throw and catch"'
     check "signal handlers and SIG_ constants work under gnu17 and gnu23" './sig-gnu17 && ./sig-gnu23 && [ ! -s sig17.err ] && [ ! -s sig23.err ]'
+    # illumos only hands out the thread-safe errno under _REENTRANT, _TS_ERRNO or a POSIX feature macro. A library
+    # that imports the plain `errno` object overwrites the main thread's errno from any thread.
+    echo "libe.so imports: $(/usr/bin/elfdump -s -N .dynsym libe.so | awk '$NF=="errno" || $NF=="___errno" {print $NF}' | tr '\n' ' ')"
+    check "a library built without -pthread uses the thread-safe errno" \
+      '/usr/bin/elfdump -s -N .dynsym libe.so | awk "\$NF==\"___errno\"" | grep -q . && ! /usr/bin/elfdump -s -N .dynsym libe.so | awk "\$NF==\"errno\"" | grep -q .'
     # The link-editor stamps its revision into .comment. It must be the stdenv's ld, reached through the wrappers,
     # and not one the compiler driver found on the build host.
     # `ld -V` prints its revision and then fails for want of input files.
