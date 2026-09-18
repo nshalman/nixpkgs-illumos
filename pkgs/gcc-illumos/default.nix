@@ -141,6 +141,16 @@ stdenv.mkDerivation rec {
     runHook preInstall
     make install
 
+    # What fixincludes would do if it knew about it. The 2021 <sys/signal.h> declares sa_handler for C as
+    # `void (*)()`, which C23 reads as "no arguments". gcc 14 rejects assigning a `void (*)(int)` handler to it,
+    # and autoconf 2.73 configure scripts select -std=gnu23 on their own. illumos made the same one-line change
+    # later; it is the only such declaration in the userland headers that differs from a current system.
+    fixed=$(echo "$out"/lib/gcc/${target}/*/include-fixed)
+    mkdir -p "$fixed/sys"
+    sed 's/void (\*_handler)();/void (*_handler)(int);/' ${illumos-sysroot}/usr/include/sys/signal.h > "$fixed/sys/signal.h"
+    ! grep -q '(\*_handler)();' "$fixed/sys/signal.h"
+    ! cmp -s ${illumos-sysroot}/usr/include/sys/signal.h "$fixed/sys/signal.h"
+
     rm "$lib/lib/amd64"
     mv "$out/lib/amd64" "$lib/lib/amd64"
 
