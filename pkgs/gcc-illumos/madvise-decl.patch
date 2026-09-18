@@ -1,0 +1,22 @@
+Declare madvise when the system headers do not.
+
+illumos headers before 2022 declare madvise() only outside the X/Open
+namespace, and g++ for Solaris targets always defines _XOPEN_SOURCE. The
+illumos sysroot (2021-05-01) is such a header set, so gcc/cp/module.cc fails
+with "'madvise' was not declared in this scope" once stage 2 compiles
+against it. configure already notices (HAVE_DECL_MADVISE=0); act on it the
+way system.h does for sbrk and getwd. libc has always had the symbol.
+
+--- a/gcc/system.h
++++ b/gcc/system.h
+@@ -497,6 +497,10 @@
+ extern void *sbrk (int);
+ #endif
+ 
++#if defined (HAVE_DECL_MADVISE) && !HAVE_DECL_MADVISE
++extern int madvise (void *, size_t, int);
++#endif
++
+ #if defined (HAVE_DECL_SETENV) && !HAVE_DECL_SETENV
+ int setenv(const char *, const char *, int);
+ #endif

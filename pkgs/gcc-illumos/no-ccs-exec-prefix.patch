@@ -1,0 +1,21 @@
+Do not search /usr/ccs/bin for the linker and assembler.
+
+MD_EXEC_PREFIX is searched before PATH. nixpkgs puts its ld wrapper on PATH
+and expects the compiler to pick it up from there; with this prefix built in
+the driver finds the build host's /usr/ccs/bin/ld first, so the wrapper never
+runs and the link-editor is whatever the host happens to ship.
+
+--- a/gcc/config/sol2.h
++++ b/gcc/config/sol2.h
+@@ -164,11 +164,6 @@
+   "%{!symbolic:\
+      %{p|pg:-ldl} -lc}"
+ 
+-#ifndef CROSS_DIRECTORY_STRUCTURE
+-#undef MD_EXEC_PREFIX
+-#define MD_EXEC_PREFIX "/usr/ccs/bin/"
+-#endif
+-
+ /* Enable constructor priorities if the configured linker supports it.  */
+ #undef SUPPORTS_INIT_PRIORITY
+ #define SUPPORTS_INIT_PRIORITY HAVE_INITFINI_ARRAY_SUPPORT
