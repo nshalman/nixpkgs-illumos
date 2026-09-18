@@ -2,7 +2,7 @@
 #
 # The userland block is the illumos-recipe-v2 bootstrap closure (pkgs/stdenv/illumos-recipe/bootstrap-files/
 # x86_64-illumos-paths.nix on that branch), minus its gcc. The toolchain block is this repo's packages as built
-# with that tree:  nix-build -I nixpkgs=<illumos-recipe-v2> -A illumos-sysroot -A illumos-ld -A gcc-illumos
+# with that tree:  nix-build -I nixpkgs=<illumos-recipe-v2> -A illumos-libc -A illumos-ld -A gcc-illumos
 {
   bash                   = builtins.storePath /nix/store/lrw8qramw7p54d7d3li5d08lqsppgl6q-bash-interactive-5.3p3;
   coreutils              = builtins.storePath /nix/store/sxy1z9ckdh7vcq1ppxmjpb7ynfbg4shq-coreutils-9.8;
@@ -34,6 +34,7 @@
   perl                   = builtins.storePath /nix/store/gasv6lvsai98i7gp16qn35aapzsf6mr5-perl-5.40.0;
 
   illumos-sysroot        = builtins.storePath /nix/store/gns4wck6hc3dd73v6ah6ig3ih1rnfhv8-illumos-sysroot-20210501-e0b4275f34-v0;
+  illumos-libc           = builtins.storePath /nix/store/xkpwpb00l5q6pjnvinc11ab9prplmm0c-illumos-libc-20210501-e0b4275f34-v0;
   illumos-ld             = builtins.storePath /nix/store/v1p0cfrwp6c3cvnnnbsinqwswb3b8jfy-illumos-ld-0-unstable-2026-09-18;
   gcc-illumos = {
     out = builtins.storePath /nix/store/mnwdr2cgka37afs1qdr6b1lq62nnll7r-gcc-illumos-14.2.0-il-1;

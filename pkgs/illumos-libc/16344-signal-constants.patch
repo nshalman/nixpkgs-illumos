@@ -1,0 +1,85 @@
+From 306990466301759c88d84c51c57b57ca930a3635
+From: Richard Lowe <richlowe@richlowe.net>
+Date: 2024-03-06
+Subject: 16344 -Wstrict-prototypes warnings about SIG_DFL, SIG_ERR, SIG_IGN and SIG_HOLD signal constants Reviewed by: Bill Sommerfeld <sommerfeld@hamachi.org> Reviewed by: Toomas Soome <tsoome@me.com
+
+Header hunks of illumos-gate commit 3069904663, paths rewritten from usr/src/{uts/common,head} to usr/include.
+
+diff --git a/usr/include/sys/iso/signal_iso.h b/usr/include/sys/iso/signal_iso.h
+index bf89ef0d33..ce4ee8c163 100644
+--- a/usr/include/sys/iso/signal_iso.h
++++ b/usr/include/sys/iso/signal_iso.h
+@@ -36,7 +36,7 @@
+  * C Standard must be placed in this header.  If these new identifiers
+  * are required to also be in the C++ Standard "std" namespace, then for
+  * anything other than macro definitions, corresponding "using" directives
+- * must also be added to <sys/signal.h.h>.
++ * must also be added to <sys/signal.h>.
+  */
+ 
+ #ifndef _SYS_SIGNAL_ISO_H
+@@ -113,17 +113,17 @@ typedef	SIG_FUNC_TYP *SIG_TYP;
+ 
+ #elif	defined(__lint)
+ 
+-#define	SIG_DFL	(void(*)())0
+-#define	SIG_ERR (void(*)())0
+-#define	SIG_IGN	(void (*)())0
+-#define	SIG_HOLD (void(*)())0
++#define	SIG_DFL	(void(*)(int))0
++#define	SIG_ERR (void(*)(int))0
++#define	SIG_IGN	(void(*)(int))0
++#define	SIG_HOLD (void(*)(int))0
+ 
+ #else
+ 
+-#define	SIG_DFL	(void(*)())0
+-#define	SIG_ERR	(void(*)())-1
+-#define	SIG_IGN	(void (*)())1
+-#define	SIG_HOLD (void(*)())2
++#define	SIG_DFL	(void(*)(int))0
++#define	SIG_ERR	(void(*)(int))-1
++#define	SIG_IGN	(void(*)(int))1
++#define	SIG_HOLD (void(*)(int))2
+ 
+ #endif
+ 
+diff --git a/usr/include/sys/signal.h b/usr/include/sys/signal.h
+index aece147bec..34b98cc2e9 100644
+--- a/usr/include/sys/signal.h
++++ b/usr/include/sys/signal.h
+@@ -72,14 +72,14 @@ typedef	struct {
+ } k_sigset_t;
+ 
+ /*
+- * The signal handler routine can have either one or three arguments.
+- * Existing C code has used either form so not specifing the arguments
+- * neatly finesses the problem.  C++ doesn't accept this.  To C++
+- * "(*sa_handler)()" indicates a routine with no arguments (ANSI C would
+- * specify this as "(*sa_handler)(void)").  One or the other form must be
+- * used for C++ and the only logical choice is "(*sa_handler)(int)" to allow
+- * the SIG_* defines to work.  "(*sa_sigaction)(int, siginfo_t *, void *)"
+- * can be used for the three argument form.
++ * The signal handler routine can have either one or three arguments.  With
++ * K&R C code could use either form so not specifing the arguments neatly
++ * finessed the problem.  Modern C and any C++ do not accept this.  To them
++ * "(*sa_handler)()" indicates a routine with no arguments (what used to be
++ * "(*sa_handler)(void)").  One or the other form must be used and the only
++ * logical choice is "(*sa_handler)(int)" to allow the SIG_* defines to work.
++ * "(*sa_sigaction)(int, siginfo_t *, void *)" can be used for the three
++ * argument form.
+  */
+ 
+ /*
+@@ -88,11 +88,7 @@ typedef	struct {
+ struct sigaction {
+ 	int sa_flags;
+ 	union {
+-#ifdef	__cplusplus
+ 		void (*_handler)(int);
+-#else
+-		void (*_handler)();
+-#endif
+ #if defined(__EXTENSIONS__) || defined(_KERNEL) || \
+ 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
+ 	(_POSIX_C_SOURCE > 2) || defined(_XPG4_2)

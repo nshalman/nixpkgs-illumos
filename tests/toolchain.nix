@@ -32,6 +32,23 @@ pkgs.stdenv.mkDerivation {
       return 1;
     }
     CXX
+    cat > sig.c <<'C'
+    #include <signal.h>
+    #include <string.h>
+    static void handler(int s) { (void)s; }
+    int main(void) {
+      struct sigaction sa;
+      memset(&sa, 0, sizeof sa);
+      sa.sa_handler = handler;
+      if (sigaction(SIGUSR1, &sa, 0)) return 1;
+      sa.sa_handler = SIG_IGN;
+      if (sigaction(SIGUSR2, &sa, 0)) return 2;
+      return signal(SIGPIPE, SIG_DFL) == SIG_ERR;
+    }
+    C
+    # Both dialects: autoconf 2.73 configure scripts pick gnu23 by themselves.
+    $CC -std=gnu17 sig.c -o sig-gnu17 2> sig17.err || { cat sig17.err; exit 1; }
+    $CC -std=gnu23 sig.c -o sig-gnu23 2> sig23.err || { cat sig23.err; exit 1; }
     $CC hello.c -o hello-c 2> c.err || { cat c.err; exit 1; }
     $CXX hello.cc -o hello-cxx 2> cxx.err || { cat cxx.err; exit 1; }
   '';
@@ -44,6 +61,7 @@ pkgs.stdenv.mkDerivation {
     check "C++ compiles and links silently" '[ ! -s cxx.err ]'; cat cxx.err
     check "C runs" './hello-c | grep -q "hello from C"'
     check "C++ throw/catch runs" './hello-cxx | grep -q "throw and catch"'
+    check "signal handlers and SIG_ constants work under gnu17 and gnu23" './sig-gnu17 && ./sig-gnu23 && [ ! -s sig17.err ] && [ ! -s sig23.err ]'
     # The link-editor stamps its revision into .comment. It must be the stdenv's ld, reached through the wrappers,
     # and not one the compiler driver found on the build host.
     # `ld -V` prints its revision and then fails for want of input files.
@@ -54,7 +72,7 @@ pkgs.stdenv.mkDerivation {
       echo "--- $p"; /usr/bin/elfdump -d $p | /usr/bin/egrep 'NEEDED|RUNPATH'; /usr/bin/pvs -r $p | sed 's/^/    /'
       check "$p: interpreter is the system runtime linker" '/usr/bin/elfdump -i $p | grep -q "/usr/lib/amd64/ld.so.1"'
       check "$p: linked by the stdenv's ld ($ldrev)" '/usr/bin/mcs -p $p | grep -q "$ldrev"'
-      check "$p: no sysroot in RUNPATH" '! /usr/bin/elfdump -d $p | /usr/bin/egrep "RUNPATH|RPATH" | grep -q illumos-sysroot'
+      check "$p: no sysroot or libc directory in RUNPATH" '! /usr/bin/elfdump -d $p | /usr/bin/egrep "RUNPATH|RPATH" | /usr/bin/egrep -q "illumos-(sysroot|libc)"'
       check "$p: no libc interface above ILLUMOS_0.${toString floor}" \
         '! /usr/bin/pvs -r $p | /usr/bin/egrep -o "ILLUMOS_0\.[0-9]+" | awk -F. "\$2 > ${toString floor}" | grep -q .'
       check "$p: libc resolves to the running system" '/usr/bin/ldd $p | grep "libc\.so\.1" | grep -q "=>[[:space:]]*/lib/"'

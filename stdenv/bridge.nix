@@ -60,12 +60,12 @@ let
     extraAttrs.isGNU = true;
   };
 
-  # The libc is the sysroot. It is only linked against: its runtime linker is the host's, so the ld wrapper keeps
-  # it out of RUNPATH.
+  # The libc is the sysroot with header backports (pkgs/illumos-libc). It is only linked against: its runtime
+  # linker is the host's, so the ld wrapper keeps it out of RUNPATH.
   libc = mkStoreDrv {
-    pname = "illumos-sysroot";
+    pname = "illumos-libc";
     version = "20210501";
-    outPath = paths.illumos-sysroot;
+    outPath = paths.illumos-libc;
     extraAttrs = {
       incdir = "/usr/include";
       libdir = "/usr/lib/amd64";
