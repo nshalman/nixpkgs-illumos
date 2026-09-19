@@ -1,4 +1,4 @@
-# BRIDGE stdenv for x86_64-solaris on the illumos-26.05 nixpkgs branch. Not a bootstrap: every input is a store
+# BRIDGE stdenv for x86_64-solaris on the illumos-26.05 nixpkgs branch. Not a bootstrap: every input of stage 0 is a store
 # path that already exists on the builder, named in ./bridge-paths.nix.
 #
 #   - userland (bash, coreutils, make, ...): the illumos-recipe-v2 bootstrap closure, built against the HOST libc;
@@ -214,4 +214,104 @@ in
         overrides = self: super: { inherit (prevStage) fetchurl; };
       };
   })
+
+  # Stage 2 (final). Stage 1's packages are built by the first-generation tools and some bake a tool path in:
+  # bison's and curl's scripts name the stdenv shell, gnum4 a shell, perl coreutils. That drags the old,
+  # host-linked closure into anything depending on them (tests/audit-closure.sh shows it). So build the final
+  # set with a stdenv made of stage 1's own tools, and re-wrap the toolchain with them.
+  #
+  # The basic tools below came out of stage 1 without any reference to the first generation, so the final set
+  # reuses them instead of building a third copy.
+  (
+    prevStage:
+    let
+      cleanTools = {
+        inherit (prevStage)
+          bash
+          bashNonInteractive
+          coreutils
+          findutils
+          gnutar
+          gnused
+          gnugrep
+          gawk
+          gnumake
+          diffutils
+          patch
+          xz
+          gzip
+          bzip2
+          ;
+      };
+      cleanShell = "${prevStage.bashNonInteractive}/bin/bash";
+
+      cleanBintoolsUnwrapped = prevStage.stdenvNoCC.mkDerivation {
+        pname = "illumos-bintools";
+        version = prevStage.binutils-unwrapped.version;
+        dontUnpack = true;
+        dontFixup = true;
+        # Everything but ld is GNU binutils; the wrapper only wraps `strip` for bintools that say so.
+        passthru.isGNU = true;
+        installPhase = ''
+          mkdir -p $out/bin
+          for f in ${prevStage.binutils-unwrapped}/bin/*; do
+            case "''${f##*/}" in
+              ld | ld.*) ;;
+              *) ln -s "$f" $out/bin/ ;;
+            esac
+          done
+          ln -s ${paths.illumos-ld}/bin/ld $out/bin/ld
+        '';
+      };
+
+      cleanBintools = prevStage.wrapBintoolsWith {
+        bintools = cleanBintoolsUnwrapped;
+        inherit libc;
+        nativeTools = false;
+        nativeLibc = false;
+      };
+
+      cleanCC = prevStage.wrapCCWith {
+        cc = gcc;
+        bintools = cleanBintools;
+        inherit libc;
+        nativeTools = false;
+        nativeLibc = false;
+        isGNU = true;
+      };
+    in
+    {
+      inherit config overlays;
+      stdenv =
+        import (pkgsPath + "/pkgs/stdenv/generic") {
+          name = "illumos-bridge-stdenv-final";
+          buildPlatform = localSystem;
+          hostPlatform = localSystem;
+          targetPlatform = localSystem;
+          inherit preHook config;
+          shell = cleanShell;
+          cc = cleanCC;
+          initialPath = with cleanTools; [
+            bash
+            coreutils
+            findutils
+            gnutar
+            gnused
+            gnugrep
+            gawk
+            gnumake
+            diffutils
+            patch
+            xz.bin
+            gzip
+            bzip2.bin
+          ];
+          fetchurlBoot = prevStage.fetchurl;
+          overrides = self: super: cleanTools // { inherit (prevStage) fetchurl; };
+        }
+        // {
+          inherit (prevStage) fetchurl;
+        };
+    }
+  )
 ]
