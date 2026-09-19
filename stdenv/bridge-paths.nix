@@ -37,7 +37,7 @@
   illumos-libc           = builtins.storePath /nix/store/cail5r0f1vw57kvn3j1spgq53459qxf1-illumos-libc-20210501-e0b4275f34-v0;
   illumos-ld             = builtins.storePath /nix/store/v1p0cfrwp6c3cvnnnbsinqwswb3b8jfy-illumos-ld-0-unstable-2026-09-18;
   gcc-illumos = {
-    out = builtins.storePath /nix/store/mnwdr2cgka37afs1qdr6b1lq62nnll7r-gcc-illumos-14.2.0-il-1;
-    lib = builtins.storePath /nix/store/285qr0g33b5hrmfajyh1dkkxycmd0bda-gcc-illumos-14.2.0-il-1-lib;
+    out = builtins.storePath /nix/store/xdhjqza47igfjwyrj13g29p73b1nk0an-gcc-illumos-14.2.0-il-1;
+    lib = builtins.storePath /nix/store/db8wnsr5c68pdlbjppfsn3hgx9x6dynn-gcc-illumos-14.2.0-il-1-lib;
   };
 }

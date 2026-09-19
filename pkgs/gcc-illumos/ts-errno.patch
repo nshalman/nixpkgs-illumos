@@ -1,0 +1,23 @@
+Always request the thread-safe errno.
+
+illumos <errno.h> gives a translation unit the thread-safe errno only under
+_REENTRANT, _TS_ERRNO or _POSIX_C_SOURCE >= 199506L, and this spec defines
+_REENTRANT only for -pthread. Everything else gets libc's global `errno`
+object, which is also where the main thread's errno lives, so a library built
+without -pthread overwrites the main thread's errno from whichever thread it
+runs on. _TS_ERRNO changes errno and nothing else.
+
+The nixpkgs cc-wrapper passes -D_TS_ERRNO too; this covers the unwrapped
+compiler and gcc's own target libraries (libquadmath imported plain errno).
+
+--- a/gcc/config/sol2.h
++++ b/gcc/config/sol2.h
+@@ -77,7 +77,7 @@
+ 
+ #undef CPP_SUBTARGET_SPEC
+ #define CPP_SUBTARGET_SPEC "\
+-%{pthreads|pthread:-D_REENTRANT -D_PTHREADS}"
++-D_TS_ERRNO %{pthreads|pthread:-D_REENTRANT -D_PTHREADS}"
+ 
+ /* Names to predefine in the preprocessor for this target machine.  */
+ #define TARGET_SUB_OS_CPP_BUILTINS()

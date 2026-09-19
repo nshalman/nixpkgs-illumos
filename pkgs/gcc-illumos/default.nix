@@ -10,6 +10,11 @@
 # So both the compiler (stages 2 and 3 are built by gcc itself) and its output need nothing newer than the
 # sysroot's libc.
 #
+# The sysroot is illumos-libc, the published sysroot plus header backports, not the pristine one. fixincludes keeps
+# its own copy of several headers (sys/feature_tests.h among them) and that copy is found before the sysroot's, so
+# a gcc configured against the pristine sysroot hides header fixes made later. The price: a backport that touches
+# a header fixincludes copies needs a gcc rebuild. Others do not, because the cc-wrapper passes --sysroot itself.
+#
 # No --with-ld: gcc looks `ld` up at run time, through -B and PATH, so the nixpkgs bintools wrapper can stand
 # in front of the link-editor. configure still has to know it is the Solaris one, hence LD_FOR_TARGET.
 {
@@ -21,7 +26,7 @@
   gnum4,
   perl,
   binutils-unwrapped,
-  illumos-sysroot,
+  illumos-libc,
   illumos-ld,
   # Cap on `make -j`; 0 means NIX_BUILD_CORES. The stage 3 links of cc1, cc1plus and lto1 run together and each
   # holds several GB.
@@ -70,6 +75,7 @@ stdenv.mkDerivation rec {
     ./ld-flags.patch
     ./madvise-decl.patch
     ./no-ccs-exec-prefix.patch
+    ./ts-errno.patch
   ];
 
   # GCC's build sets its own flags for each stage; the wrapper's would only reach stage 1.
@@ -108,7 +114,7 @@ stdenv.mkDerivation rec {
 
     # The runtime libraries are compiled with -g, and the debug information would name the sysroot's include
     # directories. That is the only thing tying $lib, and so every C++ program's closure, to the sysroot.
-    targetFlags="-g -O2 -ffile-prefix-map=${illumos-sysroot}=/illumos-sysroot"
+    targetFlags="-g -O2 -ffile-prefix-map=${illumos-libc}=/illumos-libc"
 
     mkdir ../build && cd ../build
     LD_FOR_TARGET=${illumos-ld}/bin/ld \
@@ -116,7 +122,7 @@ stdenv.mkDerivation rec {
       --prefix="$out" \
       --enable-bootstrap \
       --build=${target} --host=${target} --target=${target} \
-      --with-sysroot=${illumos-sysroot} \
+      --with-sysroot=${illumos-libc} \
       --without-gnu-ld \
       --with-gnu-as --with-as=${binutils-unwrapped}/bin/as \
       --enable-languages=c,c++ \
@@ -140,16 +146,6 @@ stdenv.mkDerivation rec {
   installPhase = ''
     runHook preInstall
     make install
-
-    # What fixincludes would do if it knew about it. The 2021 <sys/signal.h> declares sa_handler for C as
-    # `void (*)()`, which C23 reads as "no arguments". gcc 14 rejects assigning a `void (*)(int)` handler to it,
-    # and autoconf 2.73 configure scripts select -std=gnu23 on their own. illumos made the same one-line change
-    # later; it is the only such declaration in the userland headers that differs from a current system.
-    fixed=$(echo "$out"/lib/gcc/${target}/*/include-fixed)
-    mkdir -p "$fixed/sys"
-    sed 's/void (\*_handler)();/void (*_handler)(int);/' ${illumos-sysroot}/usr/include/sys/signal.h > "$fixed/sys/signal.h"
-    ! grep -q '(\*_handler)();' "$fixed/sys/signal.h"
-    ! cmp -s ${illumos-sysroot}/usr/include/sys/signal.h "$fixed/sys/signal.h"
 
     rm "$lib/lib/amd64"
     mv "$out/lib/amd64" "$lib/lib/amd64"
@@ -175,7 +171,7 @@ stdenv.mkDerivation rec {
   passthru = {
     inherit target;
     isGNU = true;
-    sysroot = illumos-sysroot;
+    sysroot = illumos-libc;
   };
 
   meta = {
