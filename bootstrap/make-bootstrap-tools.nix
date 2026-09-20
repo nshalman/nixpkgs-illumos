@@ -11,11 +11,15 @@
 {
   nixpkgs ? <nixpkgs>,
   paths ? import ../stdenv/bridge-paths-gen2.nix,
+
+  # What to pack. By default the bridge's package set with the toolchain the bridge ran on. For a release made by
+  # pkgs/stdenv/illumos pass its package set, `import ../illumos.nix { ... }`; the toolchain is then its own.
+  pkgs ? (import ./default.nix { inherit nixpkgs paths; }).pkgs,
+  toolchain ?
+    if pkgs ? gcc-illumos then { inherit (pkgs) illumos-libc illumos-ld gcc-illumos; } else paths,
 }:
 
 let
-  bootstrap = import ./default.nix { inherit nixpkgs paths; };
-  inherit (bootstrap) pkgs;
   inherit (pkgs) lib runCommand;
 
   pack-all =
@@ -29,7 +33,7 @@ let
             r
           ]) roots
         );
-        linkOnly = "${paths.illumos-libc}";
+        linkOnly = "${toolchain.illumos-libc}";
       }
       ''
         base=$PWD/root
@@ -109,18 +113,19 @@ rec {
         rm -rf include lib/*.a lib/bash lib/pkgconfig share libexec
       '';
 
-  # The toolchain is the one the bridge ran on (`paths`), not one built by it: the userland is linked against that
-  # gcc's runtime libraries, and a release must ship the libraries its programs were linked against.
+  # From the bridge the toolchain is the one the bridge ran on (`paths`), not one built by it: the userland is
+  # linked against that gcc's runtime libraries, and a release must ship the libraries its programs were linked
+  # against.
   bootstrap-tools =
     tar-all "bootstrap-tools.tar.xz"
       (
         # Order matters, see pack-all: the userland last.
         [
-          paths.illumos-ld
-          paths.gcc-illumos.out
-          paths.gcc-illumos.lib
+          toolchain.illumos-ld
+          toolchain.gcc-illumos.out
+          toolchain.gcc-illumos.lib
         ]
-        ++ bootstrap.userland
+        ++ import ./userland.nix pkgs
       )
       # binutils brings GNU ld; the link-editor of this platform is illumos-ld, put back below. Some scripts name the
       # interactive bash, which brings its own bin/bash; the stdenv shell is the non-interactive one, also put back.
@@ -134,7 +139,7 @@ rec {
         # prefix, put GNU ld there. No ld at all may be left there: the cc-wrapper relies on gcc finding `ld` on
         # PATH, which is where the ld wrapper is. An ld in the tool directory gets the wrapper's flags unwrapped.
         rm -f bin/ld bin/ld.bfd bin/ld.gold */bin/ld */bin/ld.bfd */bin/ld.gold
-        cp -a ${paths.illumos-ld}/bin/ld bin/ld
+        cp -a ${toolchain.illumos-ld}/bin/ld bin/ld
         [ -e x86_64-pc-solaris2.11/bin/as ] || { echo "gcc's tool directory is not where expected"; exit 1; }
 
         rm -f bin/bash
