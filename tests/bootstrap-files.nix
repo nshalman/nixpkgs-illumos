@@ -51,8 +51,8 @@ derivation {
       for b in $archive/bin/*; do
         [ -f "$b" ] && [ -x "$b" ] || continue
         n=$((n + 1))
-        out=$( ( "$b" --version < /dev/null || "$b" --help < /dev/null ) 2>&1 | head -3 )
-        case "$out" in *ld.so.1:*|*"Exec format"*|*"cannot execute"*|*"bad interpreter"*|*"env: "*) bad="$bad ''${b##*/}" ;; esac
+        msg=$( ( "$b" --version < /dev/null || "$b" --help < /dev/null ) 2>&1 | head -3 )
+        case "$msg" in *ld.so.1:*|*"Exec format"*|*"cannot execute"*|*"bad interpreter"*|*"env: "*) bad="$bad ''${b##*/}" ;; esac
       done
       check "all $n programs in bin/ start (failed:$bad)" '[ -z "$bad" ]'
 

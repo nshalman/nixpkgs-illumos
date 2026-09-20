@@ -34,21 +34,44 @@ let
       ''
         base=$PWD/root
         mkdir $base
-        for f in $(cat graph-* | grep '^/nix/store/' | sort -u); do
-          [ "$f" = "$linkOnly" ] && continue
-          # Two closures putting different files at the same place would make the result depend on copy order.
-          (cd $f && find . \( -type f -o -type l \) ! -path './nix-support/*') | while read -r p; do
-            if [ -e "$base/$p" ] || [ -L "$base/$p" ]; then
-              cmp -s "$f/$p" "$base/$p" || echo "$p ($f)" >> $NIX_BUILD_TOP/collisions
-            fi
+
+        # Closures in the order of `roots`, so that a later root's files win. Put the userland last: gcc's closure
+        # holds the builds of bash, sed, binutils, ... it was built with, the userland holds the current ones.
+        : > order
+        for g in $(ls graph-* | sort -t- -k2 -n); do
+          grep '^/nix/store/' $g | sort -u | while read -r f; do
+            grep -qxF "$f" order || echo "$f" >> order
           done
-          cp -a $f/. $base/
-          chmod -R u+w $base
         done
-        if [ -s $NIX_BUILD_TOP/collisions ]; then
-          grep -vE "^(${lib.concatStringsSep "|" allowedCollisions}) " $NIX_BUILD_TOP/collisions > $NIX_BUILD_TOP/bad || true
-          if [ -s $NIX_BUILD_TOP/bad ]; then echo "colliding files:"; cat $NIX_BUILD_TOP/bad; exit 1; fi
-        fi
+
+        # Two store paths of different names putting different files at the same place is a packaging error,
+        # unless listed in allowedCollisions. Same name means two builds of one package; the later wins.
+        : > files
+        grep -vxF "$linkOnly" order | while read -r f; do
+          name=''${f#/nix/store/*-}
+          (cd $f && find . \( -type f -o -type l \) ! -path './nix-support/*') | sed "s|\$|\t$name\t$f|" >> files
+        done
+        awk -F'\t' '{ if (($1 in n) && n[$1] != $2) print $1 "\t" p[$1] "\t" $3; n[$1] = $2; p[$1] = $3 }' files > candidates
+        : > bad
+        while IFS="$(printf '\t')" read -r p one two; do
+          # A symlink to the same place in another store path stands for the file the merge provides anyway.
+          for x in "$one" "$two"; do
+            if [ -L "$x/$p" ]; then case "$(readlink "$x/$p")" in /nix/store/*/"''${p#./}") continue 2 ;; esac; fi
+          done
+          cmp -s "$one/$p" "$two/$p" || echo "$p ($one, $two)" >> bad
+        done < candidates
+        grep -vE "^(${lib.concatStringsSep "|" allowedCollisions}) " bad > bad.unexpected || true
+        if [ -s bad.unexpected ]; then echo "colliding files:"; cat bad.unexpected; exit 1; fi
+
+        grep -vxF "$linkOnly" order | while read -r f; do
+          (cd $f && find . \( -type f -o -type l \) ! -path './nix-support/*') | while read -r p; do
+            if [ -L "$f/$p" ]; then case "$(readlink "$f/$p")" in /nix/store/*/"''${p#./}") continue ;; esac; fi
+            mkdir -p "$base/$(dirname "$p")"
+            rm -f "$base/$p"
+            cp -a "$f/$p" "$base/$p"
+          done
+        done
+        chmod -R u+w $base
         cd $base
         rm -rf nix-support
 
@@ -91,15 +114,21 @@ rec {
   bootstrap-tools =
     tar-all "bootstrap-tools.tar.xz"
       (
-        bootstrap.userland
-        ++ [
+        # Order matters, see pack-all: the userland last.
+        [
           paths.illumos-ld
           paths.gcc-illumos.out
           paths.gcc-illumos.lib
         ]
+        ++ bootstrap.userland
       )
-      # binutils brings GNU ld; the link-editor of this platform is illumos-ld, put back below.
-      [ "\\./bin/ld" ]
+      # binutils brings GNU ld; the link-editor of this platform is illumos-ld, put back below. Some scripts name the
+      # interactive bash, which brings its own bin/bash; the stdenv shell is the non-interactive one, also put back.
+      [
+        "\\./bin/ld"
+        "\\./bin/bash"
+        "\\./bin/sh"
+      ]
       ''
         # gcc looks for its tools in PREFIX/x86_64-pc-solaris2.11/bin before PATH, and binutils, now in the same
         # prefix, put GNU ld there.
@@ -107,6 +136,9 @@ rec {
         cp -a ${paths.illumos-ld}/bin/ld bin/ld
         for d in */bin; do [ -e "$d/as" ] && ln -s ../../bin/ld "$d/ld"; done
         [ "$(readlink x86_64-pc-solaris2.11/bin/ld)" = ../../bin/ld ] || { echo "gcc's tool directory is not where expected"; exit 1; }
+
+        rm -f bin/bash
+        cp -a ${pkgs.bashNonInteractive}/bin/bash bin/bash
 
         # gettext's spit is a python script.
         rm -f bin/spit
