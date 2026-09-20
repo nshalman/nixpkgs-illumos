@@ -1,4 +1,4 @@
-# Build sgsmsg (a build tool), libconv.a, liblddbg.so.4, libld.so.4 and ld.
+# Build sgsmsg (a build tool), libconv.a, liblddbg.so.4, libelf.so.1, libld.so.4 and ld.
 # Expects: $src (illumos-gate), $sysroot, $CC, NIX_BUILD_CORES. Mirrors usr/src/cmd/sgs/*/Makefile.com.
 set -eu
 SRC=$src/usr/src; SGS=$SRC/cmd/sgs
@@ -77,6 +77,26 @@ settle liblddbg
 $cc -shared -o "$OUT/lib/liblddbg.so.4" -Wl,-h,liblddbg.so.4 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
   *.o -L"$W/libconv" -lconv -lc $LINK
 ln -s liblddbg.so.4 "$OUT/lib/liblddbg.so"
+
+# libelf, 64-bit only. libld binds private libelf interfaces (_elf_*), which gate may change together with libld,
+# so ld gets the libelf of its own commit instead of whatever the running system has.
+mkdir -p "$W/libelf" && cd "$W/libelf"
+C=$SGS/libelf/common
+$SGSMSG $IDENT -h msg.h -d msg.c -n libelf_msg $C/libelf.msg
+m4 < $C/xlate.m4 > xlate.c
+m4 < $C/xlate64.m4 > xlate64.c
+for b in ar begin cntl cook data end fill flag getarhdr getarsym getbase getdata getehdr getident getphdr getscn \
+         getshdr getphnum getshnum getshstrndx hash input kind ndxscn newdata newehdr newphdr newscn next \
+         nextscn output rand rawdata rawfile rawput strptr update error gelf clscook checksum; do
+  cc1 $b.o $C/$b.c -I$C
+done
+for b in clscook newehdr newphdr update checksum; do cc1 ${b}64.o $C/$b.c -I$C -D_ELF64; done
+for b in msg xlate xlate64; do cc1 $b.o $b.c -I$C; done
+cc1 nlist.o $SGS/libelf/misc/nlist.c -I$C -DELF
+settle libelf
+$cc -shared -o "$OUT/lib/libelf.so.1" -Wl,-h,libelf.so.1 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
+  *.o -L"$W/libconv" -lconv -lc $LINK
+ln -s libelf.so.1 "$OUT/lib/libelf.so"
 
 mkdir -p "$W/libld" && cd "$W/libld"
 C=$SGS/libld/common
