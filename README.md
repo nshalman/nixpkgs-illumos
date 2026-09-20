@@ -81,9 +81,9 @@ Known costs of the 2021 floor:
   has needed it.
 - `SO_REUSEPORT` does not exist at the floor, so e.g. nghttp2's applications are not built.
 
-Known host dependencies of the output: the illumos libraries listed by the audit (libc, libm, libsocket, libnsl,
-... and, through gettext's link flags, libuutil, libavl, libidmap, libsec, libnvpair, which are not public
-interfaces); `/usr/xpg4/bin/sh` in xz's scripts.
+Known host dependencies of the output: the illumos libraries its objects name in NEEDED entries, all with public
+symbol versions (libc, libm, libsocket, libnsl, libdl, libpthread, libsec, librt, libresolv, libnvpair), and
+whatever those need on the running system; `/usr/xpg4/bin/sh` in xz's scripts.
 
 Verified so far, on one SmartOS host only: both `bootstrap` attributes build and their closures pass the audit;
 `tests/toolchain.nix` and `tests/fixup.nix` pass; the second-generation gcc passes the 22 compiler checks used for
