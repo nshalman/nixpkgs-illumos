@@ -38,11 +38,13 @@ stdenvNoCC.mkDerivation {
   # Parts of the sysroot that are not "the platform" for our purposes: nixpkgs has its own implementation with a
   # different API, and a configure script that finds these uses them without the package having declared
   # anything. Seen: gettext linked the system libcurses, and texinfo then failed against its SVR4 <curses.h>
-  # (tputs takes an `int (*)(char)`). Packages that want curses get ncurses from nixpkgs. usr/xpg4 is left alone:
+  # (tputs takes an `int (*)(char)`); so did its <termcap.h>, found without any library to go with it. Packages that
+  # want curses get ncurses from nixpkgs. usr/xpg4 is left alone:
   # nothing searches it by default.
   prune = [
     "usr/include/curses.h"
     "usr/include/term.h"
+    "usr/include/termcap.h"
     "usr/include/unctrl.h"
     "lib/libcurses.so"
     "lib/libtermcap.so"
