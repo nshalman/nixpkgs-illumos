@@ -88,6 +88,14 @@ let
 
   shell = "${paths.bash}/bin/bash";
 
+  # nixpkgs' fixup phase expects patchelf in the stdenv, as on Linux and FreeBSD: its setup hook shrinks RUNPATHs,
+  # and audit-tmpdir.sh uses it to refuse a build directory in a RUNPATH. That check fails open without it.
+  patchelf = mkStoreDrv {
+    pname = "patchelf";
+    version = "0.15.2";
+    outPath = paths.patchelf;
+  };
+
   initialPath = with paths; [
     bash
     coreutils
@@ -126,6 +134,7 @@ let
         cc
         config
         ;
+      extraNativeBuildInputs = [ patchelf ];
       fetchurlBoot = fetchurl;
     };
 in
@@ -306,8 +315,9 @@ in
             gzip
             bzip2.bin
           ];
+          extraNativeBuildInputs = [ prevStage.patchelf ];
           fetchurlBoot = prevStage.fetchurl;
-          overrides = self: super: cleanTools // { inherit (prevStage) fetchurl; };
+          overrides = self: super: cleanTools // { inherit (prevStage) fetchurl patchelf; };
         }
         // {
           inherit (prevStage) fetchurl;
