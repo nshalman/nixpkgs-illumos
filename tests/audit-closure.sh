@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Audit the runtime closure of one or more store paths on an illumos host.
 #
-#   tests/audit-closure.sh [-f FLOOR] [-o OLD-PATHS-FILE] STORE-PATH...
+#   tests/audit-closure.sh [-f FLOOR] [-o OLD-PATHS-FILE] [-x LINK-ONLY-REGEX] STORE-PATH...
 #
 # For every ELF object in the closure:
 #   floor     no libc interface newer than ILLUMOS_0.FLOOR (default 38, the 2021 sysroot)
@@ -21,19 +21,23 @@
 #   platform  report which libraries are resolved from outside the store. Not a failure: these are the illumos
 #             libraries the closure expects every host to have.
 #
+# -x names store paths whose ELF objects are not examined because nothing loads them: the link-only libc, which is the
+# 2021 sysroot's own libraries. The runpath check is what guarantees they are never loaded.
+#
 # Uses the host's elfdump/pvs/ldd, so it runs outside Nix. NIX_STORE_CMD overrides `nix-store`.
 set -u
-floor=38; old=
-while getopts f:o: c; do case $c in f) floor=$OPTARG ;; o) old=$OPTARG ;; *) exit 2 ;; esac; done
-shift $((OPTIND - 1)); [ $# -gt 0 ] || { echo "usage: $0 [-f floor] [-o old-paths] store-path..." >&2; exit 2; }
+floor=38; old=; linkonly=
+while getopts f:o:x: c; do case $c in f) floor=$OPTARG ;; o) old=$OPTARG ;; x) linkonly=$OPTARG ;; *) exit 2 ;; esac; done
+shift $((OPTIND - 1)); [ $# -gt 0 ] || { echo "usage: $0 [-f floor] [-o old-paths] [-x link-only-regex] store-path..." >&2; exit 2; }
 NS=${NIX_STORE_CMD:-nix-store}; E=/usr/bin/egrep
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 $NS -qR "$@" | sort -u > $tmp/closure
 echo "closure: $(wc -l < $tmp/closure | tr -d ' ') store paths"
+if [ -n "$linkonly" ]; then $E -v -- "$linkonly" $tmp/closure > $tmp/examined; echo "link-only, not examined: $($E -c -- "$linkonly" $tmp/closure) store path(s) matching $linkonly"; else cp $tmp/closure $tmp/examined; fi
 : > $tmp/floor; : > $tmp/runpath; : > $tmp/interp; : > $tmp/errno; : > $tmp/needed; : > $tmp/resolve; : > $tmp/outside; : > $tmp/platform; n=0
 while read -r p; do
   find "$p" -type f \( -perm -u+x -o -name '*.so' -o -name '*.so.*' \) 2>/dev/null
-done < $tmp/closure | while read -r f; do
+done < $tmp/examined | while read -r f; do
   [ "$(head -c 4 "$f" 2>/dev/null | od -An -c | tr -d ' ')" = '177ELF' ] || continue
   echo "$f" >> $tmp/elf
   v=$(/usr/bin/pvs -r "$f" 2>/dev/null | $E -o 'ILLUMOS_0\.[0-9]+' | awk -F. '{print $2}' | sort -n | tail -1)
