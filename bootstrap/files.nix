@@ -11,6 +11,6 @@
   };
   bootstrapTools = import <nix/fetchurl.nix> {
     url = "${baseUrl}/bootstrap-tools.tar.xz";
-    hash = "sha256:6ced54a00afc9804100aa9fa64392ac3d0e3042e8de9a0ccee413b85caf7b17d";
+    hash = "sha256:82dc6fb913fdc90c06b73746657a2a9a763f0c4eda2ceee155060c26c8122a89";
   };
 }

@@ -131,11 +131,11 @@ rec {
       ]
       ''
         # gcc looks for its tools in PREFIX/x86_64-pc-solaris2.11/bin before PATH, and binutils, now in the same
-        # prefix, put GNU ld there.
+        # prefix, put GNU ld there. No ld at all may be left there: the cc-wrapper relies on gcc finding `ld` on
+        # PATH, which is where the ld wrapper is. An ld in the tool directory gets the wrapper's flags unwrapped.
         rm -f bin/ld bin/ld.bfd bin/ld.gold */bin/ld */bin/ld.bfd */bin/ld.gold
         cp -a ${paths.illumos-ld}/bin/ld bin/ld
-        for d in */bin; do [ -e "$d/as" ] && ln -s ../../bin/ld "$d/ld"; done
-        [ "$(readlink x86_64-pc-solaris2.11/bin/ld)" = ../../bin/ld ] || { echo "gcc's tool directory is not where expected"; exit 1; }
+        [ -e x86_64-pc-solaris2.11/bin/as ] || { echo "gcc's tool directory is not where expected"; exit 1; }
 
         rm -f bin/bash
         cp -a ${pkgs.bashNonInteractive}/bin/bash bin/bash

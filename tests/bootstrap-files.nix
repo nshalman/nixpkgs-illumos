@@ -62,6 +62,10 @@ derivation {
       check "C program runs"             '[ "$(./h-c)" = "C ok" ]'
       check "g++ compiles and links C++" 'g++ --sysroot=$libc -o h-cxx h.cc'
       check "C++ program runs (libstdc++ found through the rewritten spec)" '[ "$(./h-cxx)" = "C++ ok" ]'
+      mkdir fake
+      printf '#!%s\necho called > %s/ld-called\nexec %s/bin/ld "$@"\n' $archive/bin/bash $PWD $archive > fake/ld
+      chmod +x fake/ld
+      check "gcc takes ld from PATH, where the stdenv puts the ld wrapper" 'PATH=$PWD/fake:$PATH gcc --sysroot=$libc -o h-c2 h.c && [ -e ld-called ]'
       check "the link-editor gcc runs is the illumos one" '$(gcc -print-prog-name=ld) -V 2>&1 | grep -q "Solaris Link Editors"'
       check "so is ld on PATH" 'ld -V 2>&1 | grep -q "Solaris Link Editors"'
 
