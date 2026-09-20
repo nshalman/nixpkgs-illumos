@@ -6,19 +6,20 @@
 # The list follows pkgs/stdenv/illumos-recipe/make-bootstrap-tools.nix on the illumos-recipe-v2 branch.
 {
   nixpkgs ? <nixpkgs>,
+  paths ? import ../stdenv/bridge-paths.nix,
 }:
 
 let
-  pkgs = import ../bridge.nix { inherit nixpkgs; };
+  pkgs = import ../bridge.nix { inherit nixpkgs paths; };
   # This repo's packages, built by the bridge stdenv instead of the illumos-recipe-v2 one.
   own = import ../pkgs { callPackage = pkgs.lib.callPackageWith (pkgs // own); };
 in
 rec {
-  inherit pkgs own;
+  inherit pkgs own paths;
 
   userland = with pkgs; [
     coreutils
-    bash
+    bashNonInteractive
     gnutar
     findutils
     gnumake
