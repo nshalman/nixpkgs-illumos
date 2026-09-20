@@ -10,6 +10,8 @@
   toolsUrl,
   toolsHash,
   illumos-libc,
+  # The unpack script under test is the stdenv's own.
+  nixpkgs,
 }:
 
 let
@@ -29,7 +31,7 @@ let
     # Short, because store paths inside binaries are replaced by this one padded to their length.
     name = "boot";
     builder = "${unpack}/bin/bash";
-    args = [ ../bootstrap/unpack-bootstrap-files.sh ];
+    args = [ (nixpkgs + "/pkgs/stdenv/illumos/unpack-bootstrap-files.sh") ];
     LD_LIBRARY_PATH_64 = "${unpack}/lib";
     src = unpack;
   };
@@ -62,6 +64,8 @@ derivation {
       check "C program runs"             '[ "$(./h-c)" = "C ok" ]'
       check "g++ compiles and links C++" 'g++ --sysroot=$libc -o h-cxx h.cc'
       check "C++ program runs (libstdc++ found through the rewritten spec)" '[ "$(./h-cxx)" = "C++ ok" ]'
+      check "its RUNPATH names the archive plainly, without the padding the binaries carry" \
+        'r=$(readelf -d h-cxx | grep -E "RUNPATH|RPATH"); echo "$r" | grep -q "$archive/lib/amd64" && ! echo "$r" | grep -q "//"'
       mkdir fake
       printf '#!%s\necho called > %s/ld-called\nexec %s/bin/ld "$@"\n' $archive/bin/bash $PWD $archive > fake/ld
       chmod +x fake/ld
