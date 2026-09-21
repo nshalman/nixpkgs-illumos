@@ -64,6 +64,11 @@ pkgs.stdenv.mkDerivation {
     check "C++ compiles and links silently" '[ ! -s cxx.err ]'; cat cxx.err
     check "C runs" './hello-c | grep -q "hello from C"'
     check "C++ throw/catch runs" './hello-cxx | grep -q "throw and catch"'
+    # Builds are not sandboxed on illumos, so the build directory has a different name every time
+    # (/nix/var/nix/builds/nix-PID-RANDOM). The stdenv maps it to a constant or no output is reproducible.
+    printf 'const char *where(void) { return __FILE__; }\n' > $PWD/where.c
+    $CC -g -c $PWD/where.c -o where.o
+    check "neither __FILE__ nor debug info names the build directory" '! strings -a where.o | grep -q "$NIX_BUILD_TOP"'
     check "signal handlers and SIG_ constants work under gnu17 and gnu23" './sig-gnu17 && ./sig-gnu23 && [ ! -s sig17.err ] && [ ! -s sig23.err ]'
     # illumos only hands out the thread-safe errno under _REENTRANT, _TS_ERRNO or a POSIX feature macro. A library
     # that imports the plain `errno` object overwrites the main thread's errno from any thread.

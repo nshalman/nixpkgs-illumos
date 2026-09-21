@@ -1,0 +1,23 @@
+Pass -ffile-prefix-map and -fdebug-prefix-map on to GNU as for compiled code too.
+
+The driver hands %(asm_debug), which holds the --debug-prefix-map options, to the assembler only when it
+assembles a .s or .S file directly. For C and C++ it relies on cc1 having remapped every name it writes. With
+DWARF 5 that is not enough here: cc1 emits `.file 1 "/mapped/x.c"` but no `.file 0`, and GNU as then makes
+directory entry 0 of the line table from its own working directory, unmapped. On illumos Nix builds are not
+sandboxed and the build directory has a different name for every build, so every object with debug information
+differed from build to build.
+
+Measured with `gcc -g -c $PWD/w.c -ffile-prefix-map=$PWD=/build`: one string naming the real directory without
+this, none with it.
+
+--- a/gcc/config/sol2.h
++++ b/gcc/config/sol2.h
+@@ -145,7 +145,7 @@
+ /* It's safe to pass -s always, even if -g is not used.  Those options are
+    handled by both Sun as and GNU as.  */
+ #define ASM_SPEC_BASE \
+-"%{v:-V} %{Qy:} %{!Qn:-Qy} %{Ym,*} -s %(asm_cpu)"
++"%{v:-V} %{Qy:} %{!Qn:-Qy} %{Ym,*} -s %(asm_cpu) %(asm_debug)"
+ 
+ #define ASM_PIC_SPEC " %{" FPIE_OR_FPIC_SPEC ":-K PIC}"
+ 

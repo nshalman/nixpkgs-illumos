@@ -76,6 +76,7 @@ stdenv.mkDerivation rec {
     ./madvise-decl.patch
     ./no-ccs-exec-prefix.patch
     ./ts-errno.patch
+    ./asm-debug-prefix-map.patch
   ];
 
   # GCC's build sets its own flags for each stage; the wrapper's would only reach stage 1.
@@ -114,7 +115,12 @@ stdenv.mkDerivation rec {
 
     # The runtime libraries are compiled with -g, and the debug information would name the sysroot's include
     # directories. That is the only thing tying $lib, and so every C++ program's closure, to the sysroot.
-    targetFlags="-g -O2 -ffile-prefix-map=${illumos-libc}=/illumos-libc"
+    #
+    # Builds are not sandboxed on illumos and the build directory is named differently every time. The stdenv maps
+    # it for what goes through the compiler wrapper; stages 2 and 3 and the runtime libraries are compiled by the
+    # new compiler directly.
+    buildDirMap="-ffile-prefix-map=$NIX_BUILD_TOP=/build"
+    targetFlags="-g -O2 -ffile-prefix-map=${illumos-libc}=/illumos-libc $buildDirMap"
 
     mkdir ../build && cd ../build
     LD_FOR_TARGET=${illumos-ld}/bin/ld \
@@ -130,6 +136,7 @@ stdenv.mkDerivation rec {
       --disable-nls \
       --disable-multilib \
       CFLAGS="-g -O2 -m64" CXXFLAGS="-g -O2 -m64" \
+      BOOT_CFLAGS="-g -O2 $buildDirMap" \
       CFLAGS_FOR_TARGET="$targetFlags" CXXFLAGS_FOR_TARGET="$targetFlags" \
       LDFLAGS="-Wl,-R$lib/lib/amd64"
     runHook postConfigure
