@@ -115,12 +115,7 @@ stdenv.mkDerivation rec {
 
     # The runtime libraries are compiled with -g, and the debug information would name the sysroot's include
     # directories. That is the only thing tying $lib, and so every C++ program's closure, to the sysroot.
-    #
-    # Builds are not sandboxed on illumos and the build directory is named differently every time. The stdenv maps
-    # it for what goes through the compiler wrapper; stages 2 and 3 and the runtime libraries are compiled by the
-    # new compiler directly.
-    buildDirMap="-ffile-prefix-map=$NIX_BUILD_TOP=/build"
-    targetFlags="-g -O2 -ffile-prefix-map=${illumos-libc}=/illumos-libc $buildDirMap"
+    targetFlags="-g -O2 -ffile-prefix-map=${illumos-libc}=/illumos-libc"
 
     mkdir ../build && cd ../build
     LD_FOR_TARGET=${illumos-ld}/bin/ld \
@@ -136,7 +131,6 @@ stdenv.mkDerivation rec {
       --disable-nls \
       --disable-multilib \
       CFLAGS="-g -O2 -m64" CXXFLAGS="-g -O2 -m64" \
-      BOOT_CFLAGS="-g -O2 $buildDirMap" \
       CFLAGS_FOR_TARGET="$targetFlags" CXXFLAGS_FOR_TARGET="$targetFlags" \
       LDFLAGS="-Wl,-R$lib/lib/amd64"
     runHook postConfigure
@@ -146,13 +140,25 @@ stdenv.mkDerivation rec {
     runHook preBuild
     cores=''${NIX_BUILD_CORES:-1}
     if [ ${toString coresCap} -gt 0 ] && [ "$cores" -gt ${toString coresCap} ]; then cores=${toString coresCap}; fi
-    make -j"$cores"
+
+    # Builds are not sandboxed on illumos and the build directory is named differently every time. The stdenv maps
+    # it for what goes through the compiler wrapper; stages 2 and 3 and the runtime libraries are compiled by the
+    # new compiler directly. The map is given to make and not to configure, which would record it, build
+    # directory and all, in the compiler (`gcc -v`, "Configured with").
+    buildDirMap="-ffile-prefix-map=$NIX_BUILD_TOP=/build"
+    makeFlagsArray=(
+      BOOT_CFLAGS="-g -O2 $buildDirMap"
+      CFLAGS_FOR_TARGET="$targetFlags $buildDirMap"
+      CXXFLAGS_FOR_TARGET="$targetFlags $buildDirMap"
+    )
+    make -j"$cores" "''${makeFlagsArray[@]}"
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    make install
+    # The same variables as for the build, or make considers the flags changed.
+    make install "''${makeFlagsArray[@]}"
 
     rm "$lib/lib/amd64"
     mv "$out/lib/amd64" "$lib/lib/amd64"
