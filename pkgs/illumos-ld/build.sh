@@ -74,7 +74,10 @@ for b in bindings cap dlfcns dynamic elf entry files got libs map move phdr relo
 done
 cc1 alist.o $SGS/common/alist.c -I$C; cc1 msg.o msg.c -I$C
 settle liblddbg
-$cc -shared -o "$OUT/lib/liblddbg.so.4" -Wl,-h,liblddbg.so.4 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
+# The illumos link-editor records the name it was given for its output in the object (a FILE symbol). Every
+# build directory ($W) is reached from one level below it, so the outputs are named relative to that, or the build
+# directory, which Nix names differently for every build on illumos, ends up in ld and its libraries.
+$cc -shared -o ../out/lib/liblddbg.so.4 -Wl,-h,liblddbg.so.4 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
   *.o -L"$W/libconv" -lconv -lc $LINK
 ln -s liblddbg.so.4 "$OUT/lib/liblddbg.so"
 
@@ -94,7 +97,7 @@ for b in clscook newehdr newphdr update checksum; do cc1 ${b}64.o $C/$b.c -I$C -
 for b in msg xlate xlate64; do cc1 $b.o $b.c -I$C; done
 cc1 nlist.o $SGS/libelf/misc/nlist.c -I$C -DELF
 settle libelf
-$cc -shared -o "$OUT/lib/libelf.so.1" -Wl,-h,libelf.so.1 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
+$cc -shared -o ../out/lib/libelf.so.1 -Wl,-h,libelf.so.1 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
   *.o -L"$W/libconv" -lconv -lc $LINK
 ln -s libelf.so.1 "$OUT/lib/libelf.so"
 
@@ -117,7 +120,7 @@ cc1 doreloc_sparc_64.o $SRC/uts/sparc/krtld/doreloc.c       $LI -DDO_RELOC_LIBLD
 cc1 machrel.intel32.o $C/machrel.intel.c $LI; cc1 machrel.amd64.o $C/machrel.amd.c $LI -D_ELF64
 for b in machrel.sparc machsym.sparc; do cc1 ${b}32.o $C/$b.c $LI; cc1 ${b}64.o $C/$b.c $LI -D_ELF64; done
 settle libld
-$cc -shared -o "$OUT/lib/libld.so.4" -Wl,-h,libld.so.4 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
+$cc -shared -o ../out/lib/libld.so.4 -Wl,-h,libld.so.4 -Wl,-M,$C/mapfile-vers '-Wl,-R,$ORIGIN' \
   *.o -L"$W/libconv" -lconv -L"$OUT/lib" -llddbg -lelf -ldl -lc $LINK
 ln -s libld.so.4 "$OUT/lib/libld.so"
 
@@ -126,5 +129,5 @@ C=$SGS/ld/common
 $SGSMSG $IDENT -h msg.h -d msg.c -m ld.cat -n ld_msg $C/ld.msg
 cc1 ld.o $C/ld.c -I$C; cc1 msg.o msg.c -I$C
 settle ld
-$cc -o "$OUT/bin/ld" ld.o msg.o -Wl,-M,$C/mapfile-intf '-Wl,-R,$ORIGIN/../lib' \
+$cc -o ../out/bin/ld ld.o msg.o -Wl,-M,$C/mapfile-intf '-Wl,-R,$ORIGIN/../lib' \
   -lumem -L"$OUT/lib" -lld -lelf -llddbg -L"$W/libconv" -lconv $LINK
