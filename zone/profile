@@ -1,0 +1,77 @@
+# /etc/profile for a zone that runs Nix from this repo (the zone image
+# lays it down in place of the proto/etc/profile shipped by smartos-live).
+#
+# Keeps the bits of the proto profile we actually want — TERM setup,
+# MOTD/mail display for interactive login shells, umask 022 — and adds
+# the nix profile to PATH/MANPATH so login shells inherit `nix`,
+# `bash`, and whatever else /nix/var/nix/profiles/default ships.
+
+trap ""  2 3
+export LOGNAME
+
+if [ "$TERM" = "" ]; then
+    if [ "$(uname -p)" = "i386" ]; then
+        TERM=sun-color
+    else
+        TERM=sun
+    fi
+    export TERM
+fi
+
+# Put the nix system profile first on PATH (and MANPATH). This is the
+# stable indirection: when illumos-rebuild switches the system, the
+# profile symlink swap atomically updates what `bash`, `nix`, etc.
+# resolve to without needing edits anywhere in /etc.
+if [ -d /nix/var/nix/profiles/default/bin ]; then
+    case ":$PATH:" in
+        *:/nix/var/nix/profiles/default/bin:*) ;;
+        *) PATH="/nix/var/nix/profiles/default/bin:$PATH" ;;
+    esac
+fi
+if [ -d /nix/var/nix/profiles/default/share/man ]; then
+    case ":${MANPATH:-}:" in
+        *:/nix/var/nix/profiles/default/share/man:*) ;;
+        *) MANPATH="/nix/var/nix/profiles/default/share/man:${MANPATH:-}" ;;
+    esac
+    export MANPATH
+fi
+export PATH
+
+# CA bundle from pkgs.cacert (shipped via the system profile). The
+# /etc/ssl/certs/ca-{bundle,certificates}.crt symlinks the zone image
+# creates handle apps that hardcode the standard paths;
+# these env vars handle the rest (nix's fetchurl, language SDKs, ...).
+if [ -r /etc/ssl/certs/ca-bundle.crt ]; then
+    SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+    NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+    export SSL_CERT_FILE NIX_SSL_CERT_FILE
+fi
+
+# Source /etc/profile.d/*.sh for drop-in extensions.
+if [ -d /etc/profile.d ]; then
+    for f in /etc/profile.d/*.sh; do
+        [ -r "$f" ] && . "$f"
+    done
+    unset f
+fi
+
+# Login and -su shells get /etc/profile services.
+# -rsh is given its environment in its .profile.
+case "$0" in
+-sh | -ksh | -ksh93 | -jsh | -bash | -zsh)
+    if [ ! -f .hushlogin ]; then
+        trap "trap '' 2" 2
+        /bin/cat -s /etc/motd
+        trap "" 2
+
+        /bin/mail -E
+        case $? in
+        0) echo "You have new mail." ;;
+        2) echo "You have mail." ;;
+        esac
+    fi
+    ;;
+esac
+
+umask 022
+trap 2 3
