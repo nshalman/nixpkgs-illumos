@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+#
+# illumos-rebuild: build a zone's system profile from its configuration, make the result the profile's next
+# generation and activate its SMF services; what nixos-rebuild does for a zone that runs Nix from this repo.
+#
+# usage: illumos-rebuild build|switch|rollback|list-generations [--config FILE] [--profile DIR]
+#   build             build the configuration and print its store path
+#   switch            build, make it the profile's new generation, activate it
+#   rollback          make the previous generation current again and activate it
+#   list-generations  list the profile's generations
+#
+# The configuration (default /etc/nixos/system.nix) evaluates to a system profile as zone/system.nix builds
+# it. Activation imports every manifest under <system>/lib/svc/manifest/site/, deletes the services the
+# previous generation declared and this one does not, and restarts the services both declare when the
+# system path changed: their methods exec through the profile, so a new generation means new binaries. A
+# restart of nix-daemon kills the builds it is running; do not switch while a build is in progress.
+#
+# Tests override the SMF commands: SVCCFG (default /usr/sbin/svccfg) and SVCADM (default /usr/sbin/svcadm);
+# svccfg also honours SVCCFG_REPOSITORY, so a scratch repository can stand in for the live one.
+set -euo pipefail
+
+config=/etc/nixos/system.nix
+profile=/nix/var/nix/profiles/default
+svccfg=${SVCCFG:-/usr/sbin/svccfg}
+svcadm=${SVCADM:-/usr/sbin/svcadm}
+
+usage() {
+    echo "usage: $0 build|switch|rollback|list-generations [--config FILE] [--profile DIR]" >&2
+    exit 2
+}
+
+[ $# -ge 1 ] || usage
+action=$1
+shift
+while [ $# -gt 0 ]; do
+    case $1 in
+    --config) config=$2; shift 2 ;;
+    --profile) profile=$2; shift 2 ;;
+    *) usage ;;
+    esac
+done
+
+# the store path the profile currently points at, or nothing
+current() { (cd -P "$profile" 2>/dev/null && pwd -P) || true; }
+
+build() { nix-build "$config" --no-out-link; }
+
+# the site manifests of a system, one path per line
+manifests() {
+    [ -n "$1" ] && [ -d "$1/lib/svc/manifest/site" ] || return 0
+    ls "$1"/lib/svc/manifest/site/*.xml 2>/dev/null || true
+}
+
+# the FMRIs the site manifests of a system declare, sorted: services (svc:/a/b) and their instances (svc:/a/b:c)
+inventory() {
+    local m
+    for m in $(manifests "$1"); do
+        "$svccfg" inventory "$m"
+    done | sort -u
+}
+instances() { inventory "$1" | grep -E '^svc:/[^:]+:[^:/]+$' || true; }
+services() { inventory "$1" | grep -E '^svc:/[^:]+$' || true; }
+
+activate() { # <new system> <old system or empty>
+    local new=$1 old=$2 m fmri
+    for m in $(manifests "$new"); do
+        echo "importing $m"
+        "$svccfg" import "$m"
+    done
+    local newInstances oldInstances
+    newInstances=$(instances "$new")
+    oldInstances=$(instances "$old")
+    for fmri in $(comm -13 <(echo "$newInstances") <(echo "$oldInstances")); do
+        echo "removing $fmri"
+        "$svcadm" disable -s "$fmri"
+        "$svccfg" delete "$fmri"
+    done
+    # a service none of whose instances remain declared goes too; its instances are gone by now
+    for fmri in $(comm -13 <(services "$new") <(services "$old")); do
+        echo "removing $fmri"
+        "$svccfg" delete "$fmri"
+    done
+    if [ "$new" != "$old" ]; then
+        for fmri in $(comm -12 <(echo "$newInstances") <(echo "$oldInstances")); do
+            echo "restarting $fmri"
+            "$svcadm" restart "$fmri"
+        done
+    fi
+}
+
+case $action in
+build)
+    build
+    ;;
+switch)
+    new=$(build)
+    old=$(current)
+    nix-env -p "$profile" --set "$new"
+    activate "$new" "$old"
+    ;;
+rollback)
+    old=$(current)
+    nix-env -p "$profile" --rollback
+    activate "$(current)" "$old"
+    ;;
+list-generations)
+    nix-env -p "$profile" --list-generations
+    ;;
+*)
+    usage
+    ;;
+esac
