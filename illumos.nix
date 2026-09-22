@@ -5,6 +5,13 @@
   nixpkgs ? <nixpkgs>,
   bootstrapUrl,
   bootstrapFiles ? import ./bootstrap/files.nix { baseUrl = bootstrapUrl; },
+  # The Nix source to build: nixpkgs' `nixVersions.nix_2_35` packaging, with its source replaced by the
+  # illumos branch of nix-src (upstream 2.35.2 plus the illumos series).
+  nixSrc ? builtins.fetchGit {
+    url = "https://github.com/nshalman/nix-src";
+    ref = "illumos-support-2.35";
+    rev = "3656769df115b3440104a0375ae25ab172e9d208";
+  },
 }:
 
 import nixpkgs {
@@ -23,5 +30,12 @@ import nixpkgs {
       }
     );
   config = { };
-  overlays = [ ];
+  overlays = [
+    (final: prev: {
+      nixVersions = prev.nixVersions.extend (
+        # the packaging wants a name on the source; a store-path directory unpacks as "source"
+        _: p: { nixComponents_2_35 = p.nixComponents_2_35.overrideSource (nixSrc // { name = "source"; }); }
+      );
+    })
+  ];
 }
