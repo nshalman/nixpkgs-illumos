@@ -10,6 +10,6 @@ import /work/nixpkgs-illumos/illumos.nix {
   nixSrc = builtins.fetchGit {
     url = "file:///work/nix-src.git";
     ref = "illumos-support-2.35";
-    rev = "d68006e5eb20775aadc3521ff2fc4c7c19ab00a4";
+    rev = "ff849c099603731091ef0df5d03baa2d39a70721";
   };
 }
