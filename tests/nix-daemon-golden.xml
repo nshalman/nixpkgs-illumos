@@ -1,0 +1,73 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<!--
+  SMF manifest for the nix-daemon socket server. The daemon exposes
+  /nix/var/nix/daemon-socket/socket and serves build requests from
+  clients (root or unprivileged) running NIX_REMOTE=daemon.
+
+  Not imported by any build. The shipped manifest is generated from the
+  service definition in zone/services.nix via zone/smf-lib.nix; this
+  hand-written original is the golden fixture for smf-lib.sh, which
+  asserts the generated manifest is svccfg-export-identical to it. If
+  the nix-daemon definition in services.nix changes deliberately,
+  update this file to match (or retire the golden check).
+-->
+<service_bundle type='manifest' name='nix:nix-daemon'>
+
+<service name='application/nix-daemon' type='service' version='1'>
+
+    <create_default_instance enabled='true' />
+
+    <single_instance />
+
+    <dependency name='filesystem-local'
+                grouping='require_all'
+                restart_on='none'
+                type='service'>
+        <service_fmri value='svc:/system/filesystem/local' />
+    </dependency>
+
+    <dependency name='multi-user-server'
+                grouping='require_all'
+                restart_on='none'
+                type='service'>
+        <service_fmri value='svc:/milestone/multi-user-server' />
+    </dependency>
+
+    <exec_method type='method' name='start'
+                 exec='/nix/var/nix/profiles/default/bin/nix-daemon'
+                 timeout_seconds='60'>
+        <method_context>
+            <method_credential user='root' group='root' />
+        </method_context>
+    </exec_method>
+
+    <exec_method type='method' name='stop'
+                 exec=':kill'
+                 timeout_seconds='30' />
+
+    <property_group name='startd' type='framework'>
+        <!-- 'child' so SMF tracks the long-running nix-daemon process
+             directly; the daemon does not double-fork. -->
+        <propval name='duration' type='astring' value='child' />
+        <!-- Don't immediately fall into maintenance on a single crash
+             while we're still shaking out illumos portability issues
+             (peer-cred, etc.). -->
+        <propval name='ignore_error' type='astring' value='core,signal' />
+    </property_group>
+
+    <stability value='Unstable' />
+
+    <template>
+        <common_name>
+            <loctext xml:lang='C'>Nix build daemon</loctext>
+        </common_name>
+        <documentation>
+            <doc_link name='nix-daemon manual'
+                      uri='https://nix.dev/manual/nix/stable/command-ref/nix-daemon' />
+        </documentation>
+    </template>
+
+</service>
+
+</service_bundle>
