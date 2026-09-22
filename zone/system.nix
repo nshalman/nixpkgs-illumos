@@ -15,6 +15,8 @@ pkgs.buildEnv {
     coreutils
     rsync
     gitMinimal
+    gnugrep
+    gawk
     # Mozilla CA bundle at etc/ssl/certs/ca-bundle.crt; the zone image symlinks /etc/ssl/certs to it and
     # /etc/profile exports SSL_CERT_FILE and NIX_SSL_CERT_FILE there. Without it git, curl and nix lose TLS.
     cacert
