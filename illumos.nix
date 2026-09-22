@@ -10,7 +10,7 @@
   nixSrc ? builtins.fetchGit {
     url = "https://github.com/nshalman/nix-src";
     ref = "illumos-support-2.35";
-    rev = "3656769df115b3440104a0375ae25ab172e9d208";
+    rev = "d68006e5eb20775aadc3521ff2fc4c7c19ab00a4";
   },
 }:
 
