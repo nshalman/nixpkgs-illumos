@@ -1,9 +1,10 @@
 # nixpkgs (the illumos-26.05 branch) for x86_64-solaris on its own stdenv, pkgs/stdenv/illumos, given this repo's
 # bootstrap files and toolchain packages. ./bridge.nix is how those bootstrap files were first made.
-#   nix-build illumos.nix --arg nixpkgs /path/to/illumos-26.05 --argstr bootstrapUrl file:///... -A hello
+#   nix-build illumos.nix --arg nixpkgs /path/to/illumos-26.05 -A hello
+# bootstrapUrl is the directory of a release not hosted yet; see bootstrap/files.nix.
 {
   nixpkgs ? <nixpkgs>,
-  bootstrapUrl,
+  bootstrapUrl ? null,
   bootstrapFiles ? import ./bootstrap/files.nix { baseUrl = bootstrapUrl; },
   # The Nix source to build: nixpkgs' `nixVersions.nix_2_35` packaging, with its source replaced by the
   # illumos branch of nix-src (upstream 2.35.2 plus the illumos series).
