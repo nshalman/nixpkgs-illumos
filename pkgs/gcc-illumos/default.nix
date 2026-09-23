@@ -108,6 +108,13 @@ stdenv.mkDerivation rec {
     # stdenv puts binutils' first. Guessing GNU, it hands the real link-editor a GNU linker script.
     export PATH=${illumos-ld}/bin:$PATH
 
+    # GCC's bundled libtool takes the longest command line from `getconf ARG_MAX`, which is not on the build PATH,
+    # and its fallback probe fails here, leaving 512 bytes. With that it links libraries from reloadable chunks
+    # (`ld -r`), and where a chunk ends depends on the length of the build directory's path, which the reload
+    # command names; the libraries' layout would change with the build directory. 786240 is what libtool computes
+    # from illumos' ARG_MAX of 1048320. The configure runs of the target libraries, made by make, inherit it.
+    export lt_cv_sys_max_cmd_len=786240
+
     # The runtime libraries are installed under $out and moved to $lib afterwards; until then the link spec's
     # $lib/lib/amd64 has to resolve.
     mkdir -p "$lib/lib" "$out/lib"
