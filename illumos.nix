@@ -7,8 +7,8 @@
 {
   nixpkgs ? builtins.fetchTarball {
     # the illumos-26.05 branch of github.com/nshalman/nixpkgs
-    url = "https://github.com/nshalman/nixpkgs/archive/6acfce243e45950f1996d62a08f88db4ba21d27f.tar.gz";
-    sha256 = "0r4rgwa98ng6vvv7k4gndrpxhqwfslb99qvxn4041lr0yag0a0yf";
+    url = "https://github.com/nshalman/nixpkgs/archive/a2b70636aef341b5b4e1cbcf80657f31e4199d1a.tar.gz";
+    sha256 = "0fkb3qfsqh1x9msw046pdgnjzzb90amzdlia9l1dfg6j7594h1yr";
   },
   bootstrapUrl ? null,
   bootstrapFiles ? import ./bootstrap/files.nix { baseUrl = bootstrapUrl; },
@@ -17,8 +17,8 @@
   nixSrc ? builtins.fetchTarball {
     # a GitHub archive of the illumos-support-2.35 commit: the tree a checkout has (nix-src has no export-ignore),
     # fetched without git
-    url = "https://github.com/nshalman/nix-src/archive/ff849c099603731091ef0df5d03baa2d39a70721.tar.gz";
-    sha256 = "1xxpcd4iw23wfjl3zvycmrj4q529cfnixxy6pv9v4ch5j3rc9lbq";
+    url = "https://github.com/nshalman/nix-src/archive/55b532f45b2ba5f4a0e66037f062a72d5c4a2faa.tar.gz";
+    sha256 = "0rnf0665i24m7rvixv6dgqhw0bsl0jsarij13jjb1f3kpm0h8fy6";
   },
 }:
 
@@ -50,6 +50,13 @@ import nixpkgs {
           };
         }
       );
+      # The binary tarball and installer of that Nix, made by nix-src's own packaging from the same source. The
+      # manual does not evaluate for illumos.
+      nixInstallerTarball = final.callPackage "${nixSrc}/packaging/binary-tarball.nix" {
+        nix = final.nixVersions.nix_2_35;
+        nixComponents2 = final.nixVersions.nixComponents_2_35;
+        withManual = false;
+      };
     })
   ];
 }

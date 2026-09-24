@@ -5,12 +5,14 @@
   /nix/var/nix/daemon-socket/socket and serves build requests from
   clients (root or unprivileged) running NIX_REMOTE=daemon.
 
-  Not imported by any build. The shipped manifest is generated from the
-  service definition in zone/services.nix via zone/smf-lib.nix; this
-  hand-written original is the golden fixture for smf-lib.sh, which
-  asserts the generated manifest is svccfg-export-identical to it. If
-  the nix-daemon definition in services.nix changes deliberately,
-  update this file to match (or retire the golden check).
+  Not imported by any build. The manifest a zone runs comes with Nix
+  (nix-src misc/illumos/nix-daemon.xml, installed at
+  lib/svc/manifest/site/nix-daemon.xml); this hand-written original is
+  the golden fixture for smf-lib.sh, which asserts that both Nix's
+  manifest and the one smf-lib.nix generates from the nix-daemon
+  definition in the test are svccfg-export-identical to it. If either
+  changes deliberately, update this file to match (or retire the golden
+  check).
 -->
 <service_bundle type='manifest' name='nix:nix-daemon'>
 

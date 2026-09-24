@@ -29,6 +29,13 @@ The zone image builder is still the one on the `illumos-recipe-v2` branch of nix
 (`pkgs/stdenv/illumos-recipe/zone-root/builder.sh`, `make-zone-root.nix`, `make-zone-image.nix`,
 `make-joyent-image.nix`); porting it here is open.
 
+## Installing Nix in an existing zone
+
+`nix-build ../illumos.nix -A nixInstallerTarball` makes `nix-<version>-x86_64-solaris.tar.xz`, Nix's binary
+tarball with its multi-user installer; the illumos section of the Nix manual's "Installing a Binary Distribution"
+says how to install from it. The result is an ordinary multi-user Nix installation (nix.conf a plain file, Nix in
+root's default profile), not the system profile above.
+
 ## Tests
 
 Each takes the path of a file evaluating to the package set, e.g. `/etc/nixos/pkgs.nix`, and runs on a live
@@ -37,3 +44,7 @@ zone without touching its profile or SMF repository:
     tests/smf-lib.sh /etc/nixos/pkgs.nix          # manifests validate and match the golden export
     tests/illumos-rebuild.sh /etc/nixos/pkgs.nix  # switch, removal, restart, rollback on scratch state
     tests/nix-conf.sh /etc/nixos/pkgs.nix         # the rendered nix.conf, and that nix parses it
+
+`tests/installed-zone.sh [CACHE-URL STDENV-PATH]` checks a zone after the installer ran in it: the daemon, the
+build users, the store, login shells, an unprivileged build and, given them, substitution of the stdenv from a
+cache. It runs as root on that zone and creates two test users there.

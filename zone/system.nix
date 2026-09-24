@@ -26,7 +26,8 @@ in
 pkgs.buildEnv {
   name = "nix-zone-system";
   paths = with pkgs; [
-    # .out only: buildEnv would otherwise pull outputs such as `man` that the package does not build here
+    # .out only: buildEnv would otherwise pull outputs such as `man` that the package does not build here.
+    # It carries nix-daemon's SMF manifest at lib/svc/manifest/site/, for illumos-rebuild to import.
     nixVersions.nix_2_35.out
     bashInteractive
     coreutils
