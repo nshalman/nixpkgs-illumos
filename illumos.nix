@@ -14,10 +14,11 @@
   bootstrapFiles ? import ./bootstrap/files.nix { baseUrl = bootstrapUrl; },
   # The Nix source to build: nixpkgs' `nixVersions.nix_2_35` packaging, with its source replaced by the
   # illumos branch of nix-src (upstream 2.35.2 plus the illumos series).
-  nixSrc ? builtins.fetchGit {
-    url = "https://github.com/nshalman/nix-src";
-    ref = "illumos-support-2.35";
-    rev = "ff849c099603731091ef0df5d03baa2d39a70721";
+  nixSrc ? builtins.fetchTarball {
+    # a GitHub archive of the illumos-support-2.35 commit: the tree a checkout has (nix-src has no export-ignore),
+    # fetched without git
+    url = "https://github.com/nshalman/nix-src/archive/ff849c099603731091ef0df5d03baa2d39a70721.tar.gz";
+    sha256 = "1xxpcd4iw23wfjl3zvycmrj4q529cfnixxy6pv9v4ch5j3rc9lbq";
   },
 }:
 
@@ -40,8 +41,14 @@ import nixpkgs {
   overlays = [
     (final: prev: {
       nixVersions = prev.nixVersions.extend (
-        # the packaging wants a name on the source; a store-path directory unpacks as "source"
-        _: p: { nixComponents_2_35 = p.nixComponents_2_35.overrideSource (nixSrc // { name = "source"; }); }
+        # the packaging wants a name on the source, which may be a fetchGit result or a store path; a store-path
+        # directory unpacks as "source"
+        _: p: {
+          nixComponents_2_35 = p.nixComponents_2_35.overrideSource {
+            outPath = "${nixSrc}";
+            name = "source";
+          };
+        }
       );
     })
   ];

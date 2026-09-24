@@ -21,11 +21,13 @@ bad() { echo "FAIL: $1"; fail=$((fail+1)); }
 system() { echo "(import $top/zone/system.nix { pkgs = $1; }).outPath"; }
 
 # restrict-eval: files outside this repo, and URLs outside GitHub, are refused (the bootstrap files are fetched at
-# build time, not here). No global git config: one rewriting https URLs (url.<base>.insteadOf) would change how
-# the Nix source is fetched.
-if pinned=$(NIX_PATH= GIT_CONFIG_GLOBAL=/dev/null nix-instantiate --eval --read-write-mode \
+# build time, not here). As on a zone Nix was just installed in: nothing but nix-instantiate and the system's
+# tools on PATH (no git, so no user's git configuration either), and an empty fetcher cache.
+mkdir "$tmp/bin" "$tmp/cache"
+ln -s "$(command -v nix-instantiate)" "$tmp/bin/"
+if pinned=$(NIX_PATH= PATH="$tmp/bin:/usr/bin:/usr/sbin" XDG_CACHE_HOME="$tmp/cache" nix-instantiate --eval --read-write-mode \
         --option restrict-eval true -I "$top" \
-        --option allowed-uris "https://github.com/ git+https://github.com/" \
+        --option allowed-uris "https://github.com/" \
         --expr "$(system "import $top/illumos.nix { }")" 2>"$tmp/pinned.err"); then
     ok "illumos.nix evaluates on its defaults alone"
 else
