@@ -16,8 +16,9 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 
 | path | content | comes from |
 |---|---|---|
-| `/etc/nixos/pkgs.nix` | the package set: `../illumos.nix` with the zone's bootstrap files and Nix source | `example/pkgs.nix` |
-| `/etc/nixos/system.nix` | `system.nix` applied to that package set and the zone's `nixSettings` | `example/system.nix` |
+| `/etc/nixos/nixpkgs-illumos.nix` | the published commit of this repo the zone is built from, fetched as a tarball | `example/nixpkgs-illumos.nix` |
+| `/etc/nixos/pkgs.nix` | the package set: that commit's `illumos.nix` on its defaults | `example/pkgs.nix` |
+| `/etc/nixos/system.nix` | that commit's `system.nix` applied to the package set and the zone's `nixSettings` | `example/system.nix` |
 | `/etc/nix/nix.conf` | symlink to `/nix/var/nix/profiles/default/etc/nix/nix.conf` | made once by hand or by the image |
 | `/etc/profile` | puts the profile on PATH and MANPATH, exports the CA bundle | `profile` |
 | `/etc/ssl/certs/ca-bundle.crt`, `ca-certificates.crt` | symlinks to the profile's `etc/ssl/certs/ca-bundle.crt` | the zone image |

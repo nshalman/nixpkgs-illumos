@@ -1,5 +1,5 @@
 # /etc/nixos/system.nix of zone nixpkgs-native. Rebuild and switch with zone/illumos-rebuild.
-import /work/nixpkgs-illumos/zone/system.nix {
+import (import ./nixpkgs-illumos.nix + "/zone/system.nix") {
   pkgs = import ./pkgs.nix;
   nixSettings = {
     # the store also holds outputs the earlier Nix built as x86_64-illumos and x86_64-sunos
