@@ -77,6 +77,11 @@ stdenv.mkDerivation rec {
     ./no-ccs-exec-prefix.patch
     ./ts-errno.patch
     ./asm-debug-prefix-map.patch
+    # nixpkgs' gcc patch (pkgs/development/compilers/gcc/patches/13/, applied to gcc 13 to 16): __FILE__ of a file
+    # in the store gets its hash in upper case, so that a header's __FILE__ does not make its store path, often a
+    # -dev output, a runtime dependency. The cc-wrapper counts on it for a GNU compiler (`useMacroPrefixMap =
+    # !isGNU`).
+    ./mangle-NIX_STORE-in-__FILE__.patch
   ];
 
   # GCC's build sets its own flags for each stage; the wrapper's would only reach stage 1.

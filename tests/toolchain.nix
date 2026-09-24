@@ -9,6 +9,12 @@
   floor ? 38,
 }:
 
+let
+  # a header in the store whose inline function expands __FILE__, as Boost's and Nix's own headers do
+  storeHeader = pkgs.writeTextDir "include/where-header.h" ''
+    static inline const char *where_header(void) { return __FILE__; }
+  '';
+in
 pkgs.stdenv.mkDerivation {
   name = "illumos-toolchain-test";
   dontUnpack = true;
@@ -69,6 +75,15 @@ pkgs.stdenv.mkDerivation {
     printf 'const char *where(void) { return __FILE__; }\n' > $PWD/where.c
     $CC -g -c $PWD/where.c -o where.o
     check "neither __FILE__ nor debug info names the build directory" '! strings -a where.o | grep -q "$NIX_BUILD_TOP"'
+    # __FILE__ of a header in the store would make that store path (often a -dev output) a runtime dependency of
+    # whatever uses it. gcc mangles the hash to upper case, as nixpkgs' gcc does (mangle-NIX_STORE-in-__FILE__):
+    # the cc-wrapper counts on that for GNU compilers.
+    printf '#include <where-header.h>\nconst char *h(void) { return where_header(); }\n' > h.c
+    $CC -I${storeHeader}/include -c h.c -o h.o
+    hash=$(basename ${storeHeader} | cut -c1-32)
+    check "__FILE__ of a store header does not name its store path" '! strings -a h.o | grep -q "$hash"'
+    check "__FILE__ of a store header names it with the hash in upper case" \
+      'strings -a h.o | grep -q "$(echo "$hash" | tr a-z A-Z)-where-header.h/include/where-header.h"'
     check "signal handlers and SIG_ constants work under gnu17 and gnu23" './sig-gnu17 && ./sig-gnu23 && [ ! -s sig17.err ] && [ ! -s sig23.err ]'
     # illumos only hands out the thread-safe errno under _REENTRANT, _TS_ERRNO or a POSIX feature macro. A library
     # that imports the plain `errno` object overwrites the main thread's errno from any thread.

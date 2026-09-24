@@ -18,6 +18,8 @@
 #             allow-list: illumos-gate libraries with public, committed interfaces. -p LIB,LIB adds to the list.
 #             What those libraries need in turn is the running system's own business and is only reported.
 # And for the closure as a whole:
+#   dev       no -dev output (headers, pkg-config files): nothing needs one at run time, and one gets in when a
+#             header's __FILE__ names its store path, which gcc-illumos prevents by mangling the hash
 #   old       no store path named in OLD-PATHS-FILE, any text file with the previous generation's store paths in it,
 #             e.g. illumos-recipe-v2's bootstrap-files/x86_64-illumos-paths.nix. NOT stdenv/bridge-paths.nix: that also
 #             names the current toolchain.
@@ -80,6 +82,8 @@ report needed  $tmp/needed  "no NEEDED entry names a directory"
 report resolve $tmp/resolve "ldd finds every dependency"
 report outside $tmp/outside "every RUNPATH directory is in the store"
 report platform $tmp/notallowed "every system library an object names is on the allow-list"
+$E -- '-dev$' $tmp/closure > $tmp/dev
+report dev     $tmp/dev     "no -dev output in the closure"
 if [ -n "$old" ]; then
   $E -o '/nix/store/[a-z0-9]{32}-[^;" ]+' "$old" | sort -u > $tmp/oldpaths; comm -12 $tmp/closure $tmp/oldpaths > $tmp/oldhits
   report old $tmp/oldhits "no path of the previous generation in the closure"
