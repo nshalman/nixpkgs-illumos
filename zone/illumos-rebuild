@@ -13,16 +13,19 @@
 # it. Activation imports every manifest under <system>/lib/svc/manifest/site/, deletes the services the
 # previous generation declared and this one does not, and restarts the services both declare when the
 # system path changed: their methods exec through the profile, so a new generation means new binaries. A
-# restart of nix-daemon kills the builds it is running; do not switch while a build is in progress.
+# restart of nix-daemon kills the builds it is running; do not switch while a build is in progress. Restarts
+# are complete, and nix-daemon answers on its socket, when a switch or rollback returns.
 #
-# Tests override the SMF commands: SVCCFG (default /usr/sbin/svccfg) and SVCADM (default /usr/sbin/svcadm);
-# svccfg also honours SVCCFG_REPOSITORY, so a scratch repository can stand in for the live one.
+# Tests override the SMF commands: SVCCFG (default /usr/sbin/svccfg), SVCADM (default /usr/sbin/svcadm) and
+# SVCS (default /usr/bin/svcs); svccfg also honours SVCCFG_REPOSITORY, so a scratch repository can stand in
+# for the live one.
 set -euo pipefail
 
 config=/etc/nixos/system.nix
 profile=/nix/var/nix/profiles/default
 svccfg=${SVCCFG:-/usr/sbin/svccfg}
 svcadm=${SVCADM:-/usr/sbin/svcadm}
+svcs=${SVCS:-/usr/bin/svcs}
 
 usage() {
     echo "usage: $0 build|switch|rollback|list-generations [--config FILE] [--profile DIR]" >&2
@@ -82,10 +85,33 @@ activate() { # <new system> <old system or empty>
     done
     if [ "$new" != "$old" ]; then
         for fmri in $(comm -12 <(echo "$newInstances") <(echo "$oldInstances")); do
+            # svcadm restart returns before the instance is back. A temporary disable and enable, each waited
+            # for (-s), restart it by the time this returns and leave its persistent state alone. An instance
+            # that is not online (disabled, in maintenance) stays as it is, as restart would leave it.
+            [ "$("$svcs" -H -o state "$fmri" 2>/dev/null)" = online ] || continue
             echo "restarting $fmri"
-            "$svcadm" restart "$fmri"
+            "$svcadm" disable -s -t "$fmri"
+            "$svcadm" enable -s -t "$fmri"
         done
     fi
+    # nix-daemon listens on its socket a moment after SMF has it online; wait until it answers, so that Nix
+    # works as soon as this returns
+    if grep -qx "$nixDaemon" <<< "$newInstances"; then
+        waitForNixDaemon "$new"
+    fi
+}
+
+nixDaemon=svc:/application/nix-daemon:default
+waitForNixDaemon() { # <system>
+    local tries=0
+    until "$profile/bin/nix-store" --store daemon -q --hash "$1" > /dev/null 2>&1; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 600 ]; then
+            echo "nix-daemon does not answer on its socket after 60 seconds; see 'svcs -x $nixDaemon'" >&2
+            return 1
+        fi
+        sleep 0.1
+    done
 }
 
 case $action in

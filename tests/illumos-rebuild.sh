@@ -2,8 +2,10 @@
 #
 # Test zone/illumos-rebuild against scratch state on a live illumos zone: a
 # scratch profile under $TMPDIR-like /work, the real svccfg pointed at a
-# scratch repository (SVCCFG_REPOSITORY) and an svcadm stub that records
-# its calls. Nothing touches the live SMF repository or the system profile.
+# scratch repository (SVCCFG_REPOSITORY), an svcadm stub that records
+# its calls and an svcs stub that reports the states in $SVCS_STATES
+# (online unless listed). Nothing touches the live SMF repository or the
+# system profile.
 #
 # usage: illumos-rebuild.sh /etc/nixos/pkgs.nix
 #
@@ -32,6 +34,17 @@ cat > "$SVCADM" <<'STUB'
 echo "$*" >> "$SVCADM_LOG"
 STUB
 chmod +x "$SVCADM"
+export SVCS=$tmp/svcs-stub
+export SVCS_STATES=$tmp/svcs-states
+: > "$SVCS_STATES"
+cat > "$SVCS" <<'STUB'
+#!/usr/bin/env bash
+# `svcs -H -o state FMRI`: the state listed for FMRI in $SVCS_STATES ("FMRI STATE" lines), else online
+fmri=${!#}
+state=$(awk -v f="$fmri" '$1 == f { print $2 }' "$SVCS_STATES")
+echo "${state:-online}"
+STUB
+chmod +x "$SVCS"
 
 # a system: the manifests of the given services under lib/svc/manifest/site/
 gen() { # <name> <description> <service>... -> writes $tmp/<name>.nix
@@ -52,6 +65,9 @@ gen a "generation A" rebuild-test-a rebuild-test-b
 gen b "generation B" rebuild-test-a
 
 current() { (cd -P "$profile" 2>/dev/null && pwd -P); }
+# svcadm restart returns before the instance is back; illumos-rebuild disables and enables it, temporarily and
+# waiting for each (-s)
+restarted() { diff <(grep " $1\$" "$SVCADM_LOG") <(printf 'disable -s -t %s\nenable -s -t %s\n' "$1" "$1") > /dev/null; }
 exported() { "$SVCCFG_BIN" export "$1" >/dev/null 2>&1; }
 SVCCFG_BIN=/usr/sbin/svccfg
 
@@ -75,7 +91,7 @@ exported site/rebuild-test-a && exported site/rebuild-test-b && ok "both service
 : > "$SVCADM_LOG"
 "$rebuild" switch --config "$tmp/b.nix" --profile "$profile" >"$tmp/switch2.out" 2>&1 || { bad "switch to B fails"; sed 's/^/    /' "$tmp/switch2.out"; }
 [ "$(current)" = "$pathB" ] && ok "profile points at B" || bad "profile is '$(current)', not $pathB"
-grep -qx 'restart svc:/site/rebuild-test-a:default' "$SVCADM_LOG" && ok "kept service restarted" || { bad "kept service not restarted"; sed 's/^/    /' "$SVCADM_LOG"; }
+restarted svc:/site/rebuild-test-a:default && ok "kept service restarted, waiting for it" || { bad "kept service not restarted synchronously"; sed 's/^/    /' "$SVCADM_LOG"; }
 grep -qx 'disable -s svc:/site/rebuild-test-b:default' "$SVCADM_LOG" && ok "dropped service disabled" || bad "dropped service not disabled"
 ! exported site/rebuild-test-b && ok "dropped service deleted from the repository" || bad "dropped service still in the repository"
 exported site/rebuild-test-a && ok "kept service still in the repository" || bad "kept service missing"
@@ -92,8 +108,17 @@ grep -q 'generation B' <("$SVCCFG_BIN" export site/rebuild-test-a) && ok "kept s
 : > "$SVCADM_LOG"
 "$rebuild" rollback --profile "$profile" >"$tmp/rollback.out" 2>&1 || { bad "rollback fails"; sed 's/^/    /' "$tmp/rollback.out"; }
 [ "$(current)" = "$pathA" ] && ok "rollback points the profile at A" || bad "after rollback profile is '$(current)'"
-grep -qx 'restart svc:/site/rebuild-test-a:default' "$SVCADM_LOG" && ok "rollback restarts the kept service" || bad "rollback did not restart"
+restarted svc:/site/rebuild-test-a:default && ok "rollback restarts the kept service" || bad "rollback did not restart"
 exported site/rebuild-test-b && ok "rollback re-imports the dropped service" || bad "dropped service not back after rollback"
+
+# --- 4b. a kept service that is not online is left alone -------------------
+
+echo "svc:/site/rebuild-test-a:default disabled" > "$SVCS_STATES"
+: > "$SVCADM_LOG"
+"$rebuild" switch --config "$tmp/b.nix" --profile "$profile" >"$tmp/switch4.out" 2>&1 || { bad "switch to B fails"; sed 's/^/    /' "$tmp/switch4.out"; }
+! grep -q 'svc:/site/rebuild-test-a:default' "$SVCADM_LOG" && ok "a kept service that is not online is not restarted" \
+    || { bad "a disabled kept service was touched"; sed 's/^/    /' "$SVCADM_LOG"; }
+: > "$SVCS_STATES"
 
 # --- 5. list-generations ------------------------------------------------------
 
