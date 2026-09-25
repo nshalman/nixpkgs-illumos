@@ -78,7 +78,7 @@ let
     etc/sock2path.d/system%2Fkernel      0644 cmd/cmd-inet/etc/sock2path.d/system%2Fkernel
     # the kernel crypto framework (system/cryptosvc) and libpkcs11
     etc/crypto/kcf.conf                  0644 cmd/cmd-crypto/etc/kcf.conf
-    etc/crypto/pkcs11.conf               0644 cmd/cmd-crypto/etc/pkcs11.conf
+    # (and etc/crypto/pkcs11.conf, made below)
     # RBAC (system/rbac, pfexec), password hashing, the default project
     etc/security/auth_attr               0644 lib/libsecdb/auth_attr.txt
     etc/security/exec_attr               0644 lib/libsecdb/exec_attr.txt
@@ -259,6 +259,13 @@ pkgs.runCommand "illumos-zone-root"
     # and one it cannot qualify makes it sleep a minute and retry at every message
     sed -i 's/^127\.0\.0\.1\tlocalhost loghost$/127.0.0.1\tlocalhost localhost.local loghost/' "$r/etc/inet/hosts"
     grep -q "^127\.0\.0\.1	localhost localhost\.local loghost$" "$r/etc/inet/hosts"
+    # the gate's /etc/crypto/pkcs11.conf without the TPM provider, pkcs11_tpm.so, which SmartOS does not ship (nor
+    # names in its own copy): libpkcs11 logs an error for it in every program that loads it
+    grep -v '^/usr/lib/security/\$ISA/pkcs11_tpm\.so' "$gate/usr/src/cmd/cmd-crypto/etc/pkcs11.conf" \
+      >"$r/etc/crypto/pkcs11.conf"
+    chmod 0644 "$r/etc/crypto/pkcs11.conf"
+    grep -q '^/usr/lib/security/\$ISA/pkcs11_softtoken\.so' "$r/etc/crypto/pkcs11.conf"
+    ! grep -q pkcs11_tpm "$r/etc/crypto/pkcs11.conf"
     f 0444 "${sendmailCf}/sendmail.cf" etc/mail/sendmail.cf
     f 0444 "${sendmailCf}/submit.cf" etc/mail/submit.cf
     # the gate's /etc/default/init, with the time zone SmartOS zones use instead of PST8PDT

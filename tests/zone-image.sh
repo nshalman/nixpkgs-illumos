@@ -32,6 +32,7 @@
 #        sendmail's daemon (listening on the local host only) and its client queue runner;
 #      - every symbolic link under /etc and /var resolves;
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
+#      - every PKCS#11 provider /etc/crypto/pkcs11.conf names is on the platform;
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
 #      - sudo as the base images have it: visudo accepts /etc/sudoers, admin's login shell finds the setuid copy
 #        and runs a command as root without a password, sudoedit runs, its mailer is the platform's sendmail, and a
@@ -283,6 +284,21 @@ broken=$(in_root /usr/bin/find /etc /var -type l ! -exec /usr/bin/test -e {} \; 
 if [ -z "$broken" ]; then ok "every link under /etc and /var resolves"; else bad "links that do not resolve: $broken"; fi
 
 if [ -s "$R/etc/logindevperm" ]; then ok "/etc/logindevperm exists"; else bad "no /etc/logindevperm"; fi
+
+# every PKCS#11 provider /etc/crypto/pkcs11.conf names is on the platform, for both $ISA values (/usr/lib/security/
+# and amd64/): libpkcs11 logs an error for each missing one in every program that loads it (sendmail did)
+missing=
+for lib in $(grep '^/' "$R/etc/crypto/pkcs11.conf" | cut -d: -f1); do
+	for isa in "" amd64/; do
+		p=$(echo "$lib" | sed "s|\\\$ISA/|$isa|")
+		[ -e "$R$p" ] || missing="$missing $p"
+	done
+done
+if [ -z "$missing" ] && grep '^/' "$R/etc/crypto/pkcs11.conf" >/dev/null; then
+	ok "every PKCS#11 provider in /etc/crypto/pkcs11.conf is on the platform"
+else
+	bad "providers in /etc/crypto/pkcs11.conf the platform does not have:$missing"
+fi
 
 if in_root /usr/sbin/useradd -m -d /home/imgtest -s /usr/bin/bash imgtest >"$tmp/useradd.log" 2>&1 &&
 	[ -d "$R/home/imgtest" ]; then
