@@ -17,6 +17,8 @@
 #
 # No --with-ld: gcc looks `ld` up at run time, through -B and PATH, so the nixpkgs bintools wrapper can stand
 # in front of the link-editor. configure still has to know it is the Solaris one, hence LD_FOR_TARGET.
+# A gcc that is called directly, not through the wrappers, has neither -B nor an `ld` on the stdenv's PATH; it gets
+# --with-ld through `linker` (gcc10-illumos).
 {
   lib,
   stdenv,
@@ -35,10 +37,13 @@
   release ? import ./14.nix { inherit fetchurl; },
   # The assembler gcc is configured with.
   assembler ? "${binutils-unwrapped}/bin/as",
+  # The link-editor gcc is configured with (--with-ld), or null to look it up at run time (see above).
+  linker ? null,
 }:
 
 let
   target = "x86_64-pc-solaris2.11";
+  withLd = lib.optionalString (linker != null) " --with-ld=${linker}";
   inherit (release) mpfr gmp mpc;
 in
 stdenv.mkDerivation {
@@ -113,7 +118,7 @@ stdenv.mkDerivation {
       --enable-bootstrap \
       --build=${target} --host=${target} --target=${target} \
       --with-sysroot=${illumos-libc} \
-      --without-gnu-ld \
+      --without-gnu-ld${withLd} \
       --with-gnu-as --with-as=${assembler} \
       --enable-languages=c,c++ \
       --enable-shared \
