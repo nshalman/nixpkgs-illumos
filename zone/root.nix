@@ -79,6 +79,10 @@ let
     etc/security/policy.conf             0644 lib/libsecdb/policy.conf
     etc/security/crypt.conf              0644 cmd/initpkg/security/crypt.conf
     etc/user_attr                        0644 lib/libsecdb/user_attr.txt
+    # the audit classes and events sshd and login look up when they record a session (libbsm); read by sshd-session
+    # in a trace of an ssh login on nixpkgs-native
+    etc/security/audit_class             0644 lib/libbsm/audit_class.txt
+    etc/security/audit_event             0644 lib/libbsm/audit_event.txt
     etc/project                          0644 cmd/Adm/project
     # system-log and log rotation (logadm-upgrade, root's crontab)
     etc/syslog.conf                      0644 cmd/syslogd/syslog.conf
