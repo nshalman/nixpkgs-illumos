@@ -57,6 +57,9 @@ import nixpkgs {
         nixComponents2 = final.nixVersions.nixComponents_2_35;
         withManual = false;
       };
+      # The strap toolchain SmartOS builds illumos with (illumos-extra's binutils 2.34 and gcc 10), built here by
+      # this stdenv against the sysroot. Not part of the bootstrap.
+      binutils-strap = final.callPackage ./pkgs/binutils-strap { };
     })
   ];
 }
