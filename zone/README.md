@@ -39,7 +39,7 @@ closure is copied from the building host's store, and the database is loaded.
 |---|---|
 | `image.nix` | the inputs: `root.tar`, the system profile (`system.nix` with no zone-specific settings), its closure and registration |
 | `root.nix` | `/etc`, `/var` and the brand's mount points: what the enabled services, logins and Nix need, from the illumos-gate commit `illumos-ld` pins (sshd's configuration from smartos-live); accounts with the build users; each file with the reason it is there. Booted as a joyent-brand zone on SmartOS (platform 20260723T000757Z) |
-| `site.xml` | the site profile: turns on the zone console, turns off what a zone should not run (mDNS, rpcbind, rcap, shares, inetd, IPsec, IP tunnels). SMF applies a profile once, on the first boot |
+| `site.xml` | the site profile: turns on the zone console, turns off what a zone should not run (mDNS, rpcbind, rcap, shares, inetd, IPsec, IP tunnels, autofs, sac). SMF applies a profile once, on the first boot |
 | `smf-seed.nix`, `smf-seed-archive.xml` | a seed `/etc/svc/repository.db` from upstream illumos-gate manifests: the gate's non-global seed services, just enough for early manifest import to load the platform's manifests from `/lib/svc/manifest` on first boot, before any service starts. The build checks `svccfg archive` of the result against `smf-seed-archive.xml` |
 | `make-joyent-image` | the root-run step: a dataset, the root file system, the store, the database, a snapshot, `zfs send`, the manifest (adapted from `make-joyent-image.sh` on nixpkgs' `illumos-recipe-v2` branch) |
 

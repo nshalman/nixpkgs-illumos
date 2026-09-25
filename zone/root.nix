@@ -103,6 +103,9 @@ let
     etc/svc/profile/generic_limited_net.xml 0444 cmd/svc/profile/generic_limited_net.xml
     etc/svc/profile/generic_open.xml     0444 cmd/svc/profile/generic_open.xml
     etc/svc/profile/platform_none.xml    0444 cmd/svc/profile/platform_none.xml
+    # generic_limited_net.xml includes /etc/svc/profile/name_service.xml, which an illumos installer links to one of
+    # these; without it the whole profile fails to apply ("XInclude error"). DNS, as /etc/nsswitch.conf is.
+    etc/svc/profile/ns_dns.xml           0444 cmd/svc/profile/ns_dns.xml
   '';
 
   gateFileList = pkgs.writeText "zone-root-gate-files" gateFiles;
@@ -245,6 +248,7 @@ pkgs.runCommand "illumos-zone-root"
     l ../var/adm/utmpx etc/utmpx
     l ../var/adm/wtmpx etc/wtmpx
     l generic_limited_net.xml etc/svc/profile/generic.xml
+    l ns_dns.xml etc/svc/profile/name_service.xml
 
     # mount points that are files: mntfs on /etc/mnttab, sharefs on /etc/dfs/sharetab
     e 0444 etc/mnttab

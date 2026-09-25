@@ -43,4 +43,12 @@
   <service name="network/iptun" version="1" type="service">
     <instance name="default" enabled="false"/>
   </service>
+  <!-- enabled by generic.xml (the gate's generic_limited_net.xml), off in SmartOS's own generic.xml: no automounter
+       and no serial port monitors in this zone -->
+  <service name="system/filesystem/autofs" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="system/sac" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
 </service_bundle>

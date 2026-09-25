@@ -24,6 +24,8 @@
 #        settings (`sshd -T`) allow no password or keyboard-interactive logins and root by key only;
 #      - importing /var/svc/manifest/site, as the first boot does, adds the profile's services (nix-daemon,
 #        mdata-accounts, which runs before mdata:execute and ssh);
+#      - the first boot's early manifest-import, replayed (the platform's manifests, then generic.xml, the platform
+#        profile and site.xml), applies every profile and leaves the services a zone should not run off;
 #      - every symbolic link under /etc and /var resolves;
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
@@ -220,6 +222,29 @@ if [ -z "$missing" ] &&
 	ok "importing /var/svc/manifest/site, as the first boot does, adds nix-daemon and mdata-accounts (before mdata:execute and ssh)"
 else
 	bad "importing /var/svc/manifest/site does not add:${missing:- the dependents of mdata-accounts}"; tail -3 "$tmp/firstboot.log"
+fi
+
+# what the first boot's early manifest-import does (/lib/svc/method/manifest-import): import the platform's
+# /lib/svc/manifest into the seed, then apply generic.xml, the platform profile and site.xml. generic.xml, the gate's
+# generic_limited_net.xml, must apply (it includes /etc/svc/profile/name_service.xml); site.xml then leaves off what
+# a zone should not run, as SmartOS's own generic.xml does.
+cp "$R/etc/svc/repository.db" "$R/tmp/early.db"
+em() { in_root /usr/bin/env SVCCFG_REPOSITORY=/tmp/early.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg "$@"; }
+em import /lib/svc/manifest >"$tmp/early.log" 2>&1
+for p in generic.xml platform_none.xml site.xml; do
+	em apply /etc/svc/profile/$p >>"$tmp/early.log" 2>&1 || echo "apply $p: exit $?" >>"$tmp/early.log"
+done
+states=
+for s in system/filesystem/autofs:default system/sac:default network/inetd:default network/rpc/bind:default \
+	system/identity:domain network/dns/client:default; do
+	states="$states $s=$(em -s "$s" listprop general/enabled 2>/dev/null | awk '{ print $3 }')"
+done
+want=" system/filesystem/autofs:default=false system/sac:default=false network/inetd:default=false"
+want="$want network/rpc/bind:default=false system/identity:domain=true network/dns/client:default=true"
+if ! grep -i -E 'failed|error' "$tmp/early.log" >/dev/null && [ "$states" = "$want" ]; then
+	ok "the first boot's profiles apply (generic.xml, platform, site.xml), and leave autofs, sac, inetd and rpcbind off"
+else
+	bad "the first boot's profiles:$states"; grep -i -E 'failed|error' "$tmp/early.log" | head -5
 fi
 
 broken=$(in_root /usr/bin/find /etc /var -type l ! -exec /usr/bin/test -e {} \; -print 2>/dev/null)
