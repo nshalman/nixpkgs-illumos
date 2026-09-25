@@ -11,7 +11,7 @@
 { pkgs }:
 
 let
-  root = import ./root.nix { inherit pkgs; };
+  root = import ./root.nix { inherit pkgs system; };
   system = import ./system.nix { inherit pkgs; };
   closure = pkgs.closureInfo { rootPaths = [ system ]; };
 in

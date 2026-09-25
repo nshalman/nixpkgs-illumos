@@ -17,7 +17,8 @@
 #      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
 #      - sshd accepts /etc/ssh/sshd_config (`sshd -t`, with host keys made in the copy), and its effective
 #        settings (`sshd -T`) allow no password or keyboard-interactive logins and root by key only;
-#      - the mdata-accounts service is among the profile's site manifests, and runs before mdata:execute and ssh;
+#      - importing /var/svc/manifest/site, as the first boot does, adds the profile's services (nix-daemon,
+#        mdata-accounts, which runs before mdata:execute and ssh);
 #      - every symbolic link under /etc and /var resolves;
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
@@ -165,13 +166,21 @@ else
 	bad "sshd's effective settings: $settings"; tail -3 "$tmp/sshdT.err"
 fi
 
-site=/nix/var/nix/profiles/default/lib/svc/manifest/site/mdata-accounts.xml
-if in_root /usr/bin/test -e $site &&
-	in_root /usr/bin/grep "<service_fmri value='svc:/smartdc/mdata:execute' />" $site >/dev/null &&
-	in_root /usr/bin/grep "<service_fmri value='svc:/network/ssh' />" $site >/dev/null; then
-	ok "mdata-accounts is among the profile's site manifests, with mdata:execute and ssh as dependents"
+# what the first boot's manifest-import does with /var/svc/manifest/site: the profile's services must be there
+cp "$R/etc/svc/repository.db" "$R/tmp/firstboot.db"
+in_root /usr/bin/env SVCCFG_REPOSITORY=/tmp/firstboot.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd \
+	/usr/sbin/svccfg import /var/svc/manifest/site >"$tmp/firstboot.log" 2>&1
+fb() { in_root /usr/bin/env SVCCFG_REPOSITORY=/tmp/firstboot.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg "$@"; }
+missing=
+for s in application/nix-daemon application/mdata-accounts; do
+	fb list | grep -qx "$s" || missing="$missing $s"
+done
+if [ -z "$missing" ] &&
+	fb export application/mdata-accounts | grep "<service_fmri value='svc:/smartdc/mdata:execute'/>" >/dev/null &&
+	fb export application/mdata-accounts | grep "<service_fmri value='svc:/network/ssh'/>" >/dev/null; then
+	ok "importing /var/svc/manifest/site, as the first boot does, adds nix-daemon and mdata-accounts (before mdata:execute and ssh)"
 else
-	bad "no mdata-accounts manifest naming mdata:execute and ssh in the profile's lib/svc/manifest/site"
+	bad "importing /var/svc/manifest/site does not add:${missing:- the dependents of mdata-accounts}"; tail -3 "$tmp/firstboot.log"
 fi
 
 broken=$(in_root /usr/bin/find /etc /var -type l ! -exec /usr/bin/test -e {} \; -print 2>/dev/null)

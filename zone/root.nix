@@ -9,7 +9,11 @@
 # booted from it (etc-reads.d traces of lookups that fail).
 #
 # Tar entries are owned by root (0:0), with the modes set here.
-{ pkgs }:
+{
+  pkgs,
+  # the system profile the image ships (./image.nix), whose SMF manifests the first boot must import
+  system ? import ./system.nix { inherit pkgs; },
+}:
 
 let
   inherit (pkgs) lib;
@@ -250,7 +254,11 @@ pkgs.runCommand "illumos-zone-root"
     # --- SMF ------------------------------------------------------------------------------------------------
     f 0600 "$seedDb" etc/svc/repository.db
     f 0444 "$siteProfile" etc/svc/profile/site.xml
-    l ${profileLink}/lib/svc/manifest/site/nix-daemon.xml var/svc/manifest/site/nix-daemon.xml
+    # The first boot's manifest-import reads /lib/svc/manifest and /var/svc/manifest, not the profile (where
+    # illumos-rebuild imports from later): a link here for every service of the profile, nix-daemon and ./services.nix.
+    for m in ${system}/lib/svc/manifest/site/*.xml; do
+      l ${profileLink}/lib/svc/manifest/site/$(basename "$m") var/svc/manifest/site/$(basename "$m")
+    done
     # what vmadm reads from the image before it provisions a zone (see zoneinitJson)
     f 0644 "$zoneinitJson" var/zoneinit/zoneinit.json
 
