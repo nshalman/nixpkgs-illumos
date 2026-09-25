@@ -8,7 +8,8 @@
 # configuration is smartos-live's. Every file below says why it is here; a first cut, to be checked against a zone
 # booted from it (etc-reads.d traces of lookups that fail).
 #
-# Tar entries are owned by root (0:0), with the modes set here.
+# Tar entries are owned by root (0:0), with the modes set here, except admin's home and the mail directories, whose
+# owners are set where the tar is made.
 {
   pkgs,
   # the system profile the image ships (./image.nix), whose SMF manifests the first boot must import
@@ -93,6 +94,15 @@ let
     # system-log and log rotation (logadm-upgrade, root's crontab)
     etc/syslog.conf                      0644 cmd/syslogd/syslog.conf
     etc/logadm.conf                      0644 cmd/logadm/logadm.conf
+    # mail for the zone's users, root's above all (cron's and sudo's reports): sendmail's files (sendmail.cf and
+    # submit.cf are made below), mailx's defaults, and mailwrapper's table, which sends /usr/lib/sendmail to the
+    # platform's sendmail
+    etc/mail/aliases                     0644 cmd/sendmail/lib/aliases
+    etc/mail/helpfile                    0644 cmd/sendmail/lib/helpfile
+    etc/mail/local-host-names            0644 cmd/sendmail/lib/local-host-names
+    etc/mail/trusted-users               0644 cmd/sendmail/lib/trusted-users
+    etc/mail/mailx.rc                    0644 cmd/mailx/misc/mailx.rc
+    etc/mailer.conf                      0644 cmd/mailwrapper/mailer.conf
     # cron
     etc/cron.d/at.deny                   0644 cmd/Adm/at.deny
     etc/cron.d/cron.deny                 0644 cmd/Adm/cron.deny
@@ -109,6 +119,17 @@ let
   '';
 
   gateFileList = pkgs.writeText "zone-root-gate-files" gateFiles;
+
+  # sendmail's configurations, made as the gate's usr/src/cmd/sendmail/cf/cf/Makefile makes them: sendmail.cf for the
+  # daemon smtp:sendmail runs (local delivery through the platform's mail.local), submit.cf for the submission
+  # program, which hands mail to that daemon on 127.0.0.1. GNU m4 makes both byte for byte as the platform's m4 does.
+  sendmailCf = pkgs.runCommand "sendmail-cf" { nativeBuildInputs = [ pkgs.gnum4 ]; } ''
+    mkdir "$out"
+    cd ${gate}/usr/src/cmd/sendmail/cf/cf
+    for f in sendmail submit; do
+      m4 ../m4/cf.m4 "$f.mc" >"$out/$f.cf"
+    done
+  '';
 
   # vmadm (checkDatasetProvisionable in the platform's /usr/vm/node_modules/VM.js) provisions a joyent-brand zone
   # only from an image whose /var/zoneinit/zoneinit.json declares features.var_svc_provisioning, the promise that
@@ -214,6 +235,12 @@ pkgs.runCommand "illumos-zone-root"
     done
     d 0775 var/adm
     d 1777 var/tmp
+    # the mail queues and mailboxes, with the owners the gate's packages give them (see the tar below): the submission
+    # queue smmsp's, the daemon's queue group bin, the mailboxes group mail
+    d 0770 var/spool/clientmqueue
+    d 0750 var/spool/mqueue
+    d 1777 var/mail
+    d 0775 var/mail/:saved
     l . var/ld/32
     l amd64 var/ld/64
     for p in etc/svc etc/svc/profile etc/svc/volatile etc/dfs etc/rc0.d etc/rc1.d etc/rc2.d etc/rc3.d etc/rcS.d \
@@ -226,6 +253,13 @@ pkgs.runCommand "illumos-zone-root"
       [ -n "$path" ] || continue
       f "$mode" "$gate/usr/src/$src" "$path"
     done
+    # the gate's /etc/inet/hosts with a qualified name for 127.0.0.1, localhost.local, as the SmartOS base images
+    # have it: sendmail takes its own name from that line (hosts-nodename, ./services.nix, adds the node name to it),
+    # and one it cannot qualify makes it sleep a minute and retry at every message
+    sed -i 's/^127\.0\.0\.1\tlocalhost loghost$/127.0.0.1\tlocalhost localhost.local loghost/' "$r/etc/inet/hosts"
+    grep -q "^127\.0\.0\.1	localhost localhost\.local loghost$" "$r/etc/inet/hosts"
+    f 0444 "${sendmailCf}/sendmail.cf" etc/mail/sendmail.cf
+    f 0444 "${sendmailCf}/submit.cf" etc/mail/submit.cf
     # the gate's /etc/default/init, with the time zone SmartOS zones use instead of PST8PDT
     f 0644 "$gate/usr/src/cmd/init/init.dfl" etc/default/init
     sed -i 's/^TZ=.*/TZ=UTC/' "$r/etc/default/init"
@@ -249,6 +283,9 @@ pkgs.runCommand "illumos-zone-root"
     l ../var/adm/wtmpx etc/wtmpx
     l generic_limited_net.xml etc/svc/profile/generic.xml
     l ns_dns.xml etc/svc/profile/name_service.xml
+    l sendmail.cf etc/mail/main.cf
+    l sendmail.cf etc/mail/subsidiary.cf
+    l helpfile etc/mail/sendmail.hf
 
     # mount points that are files: mntfs on /etc/mnttab, sharefs on /etc/dfs/sharetab
     e 0444 etc/mnttab
@@ -280,6 +317,11 @@ pkgs.runCommand "illumos-zone-root"
       members=''${members:+$members,}nixbld$i
     done
     echo "nixbld::30000:$members" >>"$r/etc/group"
+    # smmsp, which the gate's sendmail package adds (service-network-smtp-sendmail.p5m): the group the platform's
+    # sendmail runs setgid to, and the owner of the submission queue
+    echo "smmsp:x:25:25:SendMail Message Submission Program:/:" >>"$r/etc/passwd"
+    echo "smmsp:NP:::::::" >>"$r/etc/shadow"
+    echo "smmsp::25:" >>"$r/etc/group"
     # admin, as the SmartOS base images have it (uid 100, group staff, no password until admin_pw sets one at
     # provisioning, the Service Management and Software Installation RBAC profiles), so payloads that set admin_pw
     # work here too, but with the system profile's bash as root has. Its home belongs to it, see the tar below.
@@ -337,8 +379,14 @@ pkgs.runCommand "illumos-zone-root"
 
     mkdir -p "$out"
     tar -C "$r" -cf "$out/root.tar" --sort=name --numeric-owner --owner=0 --group=0 --mtime=@1 \
-      --exclude=./home/admin .
+      --exclude=./home/admin --exclude=./var/spool/clientmqueue --exclude=./var/spool/mqueue --exclude=./var/mail .
     # admin's home is admin's (100:10)
     tar -C "$r" -rf "$out/root.tar" --numeric-owner --owner=100 --group=10 --mtime=@1 ./home/admin
+    # the mail directories: smmsp:smmsp (25:25), root:bin (0:2), root:mail (0:6)
+    a() { tar -C "$r" -rf "$out/root.tar" --numeric-owner --owner="$1" --group="$2" --mtime=@1 --no-recursion "./$3"; }
+    a 25 25 var/spool/clientmqueue
+    a 0 2 var/spool/mqueue
+    a 0 6 var/mail
+    a 0 6 var/mail/:saved
     (cd "$r" && find . | sort) >"$out/contents"
   ''

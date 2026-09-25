@@ -6,7 +6,9 @@
 #   1. The inputs build, the script makes a stream and a manifest whose sha1 and size match the stream, and the
 #      stream receives.
 #   2. Modes: /etc/shadow 0400, /etc/svc/repository.db 0600, /tmp and /var/tmp 1777, /nix/store 1775 group 30000,
-#      /opt/nix/bin/sudo and sudoedit 4511 (setuid root), /etc/sudoers and /etc/sudoers.d/admin 0440.
+#      /opt/nix/bin/sudo and sudoedit 4511 (setuid root), /etc/sudoers and /etc/sudoers.d/admin 0440; the mail spools
+#      as the gate's packages make them (/var/spool/clientmqueue smmsp 0770, /var/spool/mqueue 0750 group bin,
+#      /var/mail 1777 and /var/mail/:saved 0775 group mail).
 #      vmadm will provision a joyent-brand zone from it: /var/zoneinit/zoneinit.json declares
 #      features.var_svc_provisioning (checkDatasetProvisionable in /usr/vm/node_modules/VM.js; without it,
 #      "provisioning dataset ... with brand joyent is not supported").
@@ -33,6 +35,8 @@
 #      - sudo as the base images have it: visudo accepts /etc/sudoers, admin's login shell finds the setuid copy
 #        and runs a command as root without a password, sudoedit runs, its mailer is the platform's sendmail, and a
 #        user sudoers does not name gets nothing;
+#      - mail: the gate's smmsp account; a message to root, through the image's sendmail.cf and the platform's
+#        mail.local, lands in /var/mail/root and mailx reads it; submit.cf hands mail to 127.0.0.1; mailer.conf;
 #      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc;
 #      - /etc/motd says what the zone is; an interactive login shell has NixOS's aliases and prompt (/etc/bashrc)
 #        and bash-completion, and finds illumos-rebuild;
@@ -109,7 +113,8 @@ fi
 
 mode() { stat -c '%a %g' "$R/$1"; }
 for check in "etc/shadow 400 0" "etc/svc/repository.db 600 0" "tmp 1777 0" "var/tmp 1777 0" "nix/store 1775 30000" \
-	"opt/nix/bin/sudo 4511 0" "opt/nix/bin/sudoedit 4511 0" "etc/sudoers 440 0" "etc/sudoers.d/admin 440 0"; do
+	"opt/nix/bin/sudo 4511 0" "opt/nix/bin/sudoedit 4511 0" "etc/sudoers 440 0" "etc/sudoers.d/admin 440 0" \
+	"var/spool/clientmqueue 770 25" "var/spool/mqueue 750 2" "var/mail 1777 6" "var/mail/:saved 775 6"; do
 	set -- $check
 	if [ "$(mode "$1")" = "$2 $3" ]; then ok "/$1 is mode $2, group $3"; else bad "/$1 is $(mode "$1"), want $2 $3"; fi
 done
@@ -240,7 +245,7 @@ touch "$R/var/svc/provisioning"
 "$hn" start "$R" >"$tmp/hn2.log" 2>&1 && "$hn" start "$R" >"$tmp/hn3.log" 2>&1
 rm -f "$R/var/svc/provisioning"
 line=$(grep '^127\.0\.0\.1' "$R/etc/inet/hosts")
-if [ -n "$hn" ] && [ "$unchanged" = yes ] && [ "$line" = "127.0.0.1	localhost loghost $node" ] &&
+if [ -n "$hn" ] && [ "$unchanged" = yes ] && [ "$line" = "127.0.0.1	localhost localhost.local loghost $node" ] &&
 	[ "$(in_root /usr/bin/getent hosts "$node" | awk '{ print $1 }')" = 127.0.0.1 ]; then
 	ok "at provisioning, hosts-nodename puts the node name on the 127.0.0.1 line of /etc/inet/hosts, once"
 else
@@ -313,6 +318,41 @@ if out=$(in_root /usr/bin/su imgtest -c "/opt/nix/bin/sudo -n /usr/bin/id -u" 2>
 	bad "sudo ran a command as root for imgtest, whom sudoers does not name: $out"
 else
 	ok "sudo refuses a user sudoers does not name ($out)"
+fi
+
+# Mail for root, as smtp:sendmail delivers it: the platform's sendmail with the image's /etc/mail/sendmail.cf (-Am,
+# delivering at once, -odi, since no daemon runs here) hands it to the platform's mail.local, into /var/mail/root,
+# where mailx reads it. The aliases database is made first, as the smtp-sendmail method does at its start.
+if [ "$(in_root /usr/bin/getent passwd smmsp)" = "smmsp:x:25:25:SendMail Message Submission Program:/:" ] &&
+	[ "$(in_root /usr/bin/getent group smmsp)" = "smmsp::25:" ] && grep '^smmsp:NP:' "$R/etc/shadow" >/dev/null; then
+	ok "the smmsp account is the gate's (uid and gid 25, no password)"
+else
+	bad "smmsp: $(in_root /usr/bin/getent passwd smmsp) / $(in_root /usr/bin/getent group smmsp)"
+fi
+in_root /usr/lib/sendmail -bi >"$tmp/mail.log" 2>&1
+printf 'Subject: zone-image mail test\n\nhello root\n' |
+	in_root /usr/lib/sendmail -Am -odi -oi root >>"$tmp/mail.log" 2>&1
+if out=$(in_root /usr/bin/env TERM=dumb /usr/bin/mailx -H -f /var/mail/root 2>&1) &&
+	echo "$out" | grep 'zone-image mail test' >/dev/null; then
+	ok "mail to root is delivered to /var/mail/root and mailx reads it"
+else
+	bad "mail to root: mailx -H said: $out"; tail -5 "$tmp/mail.log"
+fi
+# the submission program's configuration, submit.cf, hands mail to the local host's daemon, at once: a host name it
+# cannot qualify makes sendmail sleep a minute first ("My unqualified host name (localhost) unknown; sleeping for
+# retry"), at every message; localhost.local on the 127.0.0.1 line qualifies it
+t0=$(date +%s)
+out=$(in_root /usr/lib/sendmail -Ac -bv root 2>&1)
+took=$(($(date +%s) - t0))
+if echo "$out" | grep 'mailer relay, host \[127.0.0.1\], user root@localhost.local' >/dev/null && [ "$took" -lt 30 ]; then
+	ok "submitted mail goes to the daemon on 127.0.0.1 (submit.cf), for root@localhost.local, without waiting (${took}s)"
+else
+	bad "submit.cf, after ${took}s: $out"
+fi
+if grep -E '^sendmail[[:space:]]+/usr/lib/smtp/sendmail/sendmail$' "$R/etc/mailer.conf" >/dev/null 2>&1; then
+	ok "/etc/mailer.conf points mailwrapper at the platform's sendmail"
+else
+	bad "/etc/mailer.conf: $(cat "$R/etc/mailer.conf" 2>&1 | grep -v '^#' | head -3)"
 fi
 
 if out=$(chroot "$R" /usr/bin/env -i PATH=/usr/bin:/usr/sbin HOME=/root SSH_CLIENT="192.0.2.1 50000 22" \
