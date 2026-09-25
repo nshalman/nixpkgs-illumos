@@ -6,7 +6,7 @@
 #   1. The inputs build, the script makes a stream and a manifest whose sha1 and size match the stream, and the
 #      stream receives.
 #   2. Modes: /etc/shadow 0400, /etc/svc/repository.db 0600, /tmp and /var/tmp 1777, /nix/store 1775 group 30000,
-#      /opt/nix/bin/sudo 4511 (setuid root), /etc/sudoers and /etc/sudoers.d/admin 0440.
+#      /opt/nix/bin/sudo and sudoedit 4511 (setuid root), /etc/sudoers and /etc/sudoers.d/admin 0440.
 #      vmadm will provision a joyent-brand zone from it: /var/zoneinit/zoneinit.json declares
 #      features.var_svc_provisioning (checkDatasetProvisionable in /usr/vm/node_modules/VM.js; without it,
 #      "provisioning dataset ... with brand joyent is not supported").
@@ -27,7 +27,7 @@
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
 #      - sudo as the base images have it: visudo accepts /etc/sudoers, admin's login shell finds the setuid copy
-#        and runs a command as root without a password, and a user sudoers does not name gets nothing;
+#        and runs a command as root without a password, sudoedit runs, and a user sudoers does not name gets nothing;
 #      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc;
 #      - /etc/motd says what the zone is; an interactive login shell has NixOS's aliases and prompt (/etc/bashrc)
 #        and bash-completion, and finds illumos-rebuild;
@@ -104,7 +104,7 @@ fi
 
 mode() { stat -c '%a %g' "$R/$1"; }
 for check in "etc/shadow 400 0" "etc/svc/repository.db 600 0" "tmp 1777 0" "var/tmp 1777 0" "nix/store 1775 30000" \
-	"opt/nix/bin/sudo 4511 0" "etc/sudoers 440 0" "etc/sudoers.d/admin 440 0"; do
+	"opt/nix/bin/sudo 4511 0" "opt/nix/bin/sudoedit 4511 0" "etc/sudoers 440 0" "etc/sudoers.d/admin 440 0"; do
 	set -- $check
 	if [ "$(mode "$1")" = "$2 $3" ]; then ok "/$1 is mode $2, group $3"; else bad "/$1 is $(mode "$1"), want $2 $3"; fi
 done
@@ -233,6 +233,14 @@ if out=$(in_root /usr/bin/su admin -c "/usr/bin/env -i HOME=/home/admin LOGNAME=
 	ok "admin's login shell finds the setuid sudo, which runs a command as root without a password"
 else
 	bad "admin and sudo: $out"
+fi
+# sudoedit is sudo under another name (sudo -e): admin's editor, here one that changes nothing, runs on a copy
+if out=$(in_root /usr/bin/su admin -c "/usr/bin/env -i HOME=/home/admin LOGNAME=admin USER=admin \
+	/usr/bin/bash -lc 'command -v sudoedit && SUDO_EDITOR=/usr/bin/true sudoedit -n /etc/motd'" 2>&1) &&
+	echo "$out" | head -1 | grep -x /opt/nix/bin/sudoedit >/dev/null; then
+	ok "admin's login shell finds the setuid sudoedit, which edits a root-owned file ($(echo $out | cut -d' ' -f2-))"
+else
+	bad "admin and sudoedit: $out"
 fi
 if out=$(in_root /usr/bin/su imgtest -c "/opt/nix/bin/sudo -n /usr/bin/id -u" 2>&1); then
 	bad "sudo ran a command as root for imgtest, whom sudoers does not name: $out"

@@ -10,7 +10,7 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 | `system.nix` | the profile: Nix, bash, coreutils, rsync, git, grep, awk, the CA bundle, the SMF manifests, `etc/nix/nix.conf`, sudo and `etc/setuid-programs` |
 | `nix-conf.nix` | renders `etc/nix/nix.conf` from the defaults in `system.nix` merged with the zone's `nixSettings` |
 | `smf-lib.nix`, `services.nix` | SMF manifest generators and the services declared: `nix-daemon` |
-| `illumos-rebuild` | `build`, `switch`, `rollback`, `list-generations`: `nix-env --set` generations, `svccfg import` of the manifests, deletion of services no longer declared, `svcadm restart` of the services both generations declare when the system path changed, setuid copies of the programs the profile lists in `etc/setuid-programs` (sudo) |
+| `illumos-rebuild` | `build`, `switch`, `rollback`, `list-generations`: `nix-env --set` generations, `svccfg import` of the manifests, deletion of services no longer declared, `svcadm restart` of the services both generations declare when the system path changed, setuid copies of the programs the profile lists in `etc/setuid-programs` (sudo, sudoedit) |
 
 ## Outside the profile, per zone
 
@@ -21,7 +21,7 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 | `/etc/nixos/system.nix` | that commit's `system.nix` applied to the package set and the zone's `nixSettings` | `example/system.nix` |
 | `/etc/nix/nix.conf` | symlink to `/nix/var/nix/profiles/default/etc/nix/nix.conf` | made once by hand or by the image |
 | `/etc/profile` | puts `/opt/nix/bin` and the profile on PATH and the profile on MANPATH, exports the CA bundle | `profile` |
-| `/opt/nix/bin` | setuid-root copies of the programs the profile lists in `etc/setuid-programs` (sudo), which the store cannot hold | the zone image, then `illumos-rebuild` on each switch |
+| `/opt/nix/bin` | setuid-root copies of the programs the profile lists in `etc/setuid-programs` (sudo, sudoedit), which the store cannot hold | the zone image, then `illumos-rebuild` on each switch |
 | `/etc/sudoers`, `/etc/sudoers.d/admin` | the SmartOS base images' sudo configuration: root, and admin without a password | the zone image |
 | `/etc/ssl/certs/ca-bundle.crt`, `ca-certificates.crt` | symlinks to the profile's `etc/ssl/certs/ca-bundle.crt` | the zone image |
 | `/etc/passwd`, `shadow`, `group` | root's shell is the profile's bash; group `nixbld` with members `nixbld1..32` (uids 30001..30032, gid 30000, home `/var/empty`, no login), which `build-users-group` names | the zone image |

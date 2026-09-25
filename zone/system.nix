@@ -16,8 +16,10 @@ let
   '';
   # The programs to run setuid root, which the store cannot hold: the zone image and illumos-rebuild copy each into
   # /opt/nix/bin, setuid root, and /etc/profile puts that directory ahead of the profile
+  # (sudoedit is sudo under another name: a copy of its own, as the name it runs by decides what it does)
   setuidPrograms = pkgs.writeTextDir "etc/setuid-programs" ''
     bin/sudo
+    bin/sudoedit
   '';
   nixConf = import ./nix-conf.nix {
     inherit pkgs;
