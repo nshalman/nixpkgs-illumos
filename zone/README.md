@@ -9,7 +9,7 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 |---|---|
 | `system.nix` | the profile: Nix, bash, coreutils, rsync, git, grep, awk, the CA bundle, the SMF manifests, `etc/nix/nix.conf`, sudo and `etc/setuid-programs` |
 | `nix-conf.nix` | renders `etc/nix/nix.conf` from the defaults in `system.nix` merged with the zone's `nixSettings` |
-| `smf-lib.nix`, `services.nix` | SMF manifest generators and the services declared: `nix-daemon` |
+| `smf-lib.nix`, `services.nix` | SMF manifest generators and the services declared: `mdata-accounts` (keys and passwords from the metadata), `hosts-nodename` (the node name in `/etc/inet/hosts` at provisioning); `nix-daemon`'s comes with Nix |
 | `illumos-rebuild` | `build`, `switch`, `rollback`, `list-generations`: `nix-env --set` generations, `svccfg import` of the manifests, deletion of services no longer declared, `svcadm restart` of the services both generations declare when the system path changed, setuid copies of the programs the profile lists in `etc/setuid-programs` (sudo, sudoedit) |
 
 ## Outside the profile, per zone

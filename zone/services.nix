@@ -117,7 +117,69 @@ rec {
     duration = "transient";
   };
 
-  manifests = [ mdataAccounts ];
+  # The zone's node name on the 127.0.0.1 line of /etc/inet/hosts, as a SmartOS base image's zoneinit puts it there
+  # (12-network.sh) while the zone is being provisioned: the brand writes /etc/nodename, and nothing else makes the
+  # name resolve. sendmail needs it too: a host name it cannot look up makes it sleep for a minute and retry, at
+  # every start and every message ("My unqualified host name ... unknown; sleeping for retry"). Only while the zone
+  # is being provisioned (/var/svc/provisioning), and once. The optional second argument is a directory to act on
+  # instead of /, for testing.
+  hostsNodenameMethod = smf.mkSmfMethodScript {
+    name = "hosts-nodename";
+    start = ''
+      r=''${2:-}
+      if [ ! -f "$r/var/svc/provisioning" ]; then
+          echo "not provisioning: /etc/inet/hosts left as it is"
+          exit "$SMF_EXIT_OK"
+      fi
+      name=$(cat "$r/etc/nodename" 2>/dev/null)
+      if [ -z "$name" ]; then
+          echo "no node name in /etc/nodename: /etc/inet/hosts left as it is"
+          exit "$SMF_EXIT_OK"
+      fi
+      hosts=$r/etc/inet/hosts
+      if awk -v n="$name" '$1 == "127.0.0.1" { for (i = 2; i <= NF; i++) if ($i == n) f = 1 } END { exit !f }' "$hosts"; then
+          echo "$name is on the 127.0.0.1 line of /etc/inet/hosts already"
+          exit "$SMF_EXIT_OK"
+      fi
+      sed "/^127\.0\.0\.1[ 	]/s/\$/ $name/" "$hosts" >"$hosts.new" && chmod 0644 "$hosts.new" &&
+          mv "$hosts.new" "$hosts" || exit "$SMF_EXIT_ERR_FATAL"
+      echo "added $name to the 127.0.0.1 line of /etc/inet/hosts"
+    '';
+    stop = ":";
+  };
+
+  hostsNodename = smf.mkSmfManifest {
+    name = "hosts-nodename";
+    description = "the zone's node name in /etc/inet/hosts, at provisioning";
+    dependencies = [
+      {
+        name = "filesystem-local";
+        fmri = "svc:/system/filesystem/local";
+      }
+    ];
+    dependents = [
+      {
+        name = "hosts-nodename_mdata-execute";
+        fmri = "svc:/smartdc/mdata:execute";
+      }
+      {
+        name = "hosts-nodename_smtp";
+        fmri = "svc:/network/smtp";
+      }
+      {
+        name = "hosts-nodename_sendmail-client";
+        fmri = "svc:/network/sendmail-client";
+      }
+    ];
+    start.exec = "${hostsNodenameMethod} %m";
+    stop.exec = ":true";
+    duration = "transient";
+  };
+
+  manifests = [
+    mdataAccounts
+    hostsNodename
+  ];
 
   bundle = smf.mkSmfManifestBundle { inherit manifests; };
 }

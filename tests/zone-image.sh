@@ -23,7 +23,8 @@
 #      - sshd accepts /etc/ssh/sshd_config (`sshd -t`, with host keys made in the copy), and its effective
 #        settings (`sshd -T`) allow no password or keyboard-interactive logins and root by key only;
 #      - importing /var/svc/manifest/site, as the first boot does, adds the profile's services (nix-daemon,
-#        mdata-accounts, which runs before mdata:execute and ssh);
+#        mdata-accounts, which runs before mdata:execute and ssh, hosts-nodename, before mdata:execute and smtp);
+#      - hosts-nodename puts the node name on the 127.0.0.1 line of /etc/inet/hosts at provisioning only, once;
 #      - the first boot's early manifest-import, replayed (the platform's manifests, then generic.xml, the platform
 #        profile and site.xml), applies every profile and leaves the services a zone should not run off;
 #      - every symbolic link under /etc and /var resolves;
@@ -213,15 +214,38 @@ in_root /usr/bin/env SVCCFG_REPOSITORY=/tmp/firstboot.db SVCCFG_CONFIGD_PATH=/li
 	/usr/sbin/svccfg import /var/svc/manifest/site >"$tmp/firstboot.log" 2>&1
 fb() { in_root /usr/bin/env SVCCFG_REPOSITORY=/tmp/firstboot.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg "$@"; }
 missing=
-for s in application/nix-daemon application/mdata-accounts; do
+for s in application/nix-daemon application/mdata-accounts application/hosts-nodename; do
 	fb list | grep -qx "$s" || missing="$missing $s"
 done
 if [ -z "$missing" ] &&
 	fb export application/mdata-accounts | grep "<service_fmri value='svc:/smartdc/mdata:execute'/>" >/dev/null &&
-	fb export application/mdata-accounts | grep "<service_fmri value='svc:/network/ssh'/>" >/dev/null; then
-	ok "importing /var/svc/manifest/site, as the first boot does, adds nix-daemon and mdata-accounts (before mdata:execute and ssh)"
+	fb export application/mdata-accounts | grep "<service_fmri value='svc:/network/ssh'/>" >/dev/null &&
+	fb export application/hosts-nodename | grep "<service_fmri value='svc:/smartdc/mdata:execute'/>" >/dev/null &&
+	fb export application/hosts-nodename | grep "<service_fmri value='svc:/network/smtp'/>" >/dev/null; then
+	ok "importing /var/svc/manifest/site, as the first boot does, adds nix-daemon, mdata-accounts (before mdata:execute and ssh) and hosts-nodename (before mdata:execute and smtp)"
 else
 	bad "importing /var/svc/manifest/site does not add:${missing:- the dependents of mdata-accounts}"; tail -3 "$tmp/firstboot.log"
+fi
+
+# the hosts-nodename method (zone/services.nix), as the first boot runs it: with /var/svc/provisioning present it
+# puts the node name the brand wrote to /etc/nodename on the 127.0.0.1 line of /etc/inet/hosts, once; otherwise it
+# leaves the file alone. The name is this zone's own, which the chroot's sendmail below looks up.
+hn=$(nix-build --no-out-link -E "(import $top/zone/services.nix { pkgs = import $pkgsFile; }).hostsNodenameMethod" 2>"$tmp/hn.log")
+node=$(uname -n)
+echo "$node" >"$R/etc/nodename"
+before=$(cat "$R/etc/inet/hosts")
+"$hn" start "$R" >"$tmp/hn1.log" 2>&1
+unchanged=$([ "$(cat "$R/etc/inet/hosts")" = "$before" ] && echo yes)
+touch "$R/var/svc/provisioning"
+"$hn" start "$R" >"$tmp/hn2.log" 2>&1 && "$hn" start "$R" >"$tmp/hn3.log" 2>&1
+rm -f "$R/var/svc/provisioning"
+line=$(grep '^127\.0\.0\.1' "$R/etc/inet/hosts")
+if [ -n "$hn" ] && [ "$unchanged" = yes ] && [ "$line" = "127.0.0.1	localhost loghost $node" ] &&
+	[ "$(in_root /usr/bin/getent hosts "$node" | awk '{ print $1 }')" = 127.0.0.1 ]; then
+	ok "at provisioning, hosts-nodename puts the node name on the 127.0.0.1 line of /etc/inet/hosts, once"
+else
+	bad "hosts-nodename: not provisioning left the file alone: ${unchanged:-no}; 127.0.0.1 line: '$line'"
+	cat "$tmp/hn.log" "$tmp/hn1.log" "$tmp/hn2.log" "$tmp/hn3.log" 2>/dev/null | tail -5
 fi
 
 # what the first boot's early manifest-import does (/lib/svc/method/manifest-import): import the platform's
