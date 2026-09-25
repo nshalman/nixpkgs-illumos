@@ -26,7 +26,8 @@
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
 #      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc;
-#      - /etc/motd says what the zone is; an interactive login shell has NixOS's aliases and prompt (/etc/bashrc);
+#      - /etc/motd says what the zone is; an interactive login shell has NixOS's aliases and prompt (/etc/bashrc)
+#        and bash-completion, and finds illumos-rebuild;
 #      - the nixpkgs-illumos binary cache is off, and on once /etc/nix/nix.local.conf.example is copied into place.
 #   4. /etc/nixos/system.nix evaluates to the system profile the image ships, so a first `illumos-rebuild switch`
 #      changes nothing. It fetches what /etc/nixos/nixpkgs-illumos.nix names, so this holds only while that
@@ -231,6 +232,15 @@ if out=$(in_root /usr/bin/env TERM=xterm /nix/var/nix/profiles/default/bin/bash 
 	ok "an interactive login shell has NixOS's aliases and prompt"
 else
 	bad "an interactive login shell lacks the aliases or prompt: $out"
+fi
+
+if out=$(in_root /usr/bin/env TERM=xterm /nix/var/nix/profiles/default/bin/bash -lic \
+	'command -v illumos-rebuild; type -t _comp_initialize || type -t _init_completion' 2>/dev/null) &&
+	echo "$out" | grep -x /nix/var/nix/profiles/default/bin/illumos-rebuild >/dev/null &&
+	echo "$out" | grep -x function >/dev/null; then
+	ok "an interactive login shell has bash-completion and finds illumos-rebuild"
+else
+	bad "an interactive login shell lacks bash-completion or illumos-rebuild: $out"
 fi
 
 cache=https://www.shalman.org/files/cache

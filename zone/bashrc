@@ -36,6 +36,11 @@ if [ -n "$PS1" ]; then
     alias -- l='ls -alh'
     alias -- ll='ls -l'
     alias -- ls='ls --color=tty'
+
+    # Programmable completion, from bash-completion in the system profile, as NixOS enables it by default.
+    if [ -r /nix/var/nix/profiles/default/etc/profile.d/bash_completion.sh ]; then
+        . /nix/var/nix/profiles/default/etc/profile.d/bash_completion.sh
+    fi
 fi
 
 # Read system-wide modifications.

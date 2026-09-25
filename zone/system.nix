@@ -10,6 +10,10 @@
 }:
 let
   services = import ./services.nix { inherit pkgs; };
+  # ./illumos-rebuild on the profile's PATH, so a zone can rebuild and switch itself from /etc/nixos/system.nix
+  illumosRebuild = pkgs.runCommand "illumos-rebuild" { } ''
+    install -D -m 0555 ${./illumos-rebuild} $out/bin/illumos-rebuild
+  '';
   nixConf = import ./nix-conf.nix {
     inherit pkgs;
     settings = {
@@ -42,6 +46,10 @@ pkgs.buildEnv {
     services.bundle
     # etc/nix/nix.conf, which the zone's /etc/nix/nix.conf points at
     nixConf
+    illumosRebuild
+    # programmable completion in interactive bash (/etc/bashrc loads its etc/profile.d/bash_completion.sh), which
+    # NixOS enables by default; a command's completions are found beside it, under the profile's share/
+    bash-completion
   ];
   pathsToLink = [ "/bin" "/etc" "/lib" "/libexec" "/share" ];
   ignoreCollisions = true;
