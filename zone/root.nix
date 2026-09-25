@@ -147,6 +147,18 @@ let
     extra-substituters = ${cacheUrl}
   '';
 
+  # sudo as the SmartOS base images configure it (pkgsrc's /opt/local/etc/sudoers and sudoers.d/admin), with this
+  # zone's paths: the setuid copies and the system profile on the secure path
+  sudoers = pkgs.writeText "sudoers" ''
+    Defaults!${profileLink}/bin/visudo env_keep += "SUDO_EDITOR EDITOR VISUAL"
+    Defaults secure_path="/opt/nix/bin:${profileLink}/bin:/usr/sbin:/usr/bin:/sbin"
+    root ALL=(ALL:ALL) ALL
+    @includedir /etc/sudoers.d
+  '';
+  sudoersAdmin = pkgs.writeText "sudoers-admin" ''
+    admin ALL=(root) NOPASSWD: SETENV: ALL
+  '';
+
   motd = pkgs.writeText "motd" ''
 
       nixpkgs-illumos zone: Nix ${pkgs.nixVersions.nix_2_35.version} in a SmartOS zone
@@ -161,7 +173,7 @@ let
 in
 pkgs.runCommand "illumos-zone-root"
   {
-    inherit gate gateFileList sshdConfig nixosSystem zoneinitJson nixLocalConfExample motd;
+    inherit gate gateFileList sshdConfig nixosSystem zoneinitJson nixLocalConfExample motd sudoers sudoersAdmin;
     seedDb = "${seed}/repository.db";
     siteProfile = ./site.xml;
     etcProfile = ./profile;
@@ -267,12 +279,23 @@ pkgs.runCommand "illumos-zone-root"
     # admin, as the SmartOS base images have it (uid 100, group staff, no password until admin_pw sets one at
     # provisioning, the Service Management and Software Installation RBAC profiles), so payloads that set admin_pw
     # work here too, but with the system profile's bash as root has. Its home belongs to it, see the tar below.
-    # (Those images also give it sudo, which this image does not ship; pfexec and the profiles remain.)
+    # Those images also give it sudo without a password, as does this one (see sudo below).
     echo "admin:x:100:10::/home/admin:${profileLink}/bin/bash" >>"$r/etc/passwd"
     echo "admin:NP:::::::" >>"$r/etc/shadow"
     echo "admin::::type=normal;profiles=Service Management,Software Installation" >>"$r/etc/user_attr"
     d 0755 home/admin
     chmod 0400 "$r/etc/shadow"
+
+    # --- sudo -------------------------------------------------------------------------------------------------
+    # the setuid copies illumos-rebuild keeps up to date (./illumos-rebuild, installSetuid), as it would make them
+    # for the shipped system
+    while read -r p; do
+      [ -n "$p" ] || continue
+      f 4511 "${system}/$p" "opt/nix/bin/$(basename "$p")"
+    done <${system}/etc/setuid-programs
+    f 0440 "$sudoers" etc/sudoers
+    d 0755 etc/sudoers.d
+    f 0440 "$sudoersAdmin" etc/sudoers.d/admin
 
     # --- sshd -------------------------------------------------------------------------------------------------
     # the platform's sshd with smartos-live's configuration; the method makes host keys in /var/ssh at first start

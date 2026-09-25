@@ -14,6 +14,11 @@ let
   illumosRebuild = pkgs.runCommand "illumos-rebuild" { } ''
     install -D -m 0555 ${./illumos-rebuild} $out/bin/illumos-rebuild
   '';
+  # The programs to run setuid root, which the store cannot hold: the zone image and illumos-rebuild copy each into
+  # /opt/nix/bin, setuid root, and /etc/profile puts that directory ahead of the profile
+  setuidPrograms = pkgs.writeTextDir "etc/setuid-programs" ''
+    bin/sudo
+  '';
   nixConf = import ./nix-conf.nix {
     inherit pkgs;
     settings = {
@@ -50,6 +55,9 @@ pkgs.buildEnv {
     # programmable completion in interactive bash (/etc/bashrc loads its etc/profile.d/bash_completion.sh), which
     # NixOS enables by default; a command's completions are found beside it, under the profile's share/
     bash-completion
+    # sudo, as the SmartOS base images have it (the zone image's /etc/sudoers); it runs from its setuid copy
+    sudo
+    setuidPrograms
   ];
   pathsToLink = [ "/bin" "/etc" "/lib" "/libexec" "/share" ];
   ignoreCollisions = true;

@@ -35,6 +35,14 @@ if [ -d /nix/var/nix/profiles/default/share/man ]; then
     esac
     export MANPATH
 fi
+# The setuid copies illumos-rebuild keeps in /opt/nix/bin (sudo) go ahead of
+# the profile, whose own copies of them cannot be setuid.
+if [ -d /opt/nix/bin ]; then
+    case ":$PATH:" in
+        *:/opt/nix/bin:*) ;;
+        *) PATH="/opt/nix/bin:$PATH" ;;
+    esac
+fi
 export PATH
 
 # CA bundle from pkgs.cacert (shipped via the system profile). The

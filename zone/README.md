@@ -7,10 +7,10 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 
 | file | what |
 |---|---|
-| `system.nix` | the profile: Nix, bash, coreutils, rsync, git, grep, awk, the CA bundle, the SMF manifests, `etc/nix/nix.conf` |
+| `system.nix` | the profile: Nix, bash, coreutils, rsync, git, grep, awk, the CA bundle, the SMF manifests, `etc/nix/nix.conf`, sudo and `etc/setuid-programs` |
 | `nix-conf.nix` | renders `etc/nix/nix.conf` from the defaults in `system.nix` merged with the zone's `nixSettings` |
 | `smf-lib.nix`, `services.nix` | SMF manifest generators and the services declared: `nix-daemon` |
-| `illumos-rebuild` | `build`, `switch`, `rollback`, `list-generations`: `nix-env --set` generations, `svccfg import` of the manifests, deletion of services no longer declared, `svcadm restart` of the services both generations declare when the system path changed |
+| `illumos-rebuild` | `build`, `switch`, `rollback`, `list-generations`: `nix-env --set` generations, `svccfg import` of the manifests, deletion of services no longer declared, `svcadm restart` of the services both generations declare when the system path changed, setuid copies of the programs the profile lists in `etc/setuid-programs` (sudo) |
 
 ## Outside the profile, per zone
 
@@ -20,7 +20,9 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 | `/etc/nixos/pkgs.nix` | the package set: that commit's `illumos.nix` on its defaults | `example/pkgs.nix` |
 | `/etc/nixos/system.nix` | that commit's `system.nix` applied to the package set and the zone's `nixSettings` | `example/system.nix` |
 | `/etc/nix/nix.conf` | symlink to `/nix/var/nix/profiles/default/etc/nix/nix.conf` | made once by hand or by the image |
-| `/etc/profile` | puts the profile on PATH and MANPATH, exports the CA bundle | `profile` |
+| `/etc/profile` | puts `/opt/nix/bin` and the profile on PATH and the profile on MANPATH, exports the CA bundle | `profile` |
+| `/opt/nix/bin` | setuid-root copies of the programs the profile lists in `etc/setuid-programs` (sudo), which the store cannot hold | the zone image, then `illumos-rebuild` on each switch |
+| `/etc/sudoers`, `/etc/sudoers.d/admin` | the SmartOS base images' sudo configuration: root, and admin without a password | the zone image |
 | `/etc/ssl/certs/ca-bundle.crt`, `ca-certificates.crt` | symlinks to the profile's `etc/ssl/certs/ca-bundle.crt` | the zone image |
 | `/etc/passwd`, `shadow`, `group` | root's shell is the profile's bash; group `nixbld` with members `nixbld1..32` (uids 30001..30032, gid 30000, home `/var/empty`, no login), which `build-users-group` names | the zone image |
 | `/etc/svc/repository.db` | from this directory's image, the seed (`smf-seed.nix`), which manifest-import fills from the platform's manifests on first boot; `illumos-rebuild` imports the profile's manifests afterwards | the zone image |
@@ -59,7 +61,7 @@ zone without touching its profile or SMF repository:
 
 `tests/zone-image.sh PKGS-FILE PARENT-DATASET` (root, a delegated dataset) makes an image, receives its stream
 and checks the received root in a chroot: modes, accounts, a login shell finding nix, Nix's database, the seed,
-`sshd -t`, that every link resolves, and that `/etc/nixos/system.nix` evaluates to the shipped system.
+`sshd -t`, sudo for admin, that every link resolves, and that `/etc/nixos/system.nix` evaluates to the shipped system.
 
 `tests/installed-zone.sh [CACHE-URL STDENV-PATH]` checks a zone after the installer ran in it: the daemon, the
 build users, the store, login shells, an unprivileged build and, given them, substitution of the stdenv from a
