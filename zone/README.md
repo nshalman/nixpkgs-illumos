@@ -23,17 +23,22 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 | `/etc/profile` | puts the profile on PATH and MANPATH, exports the CA bundle | `profile` |
 | `/etc/ssl/certs/ca-bundle.crt`, `ca-certificates.crt` | symlinks to the profile's `etc/ssl/certs/ca-bundle.crt` | the zone image |
 | `/etc/passwd`, `shadow`, `group` | root's shell is the profile's bash; group `nixbld` with members `nixbld1..32` (uids 30001..30032, gid 30000, home `/var/empty`, no login), which `build-users-group` names | the zone image |
-| `/etc/svc/repository.db` | the services imported at image time; `illumos-rebuild` keeps it current afterwards | the zone image |
+| `/etc/svc/repository.db` | from this directory's image, the seed (`smf-seed.nix`), which manifest-import fills from the platform's manifests on first boot; `illumos-rebuild` imports the profile's manifests afterwards | the zone image |
 
-The zone image builder is still the one on the `illumos-recipe-v2` branch of nixpkgs
-(`pkgs/stdenv/illumos-recipe/zone-root/builder.sh`, `make-zone-root.nix`, `make-zone-image.nix`,
-`make-joyent-image.nix`); porting it here is open.
+## The zone image
 
-## For the zone image
+`nix-build image.nix` (with `pkgs`) makes the inputs, then, as root on a zone with a delegated dataset,
+`make-joyent-image --parent-dataset <dataset> --inputs <result> --name nix-zone --version <v> --out-dir <dir>`
+makes `<uuid>.zfs.gz` and `<uuid>.imgmanifest` for `imgadm install`. It ships the Nix store: the system profile's
+closure is copied from the building host's store, and the database is loaded.
 
 | file | what |
 |---|---|
+| `image.nix` | the inputs: `root.tar`, the system profile (`system.nix` with no zone-specific settings), its closure and registration |
+| `root.nix` | `/etc`, `/var` and the brand's mount points: what the enabled services, logins and Nix need, from the illumos-gate commit `illumos-ld` pins (sshd's configuration from smartos-live); accounts with the build users; each file with the reason it is there. A first cut, not yet booted |
+| `site.xml` | the site profile: turns on the zone console, turns off what a zone should not run (mDNS, rpcbind, rcap, shares, inetd, IPsec, IP tunnels). SMF applies a profile once, on the first boot |
 | `smf-seed.nix`, `smf-seed-archive.xml` | a seed `/etc/svc/repository.db` from upstream illumos-gate manifests: the gate's non-global seed services, just enough for early manifest import to load the platform's manifests from `/lib/svc/manifest` on first boot, before any service starts. The build checks `svccfg archive` of the result against `smf-seed-archive.xml` |
+| `make-joyent-image` | the root-run step: a dataset, the root file system, the store, the database, a snapshot, `zfs send`, the manifest (adapted from `make-joyent-image.sh` on nixpkgs' `illumos-recipe-v2` branch) |
 
 ## Installing Nix in an existing zone
 
@@ -51,6 +56,10 @@ zone without touching its profile or SMF repository:
     tests/illumos-rebuild.sh /etc/nixos/pkgs.nix  # switch, removal, restart, rollback on scratch state
     tests/nix-conf.sh /etc/nixos/pkgs.nix         # the rendered nix.conf, and that nix parses it
     tests/smf-seed.sh /etc/nixos/pkgs.nix         # the seed: its services, configuration, recorded manifest paths
+
+`tests/zone-image.sh PKGS-FILE PARENT-DATASET` (root, a delegated dataset) makes an image, receives its stream
+and checks the received root in a chroot: modes, accounts, a login shell finding nix, Nix's database, the seed,
+`sshd -t`, that every link resolves, and that `/etc/nixos/system.nix` evaluates to the shipped system.
 
 `tests/installed-zone.sh [CACHE-URL STDENV-PATH]` checks a zone after the installer ran in it: the daemon, the
 build users, the store, login shells, an unprivileged build and, given them, substitution of the stdenv from a

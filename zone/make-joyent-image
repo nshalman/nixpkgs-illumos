@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+#
+# Build a joyent-brand zone image (`.zfs.gz` + `.imgmanifest`) from ./image.nix's output: the root file system
+# tar, the system profile and its closure, which is copied from this host's /nix/store.
+#
+# Impure: this is NOT a nix-driven build. The script needs:
+#   - root (or `pfexec`) so it can `zfs create`, snapshot, and `zfs send`; a Nix build runs as a build user and
+#     cannot.
+#   - /usr/sbin/zfs on PATH, a parent dataset it may create children under (a zone's delegated dataset will do).
+#   - the image inputs realised in this host's store (nix-build ./image.nix).
+#   - gzip, `digest -a sha1` (or sha1sum), a GNU tar and rsync.
+#
+# Usage:
+#   make-joyent-image \
+#       --parent-dataset zones/<zone uuid>/data \
+#       --inputs         /nix/store/<hash>-illumos-zone-image-inputs \
+#       --name           nix-zone \
+#       --version        0.1.0 \
+#       --out-dir        ./out \
+#       [--description   "...text..."] \
+#       [--keep-dataset]
+#
+# Produces (in $OUT_DIR):
+#   <uuid>.zfs.gz         the zfs send stream, gzip-compressed
+#   <uuid>.imgmanifest    IMGAPI v2 manifest, ready for `imgadm install`
+#
+# After the build the temp dataset (`$PARENT_DATASET/<uuid>`) is destroyed unless --keep-dataset is passed; with it,
+# the dataset and its @final snapshot stay for inspection.
+#
+# DB pre-population
+# -----------------
+# Both build host and target zone use /nix/store as the actual store directory. nix-store accepts a NIX_STATE_DIR
+# env var override at runtime (only NIX_STORE_DIR is compile-time-fixed), so we can run the image's own nix-store
+# binary on the host, pointed at the dataset's nix/var/nix, and have it write the DB into the dataset's
+# /nix/var/nix/db/db.sqlite.
+#
+# Using the *image's* nix-store (not the host's) keeps the on-disk DB schema matched to the nix that will read it
+# at boot.
+#
+# Adapted from make-joyent-image.sh of nixpkgs' illumos-recipe-v2 branch (pkgs/stdenv/illumos-recipe), which
+# unpacked two tarballs instead.
+
+set -euo pipefail
+
+# --- arg parsing -------------------------------------------------------------
+
+PARENT_DATASET=""
+INPUTS=""
+NAME=""
+VERSION=""
+DESCRIPTION="Nix-on-illumos zone"
+OUT_DIR=""
+KEEP_DATASET=0
+
+usage() {
+    sed -n '2,$p' "$0" | sed -n '/^# Usage:/,/^# DB pre-population/p' | sed 's/^# //;s/^#$//'
+    exit "${1:-2}"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --parent-dataset)  PARENT_DATASET="$2"; shift 2 ;;
+        --inputs)          INPUTS="$2";         shift 2 ;;
+        --name)            NAME="$2";           shift 2 ;;
+        --version)         VERSION="$2";        shift 2 ;;
+        --description)     DESCRIPTION="$2";    shift 2 ;;
+        --out-dir)         OUT_DIR="$2";        shift 2 ;;
+        --keep-dataset)    KEEP_DATASET=1;      shift ;;
+        -h|--help)         usage 0 ;;
+        *) echo "unknown arg: $1" >&2; usage ;;
+    esac
+done
+
+required="PARENT_DATASET INPUTS NAME VERSION OUT_DIR"
+for v in $required; do
+    if [[ -z "${!v:-}" ]]; then
+        echo "missing --$(echo "$v" | tr '[:upper:]_' '[:lower:]-')" >&2
+        usage
+    fi
+done
+
+for f in root.tar system store-paths registration; do
+    [[ -e "$INPUTS/$f" ]] || { echo "not found: $INPUTS/$f" >&2; exit 1; }
+done
+SYSTEM=$(readlink "$INPUTS/system")
+
+command -v zfs   >/dev/null 2>&1 || { echo "zfs not on PATH" >&2; exit 1; }
+command -v gzip  >/dev/null 2>&1 || { echo "gzip not on PATH" >&2; exit 1; }
+command -v rsync >/dev/null 2>&1 || { echo "rsync not on PATH" >&2; exit 1; }
+GTAR=$(command -v gtar || command -v gnutar || true)
+if [[ -z "$GTAR" ]] && tar --version 2>/dev/null | grep -q "GNU tar"; then GTAR=$(command -v tar); fi
+[[ -n "$GTAR" ]] || { echo "need a GNU tar on PATH" >&2; exit 1; }
+
+if command -v uuidgen >/dev/null 2>&1; then
+    UUID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+elif command -v python3 >/dev/null 2>&1; then
+    UUID=$(python3 -c 'import uuid; print(str(uuid.uuid4()))')
+else
+    echo "need uuidgen or python3 to generate a uuid" >&2
+    exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+OUT_DIR=$(cd "$OUT_DIR" && pwd)
+DATASET="$PARENT_DATASET/$UUID"
+
+cleanup() {
+    if [[ "$KEEP_DATASET" = 0 ]]; then
+        zfs destroy -r "$DATASET" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+# --- create + populate ---------------------------------------------------------
+
+if ! zfs_err=$(zfs create "$DATASET" 2>&1); then
+    cat >&2 <<EOF
+ERROR: zfs create "$DATASET" failed:
+  $zfs_err
+  (running as uid=$(id -u) ($(id -un)), gid=$(id -g) ($(id -gn)))
+This step needs root, or ZFS delegation on the parent dataset.
+EOF
+    exit 1
+fi
+
+MOUNT=$(zfs get -H -o value mountpoint "$DATASET")
+[[ "$MOUNT" != "-" && -d "$MOUNT" ]] || {
+    echo "no mountpoint for $DATASET (got '$MOUNT')" >&2
+    exit 1
+}
+ROOT="$MOUNT/root"
+mkdir -p "$ROOT"
+
+echo "unpacking the root file system into $ROOT ..."
+"$GTAR" -xpf "$INPUTS/root.tar" -C "$ROOT" --numeric-owner
+
+echo "copying $(wc -l < "$INPUTS/store-paths") store paths into $ROOT/nix/store ..."
+mkdir -p "$ROOT/nix/store" "$ROOT/nix/var/nix/profiles" "$ROOT/nix/var/nix/gcroots"
+while read -r p; do
+    rsync -a "$p" "$ROOT/nix/store/"
+done < "$INPUTS/store-paths"
+# as Nix's installer leaves it for a multi-user store: group nixbld (30000, ./root.nix), sticky and group-writable
+chgrp 30000 "$ROOT/nix/store"
+chmod 1775 "$ROOT/nix/store"
+
+# the system profile, generation 1, as `nix-env --set` makes it (zone/illumos-rebuild switches from here)
+ln -s "$SYSTEM" "$ROOT/nix/var/nix/profiles/default-1-link"
+ln -s default-1-link "$ROOT/nix/var/nix/profiles/default"
+
+NIX_BIN="$ROOT$SYSTEM/bin/nix-store"
+[[ -x "$NIX_BIN" ]] || { echo "missing nix-store at $NIX_BIN" >&2; exit 1; }
+echo "loading nix store DB ..."
+NIX_STATE_DIR="$ROOT/nix/var/nix" \
+    "$NIX_BIN" --load-db < "$INPUTS/registration"
+
+# --- snapshot + send -----------------------------------------------------------
+
+zfs snapshot "$DATASET@final"
+
+OUT_DATA="$OUT_DIR/$UUID.zfs.gz"
+echo "writing $OUT_DATA ..."
+zfs send "$DATASET@final" | gzip -c > "$OUT_DATA"
+
+if command -v sha1sum >/dev/null 2>&1; then
+    SHA1=$(sha1sum "$OUT_DATA" | awk '{print $1}')
+elif command -v digest >/dev/null 2>&1; then
+    SHA1=$(digest -a sha1 "$OUT_DATA")
+else
+    echo "need sha1sum or digest" >&2
+    exit 1
+fi
+SIZE=$(wc -c < "$OUT_DATA" | tr -d ' ')
+PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+
+MANIFEST="$OUT_DIR/$UUID.imgmanifest"
+cat > "$MANIFEST" <<EOF
+{
+  "v": 2,
+  "uuid": "$UUID",
+  "owner": "00000000-0000-0000-0000-000000000000",
+  "name": "$NAME",
+  "version": "$VERSION",
+  "state": "active",
+  "disabled": false,
+  "public": false,
+  "published_at": "$PUBLISHED_AT",
+  "type": "zone-dataset",
+  "os": "smartos",
+  "files": [
+    {
+      "sha1": "$SHA1",
+      "size": $SIZE,
+      "compression": "gzip"
+    }
+  ],
+  "description": "$DESCRIPTION",
+  "requirements": {
+    "min_platform": {
+      "7.0": "20210826T002459Z"
+    },
+    "networks": [
+      {
+        "name": "net0",
+        "description": "public"
+      }
+    ]
+  },
+  "tags": {
+    "role": "os"
+  }
+}
+EOF
+
+cat <<EOF
+
+Done.
+
+  manifest: $MANIFEST
+  image:    $OUT_DATA  ($SIZE bytes, sha1 $SHA1)
+  dataset:  $DATASET$( [[ "$KEEP_DATASET" = 1 ]] && echo " (kept, @final)" || echo " (destroyed)")
+
+Install:
+
+  imgadm install -m $MANIFEST -f $OUT_DATA
+
+The image ships with /nix/var/nix/db/db.sqlite already populated, so
+the zone's nix-store works out of the box on first boot.
+
+EOF

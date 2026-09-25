@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+  Site profile for a zone whose repository starts from a seed and is filled
+  by manifest-import from the global zone's /lib/svc/manifest. Manifest
+  defaults and generic.xml leave some services in the wrong state for a zone;
+  manifest-import applies this profile after them, on every boot.
+-->
+<service_bundle type="profile" name="site">
+  <!-- the zone console (zlogin -C); disabled in its manifest -->
+  <service name="system/console-login" version="1" type="service">
+    <instance name="default" enabled="true"/>
+    <!-- serial ports: a zone has none -->
+    <instance name="ttya" enabled="false"/>
+    <instance name="ttyb" enabled="false"/>
+    <instance name="ttyc" enabled="false"/>
+    <instance name="ttyd" enabled="false"/>
+  </service>
+  <!-- enabled in their manifests, not wanted in this zone -->
+  <service name="network/dns/multicast" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="network/rpc/bind" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="system/rcap" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="network/shares/group" version="1" type="service">
+    <instance name="default" enabled="false"/>
+    <instance name="zfs" enabled="false"/>
+  </service>
+  <!-- no inetd-started services, IPsec or IP tunnels in this zone -->
+  <service name="network/inetd" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="network/ipsec/ipsecalgs" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="network/ipsec/policy" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+  <service name="network/iptun" version="1" type="service">
+    <instance name="default" enabled="false"/>
+  </service>
+</service_bundle>
