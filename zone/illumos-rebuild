@@ -14,7 +14,9 @@
 # previous generation declared and this one does not, and restarts the services both declare when the
 # system path changed: their methods exec through the profile, so a new generation means new binaries. A
 # restart of nix-daemon kills the builds it is running; do not switch while a build is in progress. Restarts
-# are complete, and nix-daemon answers on its socket, when a switch or rollback returns.
+# are complete, and nix-daemon answers on its socket, when a switch or rollback returns. Activation also copies
+# the programs the system lists in etc/setuid-programs (sudo) to /opt/nix/bin, setuid root, and removes the
+# copies it no longer lists (SETUID_DIR overrides the directory).
 #
 # Tests override the SMF commands: SVCCFG (default /usr/sbin/svccfg), SVCADM (default /usr/sbin/svcadm) and
 # SVCS (default /usr/bin/svcs); svccfg also honours SVCCFG_REPOSITORY, so a scratch repository can stand in
@@ -94,11 +96,42 @@ activate() { # <new system> <old system or empty>
             "$svcadm" enable -s -t "$fmri"
         done
     fi
+    installSetuid "$new"
     # nix-daemon listens on its socket a moment after SMF has it online; wait until it answers, so that Nix
     # works as soon as this returns
     if grep -qx "$nixDaemon" <<< "$newInstances"; then
         waitForNixDaemon "$new"
     fi
+}
+
+# The store holds no setuid files. Each program a system lists in etc/setuid-programs (paths under the system,
+# one per line) is copied into $setuidDir, setuid root; /etc/profile puts that directory ahead of the profile. A
+# copy runs the libraries and plugins of the system it came from, so every activation replaces the copies with
+# the new system's and removes those it no longer lists.
+setuidDir=${SETUID_DIR:-/opt/nix/bin}
+installSetuid() { # <system>
+    local system=$1 p name
+    local -A listed=()
+    mkdir -p "$setuidDir"
+    if [ -f "$system/etc/setuid-programs" ]; then
+        while read -r p; do
+            [ -n "$p" ] || continue
+            name=$(basename "$p")
+            listed[$name]=1
+            echo "installing $setuidDir/$name setuid root"
+            cp "$system/$p" "$setuidDir/.$name.new"
+            chown 0:0 "$setuidDir/.$name.new"
+            chmod 4511 "$setuidDir/.$name.new"
+            mv -f "$setuidDir/.$name.new" "$setuidDir/$name"
+        done < "$system/etc/setuid-programs"
+    fi
+    for p in "$setuidDir"/*; do
+        [ -e "$p" ] || continue
+        name=$(basename "$p")
+        [ -n "${listed[$name]:-}" ] && continue
+        echo "removing $p"
+        rm -f "$p"
+    done
 }
 
 nixDaemon=svc:/application/nix-daemon:default

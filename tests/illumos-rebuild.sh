@@ -5,7 +5,7 @@
 # scratch repository (SVCCFG_REPOSITORY), an svcadm stub that records
 # its calls and an svcs stub that reports the states in $SVCS_STATES
 # (online unless listed). Nothing touches the live SMF repository or the
-# system profile.
+# system profile. Setuid copies go to a scratch SETUID_DIR. Runs as root.
 #
 # usage: illumos-rebuild.sh /etc/nixos/pkgs.nix
 #
@@ -45,6 +45,8 @@ state=$(awk -v f="$fmri" '$1 == f { print $2 }' "$SVCS_STATES")
 echo "${state:-online}"
 STUB
 chmod +x "$SVCS"
+# the setuid copies go here, not to the zone's own /opt/nix/bin
+export SETUID_DIR=$tmp/setuid
 
 # a system: the manifests of the given services under lib/svc/manifest/site/
 gen() { # <name> <description> <service>... -> writes $tmp/<name>.nix
@@ -146,6 +148,43 @@ fi
 
 out=$("$rebuild" build --config "$tmp/b.nix" 2>/dev/null)
 [ "$out" = "$pathB" ] && ok "build prints the store path" || bad "build printed '$out'"
+
+# --- 8. setuid copies ---------------------------------------------------------
+# A system that lists bin/rebuild-test-prog in etc/setuid-programs gets a copy of it in $SETUID_DIR, setuid root;
+# a switch to another build of it replaces the copy, and a switch to a system that does not list it removes it.
+
+setuidSystem() { # <name> <content of the program, or empty for a system that lists nothing>
+    cat > "$tmp/$1.nix" <<NIX
+let pkgs = import $pkgsFile; in
+pkgs.runCommand "rebuild-test-$1" { } ''
+  mkdir -p \$out/bin \$out/etc
+  ${2:+echo '$2' > \$out/bin/rebuild-test-prog; echo bin/rebuild-test-prog > \$out/etc/setuid-programs}
+''
+NIX
+}
+setuidSystem s1 one
+setuidSystem s2 two
+setuidSystem s0 ""
+copy=$SETUID_DIR/rebuild-test-prog
+
+"$rebuild" switch --config "$tmp/s1.nix" --profile "$profile" >"$tmp/s1.out" 2>&1 || { bad "switch to a system with a setuid program fails"; sed 's/^/    /' "$tmp/s1.out"; }
+if [ "$(stat -c '%a %u %g' "$copy" 2>/dev/null)" = "4511 0 0" ] && [ "$(cat "$copy")" = one ]; then
+    ok "a listed program is copied to the setuid directory, mode 4511, root's"
+else
+    bad "setuid copy after the switch: $(ls -l "$copy" 2>&1)"
+fi
+"$rebuild" switch --config "$tmp/s2.nix" --profile "$profile" >"$tmp/s2.out" 2>&1 || { bad "switch to a second build of it fails"; sed 's/^/    /' "$tmp/s2.out"; }
+if [ "$(stat -c '%a %u %g' "$copy" 2>/dev/null)" = "4511 0 0" ] && [ "$(cat "$copy")" = two ]; then
+    ok "a switch replaces the setuid copy with the new system's"
+else
+    bad "setuid copy after the second switch: $(ls -l "$copy" 2>&1), content '$(cat "$copy" 2>&1)'"
+fi
+"$rebuild" switch --config "$tmp/s0.nix" --profile "$profile" >"$tmp/s0.out" 2>&1 || { bad "switch to a system without setuid programs fails"; sed 's/^/    /' "$tmp/s0.out"; }
+if [ -d "$SETUID_DIR" ] && [ ! -e "$copy" ] && [ -z "$(ls -A "$SETUID_DIR")" ]; then
+    ok "a switch to a system that does not list it removes the copy"
+else
+    bad "the setuid directory after a switch to a system without setuid programs: $(ls -A "$SETUID_DIR")"
+fi
 
 echo
 echo "passed: $pass  failed: $fail"
