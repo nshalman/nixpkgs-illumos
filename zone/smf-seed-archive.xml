@@ -2337,4 +2337,116 @@
       </documentation>
     </template>
   </service>
+  <service name='network/sendmail-client' type='service' version='0'>
+    <single_instance/>
+    <dependency name='fs-local' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/local'/>
+    </dependency>
+    <dependency name='network-service' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/service'/>
+    </dependency>
+    <dependency name='name-services' grouping='require_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/milestone/name-services'/>
+    </dependency>
+    <dependency name='identity' grouping='optional_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/system/identity:domain'/>
+    </dependency>
+    <dependency name='system-log' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/system-log'/>
+    </dependency>
+    <instance name='default' enabled='true'>
+      <dependency name='config-file' grouping='require_all' restart_on='refresh' type='path'>
+        <service_fmri value='file://localhost/etc/mail/submit.cf'/>
+      </dependency>
+      <exec_method name='start' type='method' exec='/lib/svc/method/sendmail-client start' timeout_seconds='120'/>
+      <exec_method name='stop' type='method' exec='/lib/svc/method/sendmail-client stop %{restarter/contract}' timeout_seconds='60'/>
+      <exec_method name='refresh' type='method' exec='/lib/svc/method/sendmail-client refresh' timeout_seconds='60'/>
+      <property_group name='config' type='application'>
+        <propval name='path_to_submit_mc' type='astring' value=''/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.sendmail'/>
+      </property_group>
+      <property_group name='general' type='framework'>
+        <propval name='action_authorization' type='astring' value='solaris.smf.manage.sendmail'/>
+      </property_group>
+      <template>
+        <common_name>
+          <loctext xml:lang='C'>sendmail SMTP client queue runner</loctext>
+        </common_name>
+        <documentation>
+          <manpage title='sendmail' section='8' manpath='/usr/share/man'/>
+        </documentation>
+      </template>
+    </instance>
+    <stability value='Unstable'/>
+  </service>
+  <service name='network/smtp' type='service' version='0'>
+    <single_instance/>
+    <dependency name='fs-local' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/local'/>
+    </dependency>
+    <dependency name='network-service' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/service'/>
+    </dependency>
+    <dependency name='name-services' grouping='require_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/milestone/name-services'/>
+    </dependency>
+    <dependency name='identity' grouping='optional_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/system/identity:domain'/>
+    </dependency>
+    <dependency name='system-log' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/system-log'/>
+    </dependency>
+    <property_group name='firewall_config' type='com.sun,fw_configuration'>
+      <propval name='apply_to' type='astring' value=''/>
+      <propval name='apply_to_6' type='astring' value=''/>
+      <propval name='block_policy' type='astring' value='use_global'/>
+      <propval name='exceptions' type='astring' value=''/>
+      <propval name='exceptions_6' type='astring' value=''/>
+      <propval name='policy' type='astring' value='use_global'/>
+      <propval name='target' type='astring' value=''/>
+      <propval name='target_6' type='astring' value=''/>
+      <propval name='value_authorization' type='astring' value='solaris.smf.value.firewall.config'/>
+    </property_group>
+    <property_group name='firewall_context' type='com.sun,fw_definition'>
+      <propval name='name' type='astring' value='smtp'/>
+    </property_group>
+    <instance name='sendmail' enabled='false'>
+      <dependency name='config-file' grouping='require_all' restart_on='refresh' type='path'>
+        <service_fmri value='file://localhost/etc/mail/sendmail.cf'/>
+      </dependency>
+      <dependency name='nsswitch' grouping='require_all' restart_on='refresh' type='path'>
+        <service_fmri value='file://localhost/etc/nsswitch.conf'/>
+      </dependency>
+      <dependency name='autofs' grouping='optional_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/filesystem/autofs'/>
+      </dependency>
+      <dependent name='smtp-sendmail_multi-user' restart_on='none' grouping='optional_all'>
+        <service_fmri value='svc:/milestone/multi-user'/>
+      </dependent>
+      <exec_method name='start' type='method' exec='/lib/svc/method/smtp-sendmail start' timeout_seconds='120'/>
+      <exec_method name='stop' type='method' exec='/lib/svc/method/smtp-sendmail stop %{restarter/contract}' timeout_seconds='60'/>
+      <exec_method name='refresh' type='method' exec='/lib/svc/method/smtp-sendmail refresh' timeout_seconds='60'/>
+      <property_group name='config' type='application'>
+        <propval name='include_info' type='boolean' value='false'/>
+        <propval name='local_only' type='boolean' value='true'/>
+        <propval name='path_to_sendmail_mc' type='astring' value=''/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.sendmail'/>
+      </property_group>
+      <property_group name='startd' type='framework'>
+        <propval name='ignore_error' type='astring' value='core,signal'/>
+      </property_group>
+      <property_group name='general' type='framework'>
+        <propval name='action_authorization' type='astring' value='solaris.smf.manage.sendmail'/>
+      </property_group>
+      <template>
+        <common_name>
+          <loctext xml:lang='C'>sendmail SMTP mail transfer agent</loctext>
+        </common_name>
+        <documentation>
+          <manpage title='sendmail' section='8' manpath='/usr/share/man'/>
+        </documentation>
+      </template>
+    </instance>
+    <stability value='Unstable'/>
+  </service>
 </service_bundle>

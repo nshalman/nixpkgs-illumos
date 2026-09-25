@@ -9,6 +9,8 @@
 # and imported with PKG_INSTALL_ROOT, as the gate does, so the repository records their installed
 # /lib/svc/manifest paths.
 #
+# Also the gate's sendmail services, recorded under /var/svc/manifest/network (see varManifests below).
+#
 # One more, not in the gate: SmartOS's smartdc/mdata (system/mdata.xml, from illumos-joyent). vmadm sets properties
 # of its instances in a joyent-brand zone's repository before the first boot (the mdata:execute start timeout, and
 # mdata:fetch's start method; VM.js), and fails the provisioning if they are not there: "svccfg: Pattern
@@ -48,6 +50,15 @@ let
     "system/utmp.xml" = "cmd/utmpd/utmp.xml";
     # system/console-login.xml is generated, as the gate's milestone Makefile does
   };
+  # installed path under /var/svc/manifest -> source in the gate tree: sendmail's daemon (smtp:sendmail) and client
+  # queue runner. The platform ships their methods but not their manifests, so the image carries these files at these
+  # paths (./root.nix copies them from this derivation's output). In the seed, they exist when the first boot applies
+  # generic.xml, the gate's generic_limited_net.xml, which enables both, the daemon listening on the local host only.
+  # Imported later, from /var/svc/manifest, they would miss it: SMF applies a profile once.
+  varManifests = {
+    "network/smtp-sendmail.xml" = "cmd/sendmail/lib/smtp-sendmail.xml";
+    "network/sendmail-client.xml" = "cmd/sendmail/lib/sendmail-client.xml";
+  };
   # byte-identical to /lib/svc/manifest/system/mdata.xml of platform joyent_20260723T000757Z
   mdataManifest = pkgs.fetchurl {
     name = "mdata.xml";
@@ -65,7 +76,13 @@ pkgs.runCommand "illumos-smf-seed"
     manifestList = pkgs.lib.concatMapAttrsStringSep "" (
       installed: source: "${installed} ${source}\n"
     ) manifests;
-    passAsFile = [ "manifestList" ];
+    varManifestList = pkgs.lib.concatMapAttrsStringSep "" (
+      installed: source: "${installed} ${source}\n"
+    ) varManifests;
+    passAsFile = [
+      "manifestList"
+      "varManifestList"
+    ];
   }
   ''
     root=$PWD/root
@@ -76,6 +93,13 @@ pkgs.runCommand "illumos-smf-seed"
     done <"$manifestListPath"
     (cd "$root/lib/svc/manifest/system" && sh "$gate/usr/src/cmd/svc/milestone/make-console-login-xml")
     cp "$mdataManifest" "$root/lib/svc/manifest/system/mdata.xml"
+    while read -r installed source; do
+      mkdir -p "$root/var/svc/manifest/$(dirname "$installed")"
+      cp "$gate/usr/src/$source" "$root/var/svc/manifest/$installed"
+    done <"$varManifestListPath"
+    # the files the image carries under /var/svc/manifest, the same the seed recorded
+    mkdir -p "$out/var/svc"
+    cp -R "$root/var/svc/manifest" "$out/var/svc/manifest"
 
     mkdir -p "$out/nix-support"
     export PKG_INSTALL_ROOT=$root
@@ -86,7 +110,7 @@ pkgs.runCommand "illumos-smf-seed"
     # svccfg joins its arguments into one 2048-byte command (MAX_CMD_LINE_SZ, svccfg_main.c) and silently cuts the
     # rest, and 23 paths under the build directory exceed it. Not the directory either: services enter the
     # repository in the order they are imported, and a directory is imported in the file system's order.
-    find "$root/lib/svc/manifest" -name '*.xml' | sort | sed 's/^/import /' >import.cmds
+    find "$root/lib/svc/manifest" "$root/var/svc/manifest" -name '*.xml' | sort | sed 's/^/import /' >import.cmds
     /usr/sbin/svccfg -f import.cmds
 
     /usr/sbin/svccfg archive >"$out/archive.xml"

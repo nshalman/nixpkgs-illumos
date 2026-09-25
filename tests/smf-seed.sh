@@ -10,12 +10,18 @@
 #   3. It holds exactly the services of the gate's non-global seed list
 #      (usr/src/cmd/svc/seed/Makefile), less network/netcfg (not on
 #      SmartOS), plus system/early-manifest-import and smartdc/mdata
-#      (vmadm sets properties of its instances before the first boot).
-#   4. Every manifest it records is under its installed path in
-#      /lib/svc/manifest, not the build directory or the store: that is
-#      the path manifest-import compares on the zone's first boot.
+#      (vmadm sets properties of its instances before the first boot),
+#      and sendmail's network/smtp and network/sendmail-client.
+#   4. Every manifest it records is under its installed path, not the
+#      build directory or the store: /lib/svc/manifest, and for sendmail's
+#      two, which the platform does not ship, /var/svc/manifest/network.
+#      That is the path manifest-import compares on the zone's first boot.
 #   5. The build's own check works: given an expected archive with one
 #      service's enabled state flipped, the build fails.
+#   6. What the first boot's early manifest-import does with the gate's
+#      generic_limited_net.xml (the image's generic.xml) enables
+#      smtp:sendmail, listening on the local host only, and
+#      sendmail-client.
 #
 # Requires /usr/sbin/svccfg and /lib/svc/bin/svc.configd (any illumos
 # zone) and a nix on PATH. Nothing touches the live SMF repository.
@@ -75,6 +81,8 @@ network/iptun
 network/loopback
 network/physical
 network/rpc/bind
+network/sendmail-client
+network/smtp
 smartdc/mdata
 system/boot-archive
 system/console-login
@@ -104,10 +112,12 @@ fi
 while read -r svc; do
 	svccfg_on -s "$svc" listprop manifestfiles | awk 'NF == 3 { print $3 }' >>"$tmp/paths"
 done <"$tmp/services"
-if [ -s "$tmp/paths" ] && ! grep -v '^/lib/svc/manifest/' "$tmp/paths" >/dev/null; then
-	ok "all $(sort -u "$tmp/paths" | wc -l | tr -d ' ') recorded manifests are under /lib/svc/manifest"
+var="/var/svc/manifest/network/sendmail-client.xml
+/var/svc/manifest/network/smtp-sendmail.xml"
+if [ -s "$tmp/paths" ] && [ "$(grep -v '^/lib/svc/manifest/' "$tmp/paths" | sort -u)" = "$var" ]; then
+	ok "all $(sort -u "$tmp/paths" | wc -l | tr -d ' ') recorded manifests are under /lib/svc/manifest, but sendmail's two under /var/svc/manifest/network"
 else
-	bad "recorded manifest paths outside /lib/svc/manifest (or none recorded)"
+	bad "recorded manifest paths other than /lib/svc/manifest and sendmail's two (or none recorded)"
 	grep -v '^/lib/svc/manifest/' "$tmp/paths" | sort -u | head
 fi
 
@@ -128,6 +138,26 @@ elif grep -q "differs from zone/smf-seed-archive.xml" "$tmp/wrong.log"; then
 else
 	bad "the build with a wrong expected archive failed for another reason"
 	tail -5 "$tmp/wrong.log"
+fi
+
+# --- 6. the first boot's profile enables sendmail --------------------------
+
+gate=$(nix eval --raw --impure --expr "(import $pkgsFile).illumos-ld.src.outPath")
+cp "$seed/repository.db" "$tmp/firstboot.db"
+chmod 600 "$tmp/firstboot.db"
+fb() { SVCCFG_REPOSITORY="$tmp/firstboot.db" SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg "$@"; }
+# its include of /etc/svc/profile/name_service.xml pointed at the gate's ns_dns.xml, which the image links there
+sed "s|file:/etc/svc/profile/name_service.xml|file:$gate/usr/src/cmd/svc/profile/ns_dns.xml|" \
+	"$gate/usr/src/cmd/svc/profile/generic_limited_net.xml" >"$tmp/generic.xml"
+fb apply "$tmp/generic.xml" >"$tmp/apply.log" 2>&1
+got="$(fb -s network/smtp:sendmail listprop general/enabled | awk '{ print $3 }') \
+$(fb -s network/smtp:sendmail listprop config/local_only | awk '{ print $3 }') \
+$(fb -s network/sendmail-client:default listprop general/enabled | awk '{ print $3 }')"
+if [ "$got" = "true true true" ]; then
+	ok "generic_limited_net.xml, applied as at the first boot, enables smtp:sendmail (local only) and sendmail-client"
+else
+	bad "after generic_limited_net.xml: smtp:sendmail enabled, local_only, sendmail-client enabled = $got"
+	tail -3 "$tmp/apply.log"
 fi
 
 echo "$pass passed, $fail failed"

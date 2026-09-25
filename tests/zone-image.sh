@@ -21,14 +21,15 @@
 #      - a login shell finds nix through /etc/profile;
 #      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites), and a GC root
 #        keeps the system the setuid copies came from;
-#      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
+#      - the SMF repository is the seed (29 services), and vmadm's pre-boot svccfg calls on mdata succeed;
 #      - sshd accepts /etc/ssh/sshd_config (`sshd -t`, with host keys made in the copy), and its effective
 #        settings (`sshd -T`) allow no password or keyboard-interactive logins and root by key only;
 #      - importing /var/svc/manifest/site, as the first boot does, adds the profile's services (nix-daemon,
 #        mdata-accounts, which runs before mdata:execute and ssh, hosts-nodename, before mdata:execute and smtp);
 #      - hosts-nodename puts the node name on the 127.0.0.1 line of /etc/inet/hosts at provisioning only, once;
 #      - the first boot's early manifest-import, replayed (the platform's manifests, then generic.xml, the platform
-#        profile and site.xml), applies every profile and leaves the services a zone should not run off;
+#        profile and site.xml), applies every profile, leaves the services a zone should not run off and turns on
+#        sendmail's daemon (listening on the local host only) and its client queue runner;
 #      - every symbolic link under /etc and /var resolves;
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
@@ -185,7 +186,7 @@ fi
 cp "$R/etc/svc/repository.db" "$tmp/repo.db"
 repo() { SVCCFG_REPOSITORY="$tmp/repo.db" SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg "$@"; }
 nsvc=$(repo list | wc -l | tr -d ' ')
-if [ "$nsvc" = 27 ]; then ok "the SMF repository is the seed (27 services)"; else bad "the SMF repository has $nsvc services"; fi
+if [ "$nsvc" = 29 ]; then ok "the SMF repository is the seed (29 services)"; else bad "the SMF repository has $nsvc services"; fi
 # what vmadm does to a joyent-brand zone's repository before its first boot (VM.js: the mdata:execute timeout,
 # feature update_mdata_exec_timeout; fixMdataFetchStart, features cleanup_dataset and zoneinit)
 if repo -s svc:/smartdc/mdata:execute setprop start/timeout_seconds = count: 300 2>"$tmp/vmadm.err" &&
@@ -265,13 +266,15 @@ for p in generic.xml platform_none.xml site.xml; do
 done
 states=
 for s in system/filesystem/autofs:default system/sac:default network/inetd:default network/rpc/bind:default \
-	system/identity:domain network/dns/client:default; do
+	system/identity:domain network/dns/client:default network/smtp:sendmail network/sendmail-client:default; do
 	states="$states $s=$(em -s "$s" listprop general/enabled 2>/dev/null | awk '{ print $3 }')"
 done
+states="$states local_only=$(em -s network/smtp:sendmail listprop config/local_only 2>/dev/null | awk '{ print $3 }')"
 want=" system/filesystem/autofs:default=false system/sac:default=false network/inetd:default=false"
 want="$want network/rpc/bind:default=false system/identity:domain=true network/dns/client:default=true"
+want="$want network/smtp:sendmail=true network/sendmail-client:default=true local_only=true"
 if ! grep -i -E 'failed|error' "$tmp/early.log" >/dev/null && [ "$states" = "$want" ]; then
-	ok "the first boot's profiles apply (generic.xml, platform, site.xml), and leave autofs, sac, inetd and rpcbind off"
+	ok "the first boot's profiles apply (generic.xml, platform, site.xml): autofs, sac, inetd and rpcbind off, sendmail on (local only)"
 else
 	bad "the first boot's profiles:$states"; grep -i -E 'failed|error' "$tmp/early.log" | head -5
 fi

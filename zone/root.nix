@@ -199,6 +199,7 @@ pkgs.runCommand "illumos-zone-root"
   {
     inherit gate gateFileList sshdConfig nixosSystem zoneinitJson nixLocalConfExample motd sudoers sudoersAdmin;
     seedDb = "${seed}/repository.db";
+    seedVarManifests = "${seed}/var/svc/manifest";
     siteProfile = ./site.xml;
     etcProfile = ./profile;
     etcBashrc = ./bashrc;
@@ -357,6 +358,11 @@ pkgs.runCommand "illumos-zone-root"
 
     # --- SMF ------------------------------------------------------------------------------------------------
     f 0600 "$seedDb" etc/svc/repository.db
+    # the manifests the seed recorded under /var/svc/manifest (sendmail's), the files themselves, so the later
+    # manifest-import finds them unchanged
+    (cd "$seedVarManifests" && find . -name '*.xml') | while read -r m; do
+      f 0444 "$seedVarManifests/$m" "var/svc/manifest/$m"
+    done
     f 0444 "$siteProfile" etc/svc/profile/site.xml
     # The first boot's manifest-import reads /lib/svc/manifest and /var/svc/manifest, not the profile (where
     # illumos-rebuild imports from later): a link here for every service of the profile, nix-daemon and ./services.nix.
