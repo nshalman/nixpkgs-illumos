@@ -38,6 +38,9 @@ let
     etc/default/syslogd                  0644 cmd/syslogd/syslogd.dfl
     etc/default/inetinit                 0644 cmd/cmd-inet/etc/default/inetinit.dfl
     etc/default/dhcpagent                0644 cmd/cmd-inet/sbin/dhcpagent/dhcpagent.dfl
+    # the DHCP option tables dhcpagent and dhcpinfo read, for a NIC configured by DHCP
+    etc/dhcp/inittab                     0644 cmd/cmd-inet/etc/dhcp/inittab
+    etc/dhcp/inittab6                    0644 cmd/cmd-inet/etc/dhcp/inittab6
     etc/default/utmpd                    0644 cmd/utmpd/utmpd.dfl
     # PAM for login, su, sshd, cron
     etc/pam.conf                         0644 lib/libpam/pam.conf
