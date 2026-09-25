@@ -28,7 +28,8 @@
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
 #      - sudo as the base images have it: visudo accepts /etc/sudoers, admin's login shell finds the setuid copy
-#        and runs a command as root without a password, sudoedit runs, and a user sudoers does not name gets nothing;
+#        and runs a command as root without a password, sudoedit runs, its mailer is the platform's sendmail, and a
+#        user sudoers does not name gets nothing;
 #      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc;
 #      - /etc/motd says what the zone is; an interactive login shell has NixOS's aliases and prompt (/etc/bashrc)
 #        and bash-completion, and finds illumos-rebuild;
@@ -244,6 +245,12 @@ if out=$(in_root /usr/bin/su admin -c "/usr/bin/env -i HOME=/home/admin LOGNAME=
 	ok "admin's login shell finds the setuid sudo, which runs a command as root without a password"
 else
 	bad "admin and sudo: $out"
+fi
+# the mailer sudo runs to report a user sudoers does not name is the platform's, as the base images' sudo has it
+if out=$(in_root /opt/nix/bin/sudo -V 2>&1) && echo "$out" | grep -x 'Path to mail program: /usr/sbin/sendmail' >/dev/null; then
+	ok "sudo's mailer is /usr/sbin/sendmail"
+else
+	bad "sudo's mailer: $(echo "$out" | grep -i 'mail program')"
 fi
 # sudoedit is sudo under another name (sudo -e): admin's editor, here one that changes nothing, runs on a copy
 if out=$(in_root /usr/bin/su admin -c "/usr/bin/env -i HOME=/home/admin LOGNAME=admin USER=admin \
