@@ -12,6 +12,8 @@
 #   3. In a chroot of the received root, with /usr, /lib, /sbin, /dev and /proc lofs-mounted from this zone as the
 #      brand mounts them from the global zone:
 #      - root's shell is the system profile's bash, and nixbld has the 32 build users as members;
+#      - the admin account is the SmartOS base images' (uid 100, staff, /home/admin its own, no password until
+#        admin_pw, the Service Management and Software Installation profiles), and its login shell finds nix;
 #      - a login shell finds nix through /etc/profile;
 #      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites);
 #      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
@@ -114,6 +116,23 @@ else
 fi
 n=$(in_root /usr/bin/getent group nixbld | cut -d: -f4 | tr ',' '\n' | grep -c '^nixbld')
 if [ "$n" = 32 ]; then ok "nixbld lists 32 members"; else bad "nixbld lists $n members"; fi
+
+a_pw=$(in_root /usr/bin/getent passwd admin)
+a_home=$(stat -c '%u %g %a' "$R/home/admin" 2>/dev/null)
+if [ "$a_pw" = "admin:x:100:10::/home/admin:/usr/bin/bash" ] && [ "$a_home" = "100 10 755" ] &&
+	grep '^admin:NP:' "$R/etc/shadow" >/dev/null &&
+	grep -x 'admin::::type=normal;profiles=Service Management,Software Installation' "$R/etc/user_attr" >/dev/null; then
+	ok "the admin account is the base images' (uid 100, staff, own home, NP, two RBAC profiles)"
+else
+	bad "admin account: passwd '$a_pw', home '$a_home'"
+fi
+# `su - admin -c` on illumos reads no startup files; a login shell of admin's own is what an ssh login gets
+if out=$(in_root /usr/bin/su admin -c "/usr/bin/env -i HOME=/home/admin LOGNAME=admin USER=admin \
+	/usr/bin/bash -lc 'command -v nix'" 2>&1) && [ -n "$out" ]; then
+	ok "admin's login shell finds nix ($out)"
+else
+	bad "admin's login shell does not find nix: $out"
+fi
 
 if out=$(in_root /nix/var/nix/profiles/default/bin/bash -lc 'command -v nix && nix --version' 2>&1) &&
 	echo "$out" | grep -q '^nix (Nix) '; then

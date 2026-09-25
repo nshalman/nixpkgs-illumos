@@ -237,6 +237,14 @@ pkgs.runCommand "illumos-zone-root"
       members=''${members:+$members,}nixbld$i
     done
     echo "nixbld::30000:$members" >>"$r/etc/group"
+    # admin, as the SmartOS base images have it (uid 100, group staff, bash, no password until admin_pw sets one at
+    # provisioning, the Service Management and Software Installation RBAC profiles), so payloads that set admin_pw
+    # work here too. Its home belongs to it, see the tar below. (Those images also give it sudo, which this image
+    # does not ship; pfexec and the profiles remain.)
+    echo "admin:x:100:10::/home/admin:/usr/bin/bash" >>"$r/etc/passwd"
+    echo "admin:NP:::::::" >>"$r/etc/shadow"
+    echo "admin::::type=normal;profiles=Service Management,Software Installation" >>"$r/etc/user_attr"
+    d 0755 home/admin
     chmod 0400 "$r/etc/shadow"
 
     # --- sshd -------------------------------------------------------------------------------------------------
@@ -271,6 +279,9 @@ pkgs.runCommand "illumos-zone-root"
     f 0644 "$nixosSystem" etc/nixos/system.nix
 
     mkdir -p "$out"
-    tar -C "$r" -cf "$out/root.tar" --sort=name --numeric-owner --owner=0 --group=0 --mtime=@1 .
+    tar -C "$r" -cf "$out/root.tar" --sort=name --numeric-owner --owner=0 --group=0 --mtime=@1 \
+      --exclude=./home/admin .
+    # admin's home is admin's (100:10)
+    tar -C "$r" -rf "$out/root.tar" --numeric-owner --owner=100 --group=10 --mtime=@1 ./home/admin
     (cd "$r" && find . | sort) >"$out/contents"
   ''

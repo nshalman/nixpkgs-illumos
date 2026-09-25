@@ -18,13 +18,14 @@ in
 rec {
   # Accounts from the zone's metadata (vmadm's customer_metadata), what a SmartOS base image's zoneinit does with
   # it, so a payload written for those images works here too:
-  #   - root_authorized_keys becomes root's ~/.ssh/authorized_keys, whenever root has none: keys added by hand are
-  #     never replaced. (The platform's smartlogin plugin, libsmartsshd, asks a door only Triton's smartlogin agent
-  #     serves; a standalone host has none.)
+  #   - root_authorized_keys becomes root's and admin's ~/.ssh/authorized_keys, for each whenever it has none: keys
+  #     added by hand are never replaced. (admin getting them is this image's choice, Nahum's; the base images give
+  #     them to root only. The platform's smartlogin plugin, libsmartsshd, asks a door only Triton's smartlogin
+  #     agent serves; a standalone host has none.)
   #   - root_pw and admin_pw set those accounts' passwords, only while the zone is being provisioned
   #     (/var/svc/provisioning), as zoneinit's 91-passwords.sh does: a hash is taken as it is if it is a $2a$
   #     (bcrypt) one, anything else is hashed with the platform's /usr/lib/cryptpass. An account the image does not
-  #     have (admin) is skipped. If a password was set, sshd's PasswordAuthentication is turned on
+  #     have is skipped. If a password was set, sshd's PasswordAuthentication is turned on
   #     (zoneinit's 92-sshd.sh). Without them passwords stay as the image ships them and password
   #     authentication stays off.
   # The service runs before mdata:execute, which ends the provisioning, and before ssh, which reads the
@@ -33,17 +34,21 @@ rec {
     name = "mdata-accounts";
     start = ''
       r=''${2:-}
-      keys=$r/root/.ssh/authorized_keys
-      if [ -e "$keys" ]; then
-          echo "$keys exists; left as it is"
-      elif k=$(/usr/sbin/mdata-get root_authorized_keys 2>/dev/null) && [ -n "$k" ]; then
-          umask 077
-          mkdir -p "$(dirname "$keys")"
-          printf '%s\n' "$k" >"$keys.new" && mv "$keys.new" "$keys" || exit "$SMF_EXIT_ERR_FATAL"
-          echo "installed root_authorized_keys from the metadata into $keys"
-      else
-          echo "no root_authorized_keys in the metadata"
-      fi
+      k=$(/usr/sbin/mdata-get root_authorized_keys 2>/dev/null) || k=
+      [ -n "$k" ] || echo "no root_authorized_keys in the metadata"
+      for u in root admin; do
+          ent=$(grep "^$u:" "$r/etc/passwd") || continue
+          home=$(echo "$ent" | cut -d: -f6)
+          ids=$(echo "$ent" | cut -d: -f3,4)
+          keys=$r$home/.ssh/authorized_keys
+          if [ -e "$keys" ]; then
+              echo "$keys exists; left as it is"
+          elif [ -n "$k" ]; then
+              (umask 077 && mkdir -p "$(dirname "$keys")" && printf '%s\n' "$k" >"$keys.new" &&
+                  mv "$keys.new" "$keys" && chown -R "$ids" "$(dirname "$keys")") || exit "$SMF_EXIT_ERR_FATAL"
+              echo "installed root_authorized_keys from the metadata into $keys"
+          fi
+      done
 
       if [ ! -f "$r/var/svc/provisioning" ]; then
           echo "not provisioning: passwords and sshd left as they are"
