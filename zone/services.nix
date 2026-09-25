@@ -16,7 +16,103 @@ let
   smf = import ./smf-lib.nix { inherit pkgs; };
 in
 rec {
-  manifests = [ ];
+  # Accounts from the zone's metadata (vmadm's customer_metadata), what a SmartOS base image's zoneinit does with
+  # it, so a payload written for those images works here too:
+  #   - root_authorized_keys becomes root's ~/.ssh/authorized_keys, whenever root has none: keys added by hand are
+  #     never replaced. (The platform's smartlogin plugin, libsmartsshd, asks a door only Triton's smartlogin agent
+  #     serves; a standalone host has none.)
+  #   - root_pw and admin_pw set those accounts' passwords, only while the zone is being provisioned
+  #     (/var/svc/provisioning), as zoneinit's 91-passwords.sh does: a hash is taken as it is if it is a $2a$
+  #     (bcrypt) one, anything else is hashed with the platform's /usr/lib/cryptpass. An account the image does not
+  #     have (admin) is skipped. If a password was set, sshd's PasswordAuthentication is turned on
+  #     (zoneinit's 92-sshd.sh). Without them passwords stay as the image ships them and password
+  #     authentication stays off.
+  # The service runs before mdata:execute, which ends the provisioning, and before ssh, which reads the
+  # configuration. The optional second argument is a directory to act on instead of /, for testing.
+  mdataAccountsMethod = smf.mkSmfMethodScript {
+    name = "mdata-accounts";
+    start = ''
+      r=''${2:-}
+      keys=$r/root/.ssh/authorized_keys
+      if [ -e "$keys" ]; then
+          echo "$keys exists; left as it is"
+      elif k=$(/usr/sbin/mdata-get root_authorized_keys 2>/dev/null) && [ -n "$k" ]; then
+          umask 077
+          mkdir -p "$(dirname "$keys")"
+          printf '%s\n' "$k" >"$keys.new" && mv "$keys.new" "$keys" || exit "$SMF_EXIT_ERR_FATAL"
+          echo "installed root_authorized_keys from the metadata into $keys"
+      else
+          echo "no root_authorized_keys in the metadata"
+      fi
+
+      if [ ! -f "$r/var/svc/provisioning" ]; then
+          echo "not provisioning: passwords and sshd left as they are"
+          exit "$SMF_EXIT_OK"
+      fi
+      allow=
+      for u in admin root; do
+          pw=$(/usr/sbin/mdata-get "''${u}_pw" 2>/dev/null) && [ -n "$pw" ] || continue
+          if ! grep "^$u:" "$r/etc/shadow" >/dev/null; then
+              echo "no account $u: ''${u}_pw ignored"
+              continue
+          fi
+          case "$pw" in
+          '$2a$'*) hash=$pw ;;
+          *) hash=$(/usr/lib/cryptpass "$pw") || { echo "cryptpass failed for $u"; continue; } ;;
+          esac
+          day=$(( $(date +%s) / 86400 ))
+          umask 077
+          if awk -F: -v OFS=: -v u="$u" -v h="$hash" -v d="$day" '$1 == u { $2 = h; $3 = d } { print }' \
+                  "$r/etc/shadow" >"$r/etc/shadow.new" &&
+              chmod 0400 "$r/etc/shadow.new" && mv "$r/etc/shadow.new" "$r/etc/shadow"; then
+              echo "set the password of $u from ''${u}_pw"
+              allow=1
+          else
+              rm -f "$r/etc/shadow.new"
+              echo "setting the password of $u failed"
+          fi
+      done
+      if [ -n "$allow" ]; then
+          sed 's/^PasswordAuthentication no$/PasswordAuthentication yes/' "$r/etc/ssh/sshd_config" \
+              >"$r/etc/ssh/sshd_config.new" &&
+              chmod 0644 "$r/etc/ssh/sshd_config.new" &&
+              mv "$r/etc/ssh/sshd_config.new" "$r/etc/ssh/sshd_config" || exit "$SMF_EXIT_ERR_FATAL"
+          echo "turned on PasswordAuthentication in $r/etc/ssh/sshd_config"
+      fi
+    '';
+    stop = ":";
+  };
+
+  mdataAccounts = smf.mkSmfManifest {
+    name = "mdata-accounts";
+    description = "root's ssh keys and account passwords from the zone's metadata";
+    dependencies = [
+      {
+        name = "filesystem-local";
+        fmri = "svc:/system/filesystem/local";
+      }
+      {
+        name = "mdata-fetch";
+        fmri = "svc:/smartdc/mdata:fetch";
+        grouping = "optional_all";
+      }
+    ];
+    dependents = [
+      {
+        name = "before-mdata-execute";
+        fmri = "svc:/smartdc/mdata:execute";
+      }
+      {
+        name = "before-ssh";
+        fmri = "svc:/network/ssh";
+      }
+    ];
+    start.exec = "${mdataAccountsMethod} %m";
+    stop.exec = ":true";
+    duration = "transient";
+  };
+
+  manifests = [ mdataAccounts ];
 
   bundle = smf.mkSmfManifestBundle { inherit manifests; };
 }

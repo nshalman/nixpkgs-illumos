@@ -238,6 +238,14 @@ pkgs.runCommand "illumos-zone-root"
     # --- sshd -------------------------------------------------------------------------------------------------
     # the platform's sshd with smartos-live's configuration; the method makes host keys in /var/ssh at first start
     f 0644 "$sshdConfig" etc/ssh/sshd_config
+    # ... with passwords off, as the SmartOS zone images (pkgsrc base) ship it: no password or keyboard-interactive
+    # (PAM) logins, and root by key only. The mdata-accounts service (./services.nix) turns PasswordAuthentication
+    # on when the metadata sets root_pw or admin_pw at provisioning, as those images' zoneinit does.
+    sed -i -e 's/^PasswordAuthentication yes$/PasswordAuthentication no/' \
+      -e 's/^PermitRootLogin yes$/PermitRootLogin prohibit-password/' "$r/etc/ssh/sshd_config"
+    echo "KbdInteractiveAuthentication no" >>"$r/etc/ssh/sshd_config"
+    grep -q '^PasswordAuthentication no$' "$r/etc/ssh/sshd_config"
+    grep -q '^PermitRootLogin prohibit-password$' "$r/etc/ssh/sshd_config"
 
     # --- SMF ------------------------------------------------------------------------------------------------
     f 0600 "$seedDb" etc/svc/repository.db
