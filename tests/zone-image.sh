@@ -13,8 +13,8 @@
 #      brand mounts them from the global zone:
 #      - root's shell is the system profile's bash, and nixbld has the 32 build users as members;
 #      - the admin account is the SmartOS base images' (uid 100, staff, /home/admin its own, no password until
-#        admin_pw, but the system profile's bash as shell
-#        admin_pw, the Service Management and Software Installation profiles), and its login shell finds nix;
+#        admin_pw, the Service Management and Software Installation profiles), but with the system profile's bash as
+#        shell, and its login shell finds nix;
 #      - a login shell finds nix through /etc/profile;
 #      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites);
 #      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
