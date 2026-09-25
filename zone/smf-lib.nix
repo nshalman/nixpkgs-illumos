@@ -97,6 +97,9 @@ rec {
           fmri = "svc:/milestone/multi-user-server";
         }
       ],
+      # List of { name, fmri, grouping ? "optional_all", restartOn ? "none" }: services that wait for this one
+      # (SMF dependents), such as a platform service whose manifest we cannot change.
+      dependents ? [ ],
       # { exec, timeout ? 60, user ? null, group ? null, environment ? {} }
       start,
       # Same shape; defaults to SMF's builtin contract kill.
@@ -134,6 +137,14 @@ rec {
         "                type='service'>"
         "        <service_fmri value='${esc d.fmri}' />"
         "    </dependency>"
+      ];
+
+      renderDependent = d: [
+        "    <dependent name='${esc d.name}'"
+        "               grouping='${esc (d.grouping or "optional_all")}'"
+        "               restart_on='${esc (d.restartOn or "none")}'>"
+        "        <service_fmri value='${esc d.fmri}' />"
+        "    </dependent>"
       ];
 
       renderMethod =
@@ -187,6 +198,7 @@ rec {
         ]
         ++ lib.optional singleInstance "    <single_instance />"
         ++ lib.concatMap renderDependency dependencies
+        ++ lib.concatMap renderDependent dependents
         ++ renderMethod "start" start'
         ++ renderMethod "stop" stop'
         ++ lib.optionals (duration != null || ignoreError != null) (

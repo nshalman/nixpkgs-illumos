@@ -14,6 +14,9 @@
 #   5. mkSmfMethodScript: a tailscale-style %m-dispatch script builds,
 #      a manifest wired to it validates, and an invalid-arg invocation
 #      of the script fails with a usage message.
+#   6. dependents: a manifest naming services that wait for it validates,
+#      and a scratch repository keeps the dependent through import and
+#      export.
 #
 # Requires /usr/sbin/svccfg (present in any illumos zone via the GZ
 # /usr mount) and a nix on PATH. Safe to run as any user that can
@@ -257,6 +260,51 @@ if manifest=$(nix-build --no-out-link "$tmp/example.nix" -A manifest 2>"$tmp/bui
     fi
 else
     bad "method-script example manifest does not build"
+    sed 's/^/    /' "$tmp/build.err"
+fi
+
+# --- 6. dependents -----------------------------------------------------------
+
+cat >"$tmp/dependents.nix" <<NIX
+let
+  pkgs = import $pkgsFile;
+  smf = import $top/zone/smf-lib.nix { inherit pkgs; };
+in
+smf.mkSmfManifest {
+  name = "dependents-example";
+  category = "site";
+  description = "Runs before the services named as dependents";
+  dependents = [
+    {
+      name = "before-ssh";
+      fmri = "svc:/network/ssh";
+    }
+  ];
+  start.exec = "/usr/bin/true";
+  duration = "transient";
+}
+NIX
+
+if manifest=$(nix-build --no-out-link "$tmp/dependents.nix" 2>"$tmp/build.err"); then
+    if "$svccfg" validate "$manifest" 2>"$tmp/validate.err"; then
+        ok "svccfg validate accepts a manifest with dependents"
+    else
+        bad "svccfg validate rejects a manifest with dependents"
+        sed 's/^/    /' "$tmp/validate.err"
+    fi
+    if rm -f "$tmp/dependents.db" \
+       && SVCCFG_REPOSITORY="$tmp/dependents.db" "$svccfg" import "$manifest" \
+       && SVCCFG_REPOSITORY="$tmp/dependents.db" "$svccfg" export site/dependents-example >"$tmp/dependents.export" \
+       && grep "<dependent name='before-ssh' " "$tmp/dependents.export" | grep "grouping='optional_all'" \
+            | grep -q "restart_on='none'" \
+       && grep -q "<service_fmri value='svc:/network/ssh'/>" "$tmp/dependents.export"; then
+        ok "a dependent survives a scratch repo's import and export"
+    else
+        bad "the dependent is missing after import and export"
+        sed 's/^/    /' "$tmp/dependents.export" 2>/dev/null | grep -i -A3 depend
+    fi
+else
+    bad "a manifest with dependents does not build"
     sed 's/^/    /' "$tmp/build.err"
 fi
 
