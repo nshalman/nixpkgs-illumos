@@ -42,6 +42,8 @@ let
     etc/dhcp/inittab                     0644 cmd/cmd-inet/etc/dhcp/inittab
     etc/dhcp/inittab6                    0644 cmd/cmd-inet/etc/dhcp/inittab6
     etc/default/utmpd                    0644 cmd/utmpd/utmpd.dfl
+    # useradd's defaults (with the empty /etc/skel below, `useradd -m` works)
+    etc/default/useradd                  0644 cmd/oamuser/user/useradd.dfl
     # PAM for login, su, sshd, cron
     etc/pam.conf                         0644 lib/libpam/pam.conf
     # name services: the switch (the gate's DNS variant, as SmartOS installs), nscd, TLI transports
@@ -152,6 +154,14 @@ pkgs.runCommand "illumos-zone-root"
     l ./usr/bin bin
     # root's home; /var/empty is the build users' home
     d 0700 root
+    # root's non-login bash (a command run over ssh, an interactive subshell) reads ~/.bashrc and not /etc/profile;
+    # this puts the system profile on its PATH too, as the recipe-v2 image did (it also linked ~/.bash_profile,
+    # which a login shell would read after /etc/profile, sourcing it twice)
+    l /etc/profile root/.bashrc
+    # useradd -m copies /etc/skel into a new home and fails without it. Empty: the gate's skeleton files
+    # (cmd/nsadmin dot-profile.sh, dot-kshrc.sh) set nothing, and SmartOS's and the pkgsrc images' .profile set
+    # PATH outright, which drops the system profile /etc/profile added.
+    d 0755 etc/skel
     for p in var var/cron var/empty var/log var/logadm var/run var/spool var/spool/cron var/spool/cron/crontabs \
              var/ssh var/svc var/svc/log var/svc/manifest var/svc/manifest/site var/svc/profile var/ld var/ld/amd64; do
       d 0755 "$p"
@@ -174,6 +184,9 @@ pkgs.runCommand "illumos-zone-root"
     f 0644 "$gate/usr/src/cmd/init/init.dfl" etc/default/init
     sed -i 's/^TZ=.*/TZ=UTC/' "$r/etc/default/init"
     grep -q '^TZ=UTC$' "$r/etc/default/init"
+    # /etc/logindevperm, which login reads for console device permissions, made as the gate's build makes it
+    MACH=i386 sh "$gate/usr/src/cmd/login/logindevperm.sh" >"$r/etc/logindevperm"
+    chmod 0644 "$r/etc/logindevperm"
     # /etc/vfstab, made as the gate's build makes it
     (cd "$r/etc" && sh "$gate/usr/src/cmd/initpkg/vfstab.sh")
     chmod 0644 "$r/etc/vfstab"

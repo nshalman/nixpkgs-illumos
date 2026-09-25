@@ -16,7 +16,10 @@
 #      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites);
 #      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
 #      - sshd accepts /etc/ssh/sshd_config (`sshd -t`, with host keys made in the copy);
-#      - every symbolic link under /etc and /var resolves.
+#      - every symbolic link under /etc and /var resolves;
+#      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
+#      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
+#      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc.
 #   4. /etc/nixos/system.nix evaluates to the system profile the image ships, so a first `illumos-rebuild switch`
 #      changes nothing. It fetches what /etc/nixos/nixpkgs-illumos.nix names, so this holds only while that
 #      published commit's system is the same as this checkout's.
@@ -153,6 +156,22 @@ fi
 
 broken=$(in_root /usr/bin/find /etc /var -type l ! -exec /usr/bin/test -e {} \; -print 2>/dev/null)
 if [ -z "$broken" ]; then ok "every link under /etc and /var resolves"; else bad "links that do not resolve: $broken"; fi
+
+if [ -s "$R/etc/logindevperm" ]; then ok "/etc/logindevperm exists"; else bad "no /etc/logindevperm"; fi
+
+if in_root /usr/sbin/useradd -m -d /home/imgtest -s /usr/bin/bash imgtest >"$tmp/useradd.log" 2>&1 &&
+	[ -d "$R/home/imgtest" ]; then
+	ok "useradd -m makes a user with a home"
+else
+	bad "useradd -m: $(cat "$tmp/useradd.log")"
+fi
+
+if out=$(chroot "$R" /usr/bin/env -i PATH=/usr/bin:/usr/sbin HOME=/root SSH_CLIENT="192.0.2.1 50000 22" \
+	/nix/var/nix/profiles/default/bin/bash -c 'command -v nix' 2>&1) && [ -n "$out" ]; then
+	ok "a command run over ssh finds nix ($out)"
+else
+	bad "a command run over ssh does not find nix: $out"
+fi
 
 # --- 4. /etc/nixos evaluates to the shipped system ------------------------------------------------------------
 
