@@ -14,7 +14,7 @@
 #      - root's shell is the system profile's bash, and nixbld has the 32 build users as members;
 #      - a login shell finds nix through /etc/profile;
 #      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites);
-#      - the SMF repository is the seed (26 services);
+#      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
 #      - sshd accepts /etc/ssh/sshd_config (`sshd -t`, with host keys made in the copy);
 #      - every symbolic link under /etc and /var resolves.
 #   4. /etc/nixos/system.nix evaluates to the system profile the image ships, so a first `illumos-rebuild switch`
@@ -130,8 +130,17 @@ else
 fi
 
 cp "$R/etc/svc/repository.db" "$tmp/repo.db"
-nsvc=$(SVCCFG_REPOSITORY="$tmp/repo.db" SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg list | wc -l | tr -d ' ')
-if [ "$nsvc" = 26 ]; then ok "the SMF repository is the seed (26 services)"; else bad "the SMF repository has $nsvc services"; fi
+repo() { SVCCFG_REPOSITORY="$tmp/repo.db" SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd /usr/sbin/svccfg "$@"; }
+nsvc=$(repo list | wc -l | tr -d ' ')
+if [ "$nsvc" = 27 ]; then ok "the SMF repository is the seed (27 services)"; else bad "the SMF repository has $nsvc services"; fi
+# what vmadm does to a joyent-brand zone's repository before its first boot (VM.js: the mdata:execute timeout,
+# feature update_mdata_exec_timeout; fixMdataFetchStart, features cleanup_dataset and zoneinit)
+if repo -s svc:/smartdc/mdata:execute setprop start/timeout_seconds = count: 300 2>"$tmp/vmadm.err" &&
+	repo -s svc:/smartdc/mdata:fetch setprop start/exec = /lib/svc/method/mdata-fetch 2>>"$tmp/vmadm.err"; then
+	ok "vmadm's pre-boot svccfg calls on mdata:execute and mdata:fetch succeed"
+else
+	bad "vmadm's pre-boot svccfg calls fail: $(cat "$tmp/vmadm.err")"
+fi
 
 for t in rsa ecdsa ed25519; do
 	in_root /usr/bin/ssh-keygen -q -t $t -N '' -f /var/ssh/ssh_host_${t}_key >/dev/null 2>&1

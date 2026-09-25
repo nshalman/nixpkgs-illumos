@@ -9,7 +9,8 @@
 #   2. `svccfg archive` of the output is zone/smf-seed-archive.xml.
 #   3. It holds exactly the services of the gate's non-global seed list
 #      (usr/src/cmd/svc/seed/Makefile), less network/netcfg (not on
-#      SmartOS), plus system/early-manifest-import.
+#      SmartOS), plus system/early-manifest-import and smartdc/mdata
+#      (vmadm sets properties of its instances before the first boot).
 #   4. Every manifest it records is under its installed path in
 #      /lib/svc/manifest, not the build directory or the store: that is
 #      the path manifest-import compares on the zone's first boot.
@@ -74,6 +75,7 @@ network/iptun
 network/loopback
 network/physical
 network/rpc/bind
+smartdc/mdata
 system/boot-archive
 system/console-login
 system/device/local

@@ -9,6 +9,11 @@
 # and imported with PKG_INSTALL_ROOT, as the gate does, so the repository records their installed
 # /lib/svc/manifest paths.
 #
+# One more, not in the gate: SmartOS's smartdc/mdata (system/mdata.xml, from illumos-joyent). vmadm sets properties
+# of its instances in a joyent-brand zone's repository before the first boot (the mdata:execute start timeout, and
+# mdata:fetch's start method; VM.js), and fails the provisioning if they are not there: "svccfg: Pattern
+# 'svc:/smartdc/mdata:execute' doesn't match any instances or services".
+#
 # svccfg and svc.configd are the build host's. The repository file is not reproducible byte for byte (sqlite 2),
 # so the build checks the configuration instead: `svccfg archive` of the result must equal ./smf-seed-archive.xml.
 # A host svccfg that configures the same services passes; one that does not fails here, with the difference.
@@ -43,12 +48,19 @@ let
     "system/utmp.xml" = "cmd/utmpd/utmp.xml";
     # system/console-login.xml is generated, as the gate's milestone Makefile does
   };
+  # byte-identical to /lib/svc/manifest/system/mdata.xml of platform joyent_20260723T000757Z
+  mdataManifest = pkgs.fetchurl {
+    name = "mdata.xml";
+    url = "https://raw.githubusercontent.com/TritonDataCenter/illumos-joyent/eab31c4851f56d244d91d2452beb2f209538fd5f/usr/src/cmd/svc/milestone/mdata.xml";
+    sha256 = "0qz47l0r8lc94lqqixdpwvj748xd01vg8yx73167f559x2h2qhxg";
+  };
 in
 pkgs.runCommand "illumos-smf-seed"
   {
     gate = pkgs.illumos-ld.src;
     inherit (pkgs.illumos-ld) gateRev;
     expectedArchive = ./smf-seed-archive.xml;
+    inherit mdataManifest;
     # one "installed source" line per manifest, each ending in a newline (`read` drops an unterminated last line)
     manifestList = pkgs.lib.concatMapAttrsStringSep "" (
       installed: source: "${installed} ${source}\n"
@@ -63,6 +75,7 @@ pkgs.runCommand "illumos-smf-seed"
       cp "$gate/usr/src/$source" "$root/lib/svc/manifest/$installed"
     done <"$manifestListPath"
     (cd "$root/lib/svc/manifest/system" && sh "$gate/usr/src/cmd/svc/milestone/make-console-login-xml")
+    cp "$mdataManifest" "$root/lib/svc/manifest/system/mdata.xml"
 
     mkdir -p "$out/nix-support"
     export PKG_INSTALL_ROOT=$root
