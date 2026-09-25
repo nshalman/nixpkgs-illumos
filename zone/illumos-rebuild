@@ -16,7 +16,8 @@
 # restart of nix-daemon kills the builds it is running; do not switch while a build is in progress. Restarts
 # are complete, and nix-daemon answers on its socket, when a switch or rollback returns. Activation also copies
 # the programs the system lists in etc/setuid-programs (sudo) to /opt/nix/bin, setuid root, and removes the
-# copies it no longer lists (SETUID_DIR overrides the directory).
+# copies it no longer lists, and keeps a GC root on the system they came from (SETUID_DIR and SETUID_GCROOT
+# override the directory and the root).
 #
 # Tests override the SMF commands: SVCCFG (default /usr/sbin/svccfg), SVCADM (default /usr/sbin/svcadm) and
 # SVCS (default /usr/bin/svcs); svccfg also honours SVCCFG_REPOSITORY, so a scratch repository can stand in
@@ -107,12 +108,20 @@ activate() { # <new system> <old system or empty>
 # The store holds no setuid files. Each program a system lists in etc/setuid-programs (paths under the system,
 # one per line) is copied into $setuidDir, setuid root; /etc/profile puts that directory ahead of the profile. A
 # copy runs the libraries and plugins of the system it came from, so every activation replaces the copies with
-# the new system's and removes those it no longer lists.
+# the new system's and removes those it no longer lists. $setuidGcroot roots that system, so that collecting
+# garbage cannot delete what the copies run, even after a `nix-env --rollback` that bypassed this script (use
+# `illumos-rebuild rollback`: it replaces the copies too).
 setuidDir=${SETUID_DIR:-/opt/nix/bin}
+setuidGcroot=${SETUID_GCROOT:-/nix/var/nix/gcroots/setuid-programs}
 installSetuid() { # <system>
     local system=$1 p name
     local -A listed=()
     mkdir -p "$setuidDir"
+    if [ -s "$system/etc/setuid-programs" ]; then
+        ln -sfn "$system" "$setuidGcroot"
+    else
+        rm -f "$setuidGcroot"
+    fi
     if [ -f "$system/etc/setuid-programs" ]; then
         while read -r p; do
             [ -n "$p" ] || continue

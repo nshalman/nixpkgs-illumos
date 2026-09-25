@@ -21,7 +21,8 @@ with `illumos-rebuild`; everything else is a few files outside the store.
 | `/etc/nixos/system.nix` | that commit's `system.nix` applied to the package set and the zone's `nixSettings` | `example/system.nix` |
 | `/etc/nix/nix.conf` | symlink to `/nix/var/nix/profiles/default/etc/nix/nix.conf` | made once by hand or by the image |
 | `/etc/profile` | puts `/opt/nix/bin` and the profile on PATH and the profile on MANPATH, exports the CA bundle | `profile` |
-| `/opt/nix/bin` | setuid-root copies of the programs the profile lists in `etc/setuid-programs` (sudo, sudoedit), which the store cannot hold | the zone image, then `illumos-rebuild` on each switch |
+| `/opt/nix/bin` | setuid-root copies of the programs the profile lists in `etc/setuid-programs` (sudo, sudoedit), which the store cannot hold. Roll back with `illumos-rebuild rollback`, which replaces them too; a bare `nix-env --rollback` leaves them on the newer system | the zone image, then `illumos-rebuild` on each switch |
+| `/nix/var/nix/gcroots/setuid-programs` | a GC root on the system the copies in `/opt/nix/bin` came from, so collecting garbage cannot delete what they run | the zone image, then `illumos-rebuild` on each switch |
 | `/etc/sudoers`, `/etc/sudoers.d/admin` | the SmartOS base images' sudo configuration: root, and admin without a password | the zone image |
 | `/etc/ssl/certs/ca-bundle.crt`, `ca-certificates.crt` | symlinks to the profile's `etc/ssl/certs/ca-bundle.crt` | the zone image |
 | `/etc/passwd`, `shadow`, `group` | root's shell is the profile's bash; group `nixbld` with members `nixbld1..32` (uids 30001..30032, gid 30000, home `/var/empty`, no login), which `build-users-group` names | the zone image |

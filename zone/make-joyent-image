@@ -146,6 +146,10 @@ chmod 1775 "$ROOT/nix/store"
 # the system profile, generation 1, as `nix-env --set` makes it (zone/illumos-rebuild switches from here)
 ln -s "$SYSTEM" "$ROOT/nix/var/nix/profiles/default-1-link"
 ln -s default-1-link "$ROOT/nix/var/nix/profiles/default"
+# the GC root on the system the setuid copies in /opt/nix/bin came from, as illumos-rebuild keeps it
+if [[ -s "$ROOT$SYSTEM/etc/setuid-programs" ]]; then
+    ln -s "$SYSTEM" "$ROOT/nix/var/nix/gcroots/setuid-programs"
+fi
 
 NIX_BIN="$ROOT$SYSTEM/bin/nix-store"
 [[ -x "$NIX_BIN" ]] || { echo "missing nix-store at $NIX_BIN" >&2; exit 1; }

@@ -17,7 +17,8 @@
 #        admin_pw, the Service Management and Software Installation profiles), but with the system profile's bash as
 #        shell, and its login shell finds nix;
 #      - a login shell finds nix through /etc/profile;
-#      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites);
+#      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites), and a GC root
+#        keeps the system the setuid copies came from;
 #      - the SMF repository is the seed (27 services), and vmadm's pre-boot svccfg calls on mdata succeed;
 #      - sshd accepts /etc/ssh/sshd_config (`sshd -t`, with host keys made in the copy), and its effective
 #        settings (`sshd -T`) allow no password or keyboard-interactive logins and root by key only;
@@ -160,6 +161,16 @@ if [ "$nreq" = "$(wc -l <"$inputs/store-paths" | tr -d ' ')" ]; then
 	ok "the database knows the profile's $nreq requisites"
 else
 	bad "the database knows $nreq requisites of the profile, the closure has $(wc -l <"$inputs/store-paths")"
+fi
+# the GC root illumos-rebuild keeps on the system the setuid copies came from (zone/illumos-rebuild, installSetuid).
+# Asked with the image's state directory from outside the chroot: in it, the search for the roots of running
+# processes reads this zone's /proc, and fails there ("reading symlink '/proc/<pid>/path/root': Not owner").
+NIX_STATE_DIR="$R/nix/var/nix" "$system/bin/nix-store" -q --roots "$system" >"$tmp/roots" 2>&1
+if grep -x "$R/nix/var/nix/gcroots/setuid-programs -> $system" "$tmp/roots" >/dev/null; then
+	ok "the shipped system is a GC root for the setuid copies"
+else
+	bad "no GC root /nix/var/nix/gcroots/setuid-programs on the shipped system (link: $(readlink "$R/nix/var/nix/gcroots/setuid-programs" 2>&1)); nix-store -q --roots said:"
+	grep -v '^/proc/' "$tmp/roots" | tail -5
 fi
 
 cp "$R/etc/svc/repository.db" "$tmp/repo.db"

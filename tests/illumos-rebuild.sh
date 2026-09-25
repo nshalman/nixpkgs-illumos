@@ -18,7 +18,9 @@ pkgsFile=${1:?usage: $0 /path/to/pkgs.nix}
 top="$(cd "$(dirname "$0")/.." && pwd)"
 rebuild="$top/zone/illumos-rebuild"
 tmp=$(mktemp -d /work/rebuild-test.XXXXXX)
-trap 'rm -rf "$tmp"' EXIT
+# the GC root of the setuid copies' system: a real one, so the test can ask Nix whether it roots the system
+export SETUID_GCROOT=/nix/var/nix/gcroots/$(basename "$tmp")-setuid-programs
+trap 'rm -rf "$tmp"; rm -f "$SETUID_GCROOT"' EXIT
 
 pass=0 fail=0
 ok()  { echo "PASS: $1"; pass=$((pass+1)); }
@@ -152,6 +154,8 @@ out=$("$rebuild" build --config "$tmp/b.nix" 2>/dev/null)
 # --- 8. setuid copies ---------------------------------------------------------
 # A system that lists bin/rebuild-test-prog in etc/setuid-programs gets a copy of it in $SETUID_DIR, setuid root;
 # a switch to another build of it replaces the copy, and a switch to a system that does not list it removes it.
+# $SETUID_GCROOT roots the system the copies came from, so collecting garbage after a `nix-env --rollback` that
+# bypassed illumos-rebuild cannot delete what they run; it follows each switch and goes when no copies are left.
 
 setuidSystem() { # <name> <content of the program, or empty for a system that lists nothing>
     cat > "$tmp/$1.nix" <<NIX
@@ -166,6 +170,10 @@ setuidSystem s1 one
 setuidSystem s2 two
 setuidSystem s0 ""
 copy=$SETUID_DIR/rebuild-test-prog
+pathS1=$(nix-build --no-out-link "$tmp/s1.nix" 2>/dev/null)
+pathS2=$(nix-build --no-out-link "$tmp/s2.nix" 2>/dev/null)
+# whether Nix counts $SETUID_GCROOT as a root of the given store path
+rooted() { nix-store -q --roots "$1" 2>/dev/null | grep "^$SETUID_GCROOT -> " >/dev/null; }
 
 "$rebuild" switch --config "$tmp/s1.nix" --profile "$profile" >"$tmp/s1.out" 2>&1 || { bad "switch to a system with a setuid program fails"; sed 's/^/    /' "$tmp/s1.out"; }
 if [ "$(stat -c '%a %u %g' "$copy" 2>/dev/null)" = "4511 0 0" ] && [ "$(cat "$copy")" = one ]; then
@@ -173,18 +181,21 @@ if [ "$(stat -c '%a %u %g' "$copy" 2>/dev/null)" = "4511 0 0" ] && [ "$(cat "$co
 else
     bad "setuid copy after the switch: $(ls -l "$copy" 2>&1)"
 fi
+rooted "$pathS1" && ok "the copies' system is a GC root" || bad "the copies' system is not rooted by $SETUID_GCROOT ($(readlink "$SETUID_GCROOT" 2>&1))"
 "$rebuild" switch --config "$tmp/s2.nix" --profile "$profile" >"$tmp/s2.out" 2>&1 || { bad "switch to a second build of it fails"; sed 's/^/    /' "$tmp/s2.out"; }
 if [ "$(stat -c '%a %u %g' "$copy" 2>/dev/null)" = "4511 0 0" ] && [ "$(cat "$copy")" = two ]; then
     ok "a switch replaces the setuid copy with the new system's"
 else
     bad "setuid copy after the second switch: $(ls -l "$copy" 2>&1), content '$(cat "$copy" 2>&1)'"
 fi
+rooted "$pathS2" && ! rooted "$pathS1" && ok "the GC root follows the switch" || bad "after the second switch the GC root is $(readlink "$SETUID_GCROOT" 2>&1)"
 "$rebuild" switch --config "$tmp/s0.nix" --profile "$profile" >"$tmp/s0.out" 2>&1 || { bad "switch to a system without setuid programs fails"; sed 's/^/    /' "$tmp/s0.out"; }
 if [ -d "$SETUID_DIR" ] && [ ! -e "$copy" ] && [ -z "$(ls -A "$SETUID_DIR")" ]; then
     ok "a switch to a system that does not list it removes the copy"
 else
     bad "the setuid directory after a switch to a system without setuid programs: $(ls -A "$SETUID_DIR")"
 fi
+[ ! -e "$SETUID_GCROOT" ] && [ ! -L "$SETUID_GCROOT" ] && ok "with no copies left, the GC root goes" || bad "the GC root is still there: $(readlink "$SETUID_GCROOT")"
 
 echo
 echo "passed: $pass  failed: $fail"
