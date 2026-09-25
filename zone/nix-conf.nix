@@ -20,4 +20,9 @@ pkgs.writeTextDir "etc/nix/nix.conf" (
   ''
   + lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "${k} = ${value v}") settings)
   + "\n"
+  # A zone's local additions outside the system configuration, read last; `!include` skips a missing file. The
+  # zone image ships nix.local.conf.example, which turns on the nixpkgs-illumos binary cache.
+  + ''
+    !include /etc/nix/nix.local.conf
+  ''
 )

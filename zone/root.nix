@@ -129,16 +129,43 @@ let
     # illumos-rebuild; nixSettings are merged into /etc/nix/nix.conf (zone/nix-conf.nix of nixpkgs-illumos).
     import (import ./nixpkgs-illumos.nix + "/zone/system.nix") {
       pkgs = import ./pkgs.nix;
-      nixSettings = { };
+      nixSettings = {
+        # The nixpkgs-illumos binary cache (unsigned for now, hence trusted=true); or, without a rebuild, see
+        # /etc/nix/nix.local.conf.example.
+        # extra-substituters = [ "${cacheUrl}" ];
+      };
     }
+  '';
+
+  # The nixpkgs-illumos binary cache, off until a zone turns it on
+  cacheUrl = "https://www.shalman.org/files/cache/?trusted=true";
+  nixLocalConfExample = pkgs.writeText "nix.local.conf.example" ''
+    # Local additions to /etc/nix/nix.conf, which includes /etc/nix/nix.local.conf last (and skips it if it is
+    # missing). To use the nixpkgs-illumos binary cache:
+    #   cp /etc/nix/nix.local.conf.example /etc/nix/nix.local.conf && svcadm restart nix-daemon
+    # The cache is not signed yet, hence trusted=true.
+    extra-substituters = ${cacheUrl}
+  '';
+
+  motd = pkgs.writeText "motd" ''
+
+      nixpkgs-illumos zone: Nix ${pkgs.nixVersions.nix_2_35.version} in a SmartOS zone
+      https://github.com/nshalman/nixpkgs-illumos
+
+      system profile  /nix/var/nix/profiles/default, from /etc/nixos/system.nix
+      nix settings    /etc/nix/nix.conf, then /etc/nix/nix.local.conf if present
+      binary cache    cp /etc/nix/nix.local.conf.example /etc/nix/nix.local.conf
+                      svcadm restart nix-daemon
+
   '';
 in
 pkgs.runCommand "illumos-zone-root"
   {
-    inherit gate gateFileList sshdConfig nixosSystem zoneinitJson;
+    inherit gate gateFileList sshdConfig nixosSystem zoneinitJson nixLocalConfExample motd;
     seedDb = "${seed}/repository.db";
     siteProfile = ./site.xml;
     etcProfile = ./profile;
+    etcBashrc = ./bashrc;
     nixosExample = ./example;
     nativeBuildInputs = [ pkgs.gnutar ];
   }
@@ -237,11 +264,11 @@ pkgs.runCommand "illumos-zone-root"
       members=''${members:+$members,}nixbld$i
     done
     echo "nixbld::30000:$members" >>"$r/etc/group"
-    # admin, as the SmartOS base images have it (uid 100, group staff, bash, no password until admin_pw sets one at
+    # admin, as the SmartOS base images have it (uid 100, group staff, no password until admin_pw sets one at
     # provisioning, the Service Management and Software Installation RBAC profiles), so payloads that set admin_pw
-    # work here too. Its home belongs to it, see the tar below. (Those images also give it sudo, which this image
-    # does not ship; pfexec and the profiles remain.)
-    echo "admin:x:100:10::/home/admin:/usr/bin/bash" >>"$r/etc/passwd"
+    # work here too, but with the system profile's bash as root has. Its home belongs to it, see the tar below.
+    # (Those images also give it sudo, which this image does not ship; pfexec and the profiles remain.)
+    echo "admin:x:100:10::/home/admin:${profileLink}/bin/bash" >>"$r/etc/passwd"
     echo "admin:NP:::::::" >>"$r/etc/shadow"
     echo "admin::::type=normal;profiles=Service Management,Software Installation" >>"$r/etc/user_attr"
     d 0755 home/admin
@@ -272,6 +299,9 @@ pkgs.runCommand "illumos-zone-root"
 
     # --- Nix --------------------------------------------------------------------------------------------------
     f 0644 "$etcProfile" etc/profile
+    f 0644 "$etcBashrc" etc/bashrc
+    f 0644 "$motd" etc/motd
+    f 0644 "$nixLocalConfExample" etc/nix/nix.local.conf.example
     l ${profileLink}/etc/nix/nix.conf etc/nix/nix.conf
     l ${profileLink}/etc/ssl/certs/ca-bundle.crt etc/ssl/certs/ca-bundle.crt
     l ca-bundle.crt etc/ssl/certs/ca-certificates.crt

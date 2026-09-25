@@ -75,3 +75,10 @@ esac
 
 umask 022
 trap 2 3
+
+# bash gets /etc/bashrc too (the prompt and aliases of interactive shells), as NixOS's /etc/profile does; the
+# marker keeps /etc/bashrc from sourcing this file again.
+export __ETC_PROFILE_DONE=1
+if [ -n "${BASH_VERSION:-}" ] && [ -f /etc/bashrc ]; then
+    . /etc/bashrc
+fi

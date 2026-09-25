@@ -13,6 +13,7 @@
 #      brand mounts them from the global zone:
 #      - root's shell is the system profile's bash, and nixbld has the 32 build users as members;
 #      - the admin account is the SmartOS base images' (uid 100, staff, /home/admin its own, no password until
+#        admin_pw, but the system profile's bash as shell
 #        admin_pw, the Service Management and Software Installation profiles), and its login shell finds nix;
 #      - a login shell finds nix through /etc/profile;
 #      - Nix's database knows the whole closure (`nix-store --verify`, the profile's requisites);
@@ -24,7 +25,9 @@
 #      - every symbolic link under /etc and /var resolves;
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
-#      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc.
+#      - a command run over ssh (bash, not a login shell, SSH_CLIENT set) finds nix, through root's ~/.bashrc;
+#      - /etc/motd says what the zone is; an interactive login shell has NixOS's aliases and prompt (/etc/bashrc);
+#      - the nixpkgs-illumos binary cache is off, and on once /etc/nix/nix.local.conf.example is copied into place.
 #   4. /etc/nixos/system.nix evaluates to the system profile the image ships, so a first `illumos-rebuild switch`
 #      changes nothing. It fetches what /etc/nixos/nixpkgs-illumos.nix names, so this holds only while that
 #      published commit's system is the same as this checkout's.
@@ -119,7 +122,7 @@ if [ "$n" = 32 ]; then ok "nixbld lists 32 members"; else bad "nixbld lists $n m
 
 a_pw=$(in_root /usr/bin/getent passwd admin)
 a_home=$(stat -c '%u %g %a' "$R/home/admin" 2>/dev/null)
-if [ "$a_pw" = "admin:x:100:10::/home/admin:/usr/bin/bash" ] && [ "$a_home" = "100 10 755" ] &&
+if [ "$a_pw" = "admin:x:100:10::/home/admin:/nix/var/nix/profiles/default/bin/bash" ] && [ "$a_home" = "100 10 755" ] &&
 	grep '^admin:NP:' "$R/etc/shadow" >/dev/null &&
 	grep -x 'admin::::type=normal;profiles=Service Management,Software Installation' "$R/etc/user_attr" >/dev/null; then
 	ok "the admin account is the base images' (uid 100, staff, own home, NP, two RBAC profiles)"
@@ -220,6 +223,25 @@ if out=$(chroot "$R" /usr/bin/env -i PATH=/usr/bin:/usr/sbin HOME=/root SSH_CLIE
 else
 	bad "a command run over ssh does not find nix: $out"
 fi
+
+if grep 'nixpkgs-illumos' "$R/etc/motd" >/dev/null; then ok "/etc/motd names the image"; else bad "/etc/motd: $(head -3 "$R/etc/motd")"; fi
+
+if out=$(in_root /usr/bin/env TERM=xterm /nix/var/nix/profiles/default/bin/bash -lic 'alias ll; echo "$PS1"' 2>/dev/null) &&
+	echo "$out" | grep -x "alias ll='ls -l'" >/dev/null && echo "$out" | grep 'u@\\h:\\w' >/dev/null; then
+	ok "an interactive login shell has NixOS's aliases and prompt"
+else
+	bad "an interactive login shell lacks the aliases or prompt: $out"
+fi
+
+cache=https://www.shalman.org/files/cache
+subst() { in_root /usr/bin/env HOME=/root /nix/var/nix/profiles/default/bin/nix config show substituters 2>/dev/null; }
+if ! subst | grep "$cache" >/dev/null && [ -f "$R/etc/nix/nix.local.conf.example" ] &&
+	cp "$R/etc/nix/nix.local.conf.example" "$R/etc/nix/nix.local.conf" && subst | grep "$cache" >/dev/null; then
+	ok "the binary cache is off, and on once nix.local.conf.example is copied into place"
+else
+	bad "binary cache: off by default or on with nix.local.conf does not hold (substituters now: $(subst))"
+fi
+rm -f "$R/etc/nix/nix.local.conf"
 
 # --- 4. /etc/nixos evaluates to the shipped system ------------------------------------------------------------
 

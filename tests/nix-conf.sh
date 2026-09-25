@@ -38,6 +38,10 @@ for line in "system = x86_64-solaris" "build-users-group = nixbld" "cores = 6" "
 done
 
 # nix reads the file: NIX_CONF_DIR only, no store access
+# the last line reads a zone's local additions, if it has any (the image ships nix.local.conf.example)
+[ "$(tail -1 "$conf")" = "!include /etc/nix/nix.local.conf" ] && ok "nix.conf ends by including /etc/nix/nix.local.conf" \
+    || bad "nix.conf does not end with '!include /etc/nix/nix.local.conf' (last line: $(tail -1 "$conf"))"
+
 if NIX_CONF_DIR=$sys/etc/nix nix config show > "$tmp/show" 2>"$tmp/show.err"; then
     grep -qx "cores = 6" "$tmp/show" && grep -qx "system = x86_64-solaris" "$tmp/show" \
         && ok "nix config show reports the settings from the rendered file" \

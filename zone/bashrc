@@ -1,0 +1,44 @@
+# /etc/bashrc for a zone that runs Nix from this repo, after NixOS's (nixos/modules/programs/bash/bash.nix):
+# its default prompt and aliases and no command hashing, for interactive bash shells. nixpkgs' bash reads this file
+# in shells that are not login shells (it is built with SYS_BASHRC=/etc/bashrc), and /etc/profile sources it in
+# login shells. Local additions go in /etc/bashrc.local.
+
+# Only execute this file once per shell.
+if [ -n "$__ETC_BASHRC_SOURCED" ] || [ -n "$NOSYSBASHRC" ]; then return; fi
+__ETC_BASHRC_SOURCED=1
+
+# A shell with no login shell above it (a command run over ssh, a fresh terminal) gets /etc/profile's environment:
+# the system profile on PATH.
+if [ -z "$__ETC_PROFILE_DONE" ]; then
+    . /etc/profile
+fi
+
+# We are not always an interactive shell.
+if [ -n "$PS1" ]; then
+    # Disable hashing (i.e. caching) of command lookups: a switch of the system profile changes what they resolve to.
+    set +h
+
+    # Provide a nice prompt if the terminal supports it: red for root, green for everyone else.
+    if [ "$TERM" != "dumb" ] || [ -n "$INSIDE_EMACS" ]; then
+        PROMPT_COLOR="1;31m"
+        ((UID)) && PROMPT_COLOR="1;32m"
+        if [ -n "$INSIDE_EMACS" ]; then
+            # Emacs term mode doesn't support xterm title escape sequence (\e]0;)
+            PS1="\n\[\033[$PROMPT_COLOR\][\u@\h:\w]\\$\[\033[0m\] "
+        else
+            PS1="\n\[\033[$PROMPT_COLOR\][\[\e]0;\u@\h: \w\a\]\u@\h:\w]\\$\[\033[0m\] "
+        fi
+        if test "$TERM" = "xterm"; then
+            PS1="\[\033]2;\h:\u:\w\007\]$PS1"
+        fi
+    fi
+
+    alias -- l='ls -alh'
+    alias -- ll='ls -l'
+    alias -- ls='ls --color=tty'
+fi
+
+# Read system-wide modifications.
+if test -f /etc/bashrc.local; then
+    . /etc/bashrc.local
+fi
