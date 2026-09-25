@@ -29,6 +29,12 @@ The zone image builder is still the one on the `illumos-recipe-v2` branch of nix
 (`pkgs/stdenv/illumos-recipe/zone-root/builder.sh`, `make-zone-root.nix`, `make-zone-image.nix`,
 `make-joyent-image.nix`); porting it here is open.
 
+## For the zone image
+
+| file | what |
+|---|---|
+| `smf-seed.nix`, `smf-seed-archive.xml` | a seed `/etc/svc/repository.db` from upstream illumos-gate manifests: the gate's non-global seed services, just enough for early manifest import to load the platform's manifests from `/lib/svc/manifest` on first boot, before any service starts. The build checks `svccfg archive` of the result against `smf-seed-archive.xml` |
+
 ## Installing Nix in an existing zone
 
 `nix-build ../illumos.nix -A nixInstallerTarball` makes `nix-<version>-x86_64-solaris.tar.xz`, Nix's binary
@@ -44,6 +50,7 @@ zone without touching its profile or SMF repository:
     tests/smf-lib.sh /etc/nixos/pkgs.nix          # manifests validate and match the golden export
     tests/illumos-rebuild.sh /etc/nixos/pkgs.nix  # switch, removal, restart, rollback on scratch state
     tests/nix-conf.sh /etc/nixos/pkgs.nix         # the rendered nix.conf, and that nix parses it
+    tests/smf-seed.sh /etc/nixos/pkgs.nix         # the seed: its services, configuration, recorded manifest paths
 
 `tests/installed-zone.sh [CACHE-URL STDENV-PATH]` checks a zone after the installer ran in it: the daemon, the
 build users, the store, login shells, an unprivileged build and, given them, substitution of the stdenv from a

@@ -1,0 +1,2305 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<service_bundle type='archive' name='none'>
+  <service name='milestone/multi-user-server' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='multi-user' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/multi-user'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/sbin/rc3' timeout_seconds='1800'>
+      <propval name='restart_on' type='astring' value='external_fault'/>
+    </exec_method>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+      <propval name='timeout_retry' type='boolean' value='false'/>
+    </property_group>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>multi-user plus exports milestone</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='init' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='milestone/multi-user' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='milestones' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/single-user'/>
+      <service_fmri value='svc:/milestone/sysconfig'/>
+      <service_fmri value='svc:/milestone/name-services'/>
+    </dependency>
+    <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/local'/>
+    </dependency>
+    <dependency name='kdmconfig' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/platform/i86pc/kdmconfig:default'/>
+    </dependency>
+    <dependency name='rpcbind' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/rpc/bind'/>
+    </dependency>
+    <dependency name='syslog' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/system-log'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/sbin/rc2 start' timeout_seconds='1800'>
+      <propval name='restart_on' type='astring' value='external_fault'/>
+    </exec_method>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+      <propval name='timeout_retry' type='boolean' value='false'/>
+    </property_group>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>multi-user milestone</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='init' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='milestone/name-services' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='dns' grouping='optional_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/network/dns/client'/>
+    </dependency>
+    <dependency name='ldap' grouping='optional_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/network/ldap/client'/>
+    </dependency>
+    <dependency name='nis_client' grouping='optional_all' restart_on='refresh' type='service'>
+      <service_fmri value='svc:/network/nis/client'/>
+    </dependency>
+    <exec_method name='start' type='method' exec=':true' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='general' type='framework'>
+      <propval name='startd_duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>name services milestone</loctext>
+      </common_name>
+    </template>
+  </service>
+  <service name='milestone/single-user' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='nodename' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/identity:node'/>
+    </dependency>
+    <dependency name='filesystem-minimal' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/minimal'/>
+    </dependency>
+    <dependency name='milestone-devices' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/devices'/>
+    </dependency>
+    <dependency name='manifests' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/manifest-import'/>
+    </dependency>
+    <dependency name='loopback-network' grouping='require_any' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/loopback'/>
+    </dependency>
+    <dependency name='network' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/network'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/sbin/rcS start' timeout_seconds='1800'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+      <propval name='timeout_retry' type='boolean' value='false'/>
+    </property_group>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>single-user milestone</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='init' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='network/datalink-management' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependent name='dlmgmt-device-system' restart_on='none' grouping='require_all'>
+      <service_fmri value='svc:/system/device/local'/>
+    </dependent>
+    <dependent name='dlmgmt-install-discovery' restart_on='none' grouping='require_all'>
+      <service_fmri value='svc:/system/install-discovery'/>
+    </dependent>
+    <dependent name='dlmgmt-network-physical' restart_on='none' grouping='require_all'>
+      <service_fmri value='svc:/network/physical'/>
+    </dependent>
+    <exec_method name='start' type='method' exec='/lib/svc/method/svc-dlmgmtd' timeout_seconds='60'/>
+    <exec_method name='stop' type='method' exec=':kill' timeout_seconds='3'/>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>data-link management daemon</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='dlmgmtd' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='system/install-discovery' type='service' version='0'/>
+  <service name='system/device/local' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='usr' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/usr'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/devices-local' timeout_seconds='6000'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>standard device configuration.</loctext>
+      </common_name>
+    </template>
+  </service>
+  <service name='network/physical' type='service' version='0'>
+    <dependency name='loopback' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/loopback'/>
+    </dependency>
+    <instance name='default' enabled='true'>
+      <dependency name='physical_nwam' grouping='exclude_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/network/physical:nwam'/>
+      </dependency>
+      <exec_method name='start' type='method' exec='/lib/svc/method/net-physical' timeout_seconds='600'/>
+      <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+      <property_group name='startd' type='framework'>
+        <propval name='duration' type='astring' value='transient'/>
+      </property_group>
+      <template>
+        <common_name>
+          <loctext xml:lang='C'>physical network interfaces</loctext>
+        </common_name>
+        <documentation>
+          <manpage title='ifconfig' section='8' manpath='/usr/share/man'/>
+        </documentation>
+      </template>
+    </instance>
+    <instance name='nwam' enabled='false'>
+      <exec_method name='start' type='method' exec='/lib/svc/method/net-nwam start' timeout_seconds='120'>
+        <method_context working_directory='/'>
+          <method_credential user='root' group='root' supp_groups='netadm' privileges='zone'/>
+        </method_context>
+      </exec_method>
+      <exec_method name='stop' type='method' exec='/lib/svc/method/net-nwam stop' timeout_seconds='60'>
+        <method_context working_directory='/'>
+          <method_credential user='root' group='root' supp_groups='netadm' privileges='zone'/>
+        </method_context>
+      </exec_method>
+      <exec_method name='refresh' type='method' exec='/lib/svc/method/net-nwam refresh' timeout_seconds='60'>
+        <method_context working_directory='/'>
+          <method_credential user='root' group='root' supp_groups='netadm' privileges='zone'/>
+        </method_context>
+      </exec_method>
+      <property_group name='nwamd' type='application'>
+        <stability value='Unstable'/>
+        <propval name='active_ncp' type='astring' value='Automatic'/>
+        <propval name='autoconf' type='boolean' value='false'/>
+        <propval name='condition_check_interval' type='count' value='120'/>
+        <propval name='debug' type='boolean' value='false'/>
+        <propval name='ncu_wait_time' type='count' value='60'/>
+        <propval name='scan_interval' type='count' value='120'/>
+        <propval name='scan_level' type='astring' value='weak'/>
+        <propval name='strict_bssid' type='boolean' value='false'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.nwam'/>
+      </property_group>
+      <property_group name='general' type='framework'>
+        <propval name='action_authorization' type='astring' value='solaris.smf.manage.nwam'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.manage.nwam'/>
+      </property_group>
+      <template>
+        <common_name>
+          <loctext xml:lang='C'>physical network interface autoconfiguration</loctext>
+        </common_name>
+        <documentation>
+          <manpage title='nwamd' section='8' manpath='/usr/share/man'/>
+          <doc_link name='Network Auto-Magic OpenSolaris Project Page' uri='http://hub.opensolaris.org/bin/view/Project+nwam/'/>
+        </documentation>
+      </template>
+    </instance>
+    <stability value='Unstable'/>
+  </service>
+  <service name='network/initial' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <dependency name='network' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/network'/>
+    </dependency>
+    <dependency name='filesystem' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/usr'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/net-init' timeout_seconds='600'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>initial network services</loctext>
+      </common_name>
+      <description>
+        <loctext xml:lang='C'>Initial network services includes
+				setting any tunable parameters.</loctext>
+      </description>
+      <documentation>
+        <manpage title='ifconfig' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='network/ip-interface-management' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependent name='ipmgmt-iptun' restart_on='none' grouping='require_all'>
+      <service_fmri value='svc:/network/iptun'/>
+    </dependent>
+    <dependent name='ipmgmt-loopback' restart_on='none' grouping='require_all'>
+      <service_fmri value='svc:/network/loopback'/>
+    </dependent>
+    <dependent name='ipmgmt-physical' restart_on='none' grouping='require_all'>
+      <service_fmri value='svc:/network/physical'/>
+    </dependent>
+    <exec_method name='start' type='method' exec='/lib/svc/method/net-ipmgmt' timeout_seconds='60'/>
+    <exec_method name='stop' type='method' exec=':kill' timeout_seconds='5'/>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>IP interface management</loctext>
+      </common_name>
+      <description>
+        <loctext xml:lang='C'>Create IP interfaces, apply
+				TCP/IP properties and manage
+				address object mappings.</loctext>
+      </description>
+      <documentation>
+        <manpage title='ipadm' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='network/loopback' type='service' version='0'>
+    <instance name='default' enabled='true'>
+      <exec_method name='start' type='method' exec='/lib/svc/method/net-loopback' timeout_seconds='60'/>
+      <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+      <property_group name='startd' type='framework'>
+        <propval name='duration' type='astring' value='transient'/>
+      </property_group>
+    </instance>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>loopback network interface</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='ifconfig' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='network/iptun' type='service' version='0'/>
+  <service name='network/rpc/bind' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/minimal'/>
+    </dependency>
+    <dependency name='network_initial' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/routing-setup:default'/>
+      <service_fmri value='svc:/network/initial:default'/>
+    </dependency>
+    <dependency name='network_ipfilter' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/ipfilter:default'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/rpc-bind %m' timeout_seconds='60'>
+      <method_context working_directory='/'>
+        <method_credential user='root' group='root' privileges='basic,file_chown,file_chown_self,file_owner,net_privaddr,proc_setid,sys_nfs,net_bindmlp'/>
+      </method_context>
+    </exec_method>
+    <exec_method name='refresh' type='method' exec=':kill -HUP' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec='/lib/svc/method/rpc-bind %m %{restarter/contract}' timeout_seconds='60'>
+      <method_context working_directory='/'>
+        <method_credential user='root' group='root' privileges='basic,proc_owner'/>
+      </method_context>
+    </exec_method>
+    <property_group name='config' type='application'>
+      <propval name='allow_indirect' type='boolean' value='true'/>
+      <propval name='enable_tcpwrappers' type='boolean' value='false'/>
+      <propval name='listen_backlog' type='integer' value='64'/>
+      <propval name='local_only' type='boolean' value='true'/>
+      <propval name='max_threads' type='integer' value='72'/>
+      <propval name='value_authorization' type='astring' value='solaris.smf.value.rpc.bind'/>
+      <propval name='verbose_logging' type='boolean' value='false'/>
+    </property_group>
+    <property_group name='firewall_config' type='com.sun,fw_configuration'>
+      <propval name='apply_to' type='astring' value=''/>
+      <propval name='apply_to_6' type='astring' value=''/>
+      <propval name='block_policy' type='astring' value='use_global'/>
+      <propval name='exceptions' type='astring' value=''/>
+      <propval name='exceptions_6' type='astring' value=''/>
+      <propval name='policy' type='astring' value='use_global'/>
+      <propval name='target' type='astring' value=''/>
+      <propval name='target_6' type='astring' value=''/>
+      <propval name='value_authorization' type='astring' value='solaris.smf.value.firewall.config'/>
+    </property_group>
+    <property_group name='firewall_context' type='com.sun,fw_definition'>
+      <propval name='name' type='astring' value='sunrpc'/>
+    </property_group>
+    <property_group name='general' type='framework'>
+      <propval name='action_authorization' type='astring' value='solaris.smf.manage.rpc.bind'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>RPC bindings</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='rpcbind' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='system/boot-archive' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='root' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/root'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/boot-archive' timeout_seconds='60'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+    <property_group name='config' type='application'>
+      <propval name='format' type='astring' value='cpio'/>
+    </property_group>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>check boot archive content</loctext>
+      </common_name>
+      <description>
+        <loctext xml:lang='C'>This service checks if boot archive is
+				in sync with the root filesystem.</loctext>
+      </description>
+    </template>
+  </service>
+  <service name='system/console-login' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/minimal'/>
+    </dependency>
+    <dependency name='identity' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/identity:node'/>
+    </dependency>
+    <dependency name='utmpx' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/utmp:default'/>
+    </dependency>
+    <dependency name='sysconfig' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/sysconfig'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/console-login %i' timeout_seconds='0'>
+      <method_context working_directory='/'>
+        <method_credential user='root' group='root'/>
+      </method_context>
+    </exec_method>
+    <exec_method name='stop' type='method' exec=':kill -9' timeout_seconds='3'>
+      <method_context working_directory='/'>
+        <method_credential user='root' group='root'/>
+      </method_context>
+    </exec_method>
+    <property_group name='ttymon' type='application'>
+      <propval name='device' type='astring' value='/dev/console'/>
+      <propval name='label' type='astring' value='console'/>
+      <propval name='modules' type='astring' value='ldterm,ttcompat'/>
+      <propval name='nohangup' type='boolean' value='true'/>
+      <propval name='prompt' type='astring' value='`uname -n` console login:'/>
+      <propval name='terminal_type' type='astring' value=''/>
+      <propval name='timeout' type='count' value='0'/>
+      <propval name='value_authorization' type='astring' value='solaris.smf.value.vt'/>
+    </property_group>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='child'/>
+      <propval name='ignore_error' type='astring' value='core,signal'/>
+      <propval name='utmpx_prefix' type='astring' value='co'/>
+    </property_group>
+    <property_group name='general' type='framework'>
+      <propval name='action_authorization' type='astring' value='solaris.smf.manage.vt'/>
+      <propval name='value_authorization' type='astring' value='solaris.smf.manage.vt'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_ttymon' type='template_pg_pattern'>
+      <propval name='name' type='astring' value='ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='this'/>
+      <propval name='type' type='astring' value='application'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_device' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='values'/>
+      <propval name='description_C' type='ustring' value='The terminal device to be used for the console login prompt.'/>
+      <propval name='name' type='astring' value='device'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_F5SGK5RPMNXW443PNRSQ----_description_C' type='ustring' value='The default console device'/>
+      <propval name='value_F5SGK5RPO5ZWG33OOM------_description_C' type='ustring' value='The physical workstation console (i.e. keyboard and monitor)'/>
+      <propval name='value_F5SGK5RPORSXE3JPME------_description_C' type='ustring' value='Serial device A'/>
+      <propval name='value_F5SGK5RPORSXE3JPMI------_description_C' type='ustring' value='Serial device B'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value='/dev/console'/>
+          <value_node value='/dev/wscons'/>
+          <value_node value='/dev/term/a'/>
+          <value_node value='/dev/term/b'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_label' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='/etc/ttydefs entry'/>
+      <propval name='description_C' type='ustring' value='The appropriate entry from /etc/ttydefs'/>
+      <propval name='name' type='astring' value='label'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_timeout' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='If no user input is given within the number of seconds defined by this property after the prompt is printed, ttymon should exit.'/>
+      <propval name='name' type='astring' value='timeout'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='units_C' type='ustring' value='seconds'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_nohangup' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Do not force a hangup on the line by setting the speed to zero before setting the speed to the default or specified speed.'/>
+      <propval name='name' type='astring' value='nohangup'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_modules' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='STREAMS modules'/>
+      <propval name='description_C' type='ustring' value='STREAMS modules to be pushed on the terminal'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='modules'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_prompt' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Prompt to be printed on console'/>
+      <propval name='name' type='astring' value='prompt'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_ttymon_terminal_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Sets the initial value of the TERM environment variable'/>
+      <propval name='name' type='astring' value='terminal_type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_ttymon'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+    </property_group>
+    <instance name='vt2' enabled='false'>
+      <dependency name='system-console' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/console-login:default'/>
+      </dependency>
+      <dependency name='vtdaemon' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/vtdaemon:default'/>
+      </dependency>
+      <property_group name='ttymon' type='application'>
+        <propval name='device' type='astring' value='/dev/vt/2'/>
+        <propval name='label' type='astring' value='console'/>
+        <propval name='modules' type='astring' value='ldterm,ttcompat'/>
+        <propval name='nohangup' type='boolean' value='true'/>
+        <propval name='prompt' type='astring' value='`uname -n` vt2 login:'/>
+        <propval name='terminal_type' type='astring' value=''/>
+        <propval name='timeout' type='count' value='0'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.vt'/>
+      </property_group>
+    </instance>
+    <instance name='vt3' enabled='false'>
+      <dependency name='system-console' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/console-login:default'/>
+      </dependency>
+      <dependency name='vtdaemon' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/vtdaemon:default'/>
+      </dependency>
+      <property_group name='ttymon' type='application'>
+        <propval name='device' type='astring' value='/dev/vt/3'/>
+        <propval name='label' type='astring' value='console'/>
+        <propval name='modules' type='astring' value='ldterm,ttcompat'/>
+        <propval name='nohangup' type='boolean' value='true'/>
+        <propval name='prompt' type='astring' value='`uname -n` vt3 login:'/>
+        <propval name='terminal_type' type='astring' value=''/>
+        <propval name='timeout' type='count' value='0'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.vt'/>
+      </property_group>
+    </instance>
+    <instance name='vt4' enabled='false'>
+      <dependency name='system-console' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/console-login:default'/>
+      </dependency>
+      <dependency name='vtdaemon' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/vtdaemon:default'/>
+      </dependency>
+      <property_group name='ttymon' type='application'>
+        <propval name='device' type='astring' value='/dev/vt/4'/>
+        <propval name='label' type='astring' value='console'/>
+        <propval name='modules' type='astring' value='ldterm,ttcompat'/>
+        <propval name='nohangup' type='boolean' value='true'/>
+        <propval name='prompt' type='astring' value='`uname -n` vt4 login:'/>
+        <propval name='terminal_type' type='astring' value=''/>
+        <propval name='timeout' type='count' value='0'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.vt'/>
+      </property_group>
+    </instance>
+    <instance name='vt5' enabled='false'>
+      <dependency name='system-console' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/console-login:default'/>
+      </dependency>
+      <dependency name='vtdaemon' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/vtdaemon:default'/>
+      </dependency>
+      <property_group name='ttymon' type='application'>
+        <propval name='device' type='astring' value='/dev/vt/5'/>
+        <propval name='label' type='astring' value='console'/>
+        <propval name='modules' type='astring' value='ldterm,ttcompat'/>
+        <propval name='nohangup' type='boolean' value='true'/>
+        <propval name='prompt' type='astring' value='`uname -n` vt5 login:'/>
+        <propval name='terminal_type' type='astring' value=''/>
+        <propval name='timeout' type='count' value='0'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.vt'/>
+      </property_group>
+    </instance>
+    <instance name='vt6' enabled='false'>
+      <dependency name='system-console' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/console-login:default'/>
+      </dependency>
+      <dependency name='vtdaemon' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/vtdaemon:default'/>
+      </dependency>
+      <property_group name='ttymon' type='application'>
+        <propval name='device' type='astring' value='/dev/vt/6'/>
+        <propval name='label' type='astring' value='console'/>
+        <propval name='modules' type='astring' value='ldterm,ttcompat'/>
+        <propval name='nohangup' type='boolean' value='true'/>
+        <propval name='prompt' type='astring' value='`uname -n` vt6 login:'/>
+        <propval name='terminal_type' type='astring' value=''/>
+        <propval name='timeout' type='count' value='0'/>
+        <propval name='value_authorization' type='astring' value='solaris.smf.value.vt'/>
+      </property_group>
+    </instance>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>Console login</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='ttymon' section='8' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='milestone/devices' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='usr' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/device/local'/>
+    </dependency>
+    <exec_method name='start' type='method' exec=':true' timeout_seconds='3'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+    <property_group name='general' type='framework'>
+      <propval name='startd_duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Evolving'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>device configuration milestone</loctext>
+      </common_name>
+    </template>
+  </service>
+  <service name='system/early-manifest-import' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <exec_method name='start' type='method' exec=':true' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <exec_method name='refresh' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>early manifest import</loctext>
+      </common_name>
+      <description>
+        <loctext xml:lang='C'>This service imports manifests early
+				in the boot process before services
+				start.</loctext>
+      </description>
+      <documentation>
+        <manpage title='svc.startd' section='8' manpath='/usr/share/man'/>
+        <manpage title='smf_method' section='7' manpath='/usr/share/man'/>
+        <manpage title='smf' section='7' manpath='/usr/share/man'/>
+        <manpage title='smf_bootstrap' section='7' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='system/filesystem/local' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='single-user' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/single-user'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/fs-local' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>local file system mounts</loctext>
+      </common_name>
+    </template>
+  </service>
+  <service name='system/filesystem/minimal' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='usr' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/usr'/>
+    </dependency>
+    <dependency name='devices' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/device/local'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/fs-minimal' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>minimal file system mounts</loctext>
+      </common_name>
+    </template>
+  </service>
+  <service name='system/filesystem/root' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <exec_method name='start' type='method' exec='/lib/svc/method/fs-root' timeout_seconds='300'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>root file system mount</loctext>
+      </common_name>
+    </template>
+  </service>
+  <service name='system/filesystem/usr' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='boot-archive' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/boot-archive'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/fs-usr' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>read/write root file systems mounts</loctext>
+      </common_name>
+      <description>
+        <loctext xml:lang='C'>This service remounts both / and /usr
+				read-write.</loctext>
+      </description>
+    </template>
+  </service>
+  <service name='system/identity' type='service' version='0'>
+    <dependency name='loopback-network' grouping='require_any' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/loopback'/>
+    </dependency>
+    <dependency name='physical-network' grouping='optional_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/network/physical'/>
+    </dependency>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='60'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <instance name='domain' enabled='false'>
+      <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+        <service_fmri value='svc:/system/filesystem/minimal'/>
+      </dependency>
+      <exec_method name='start' type='method' exec='/lib/svc/method/identity-domain' timeout_seconds='60'/>
+      <template>
+        <common_name>
+          <loctext xml:lang='C'>system identity (domainname)</loctext>
+        </common_name>
+        <documentation>
+          <manpage title='domainname' section='8' manpath='/usr/share/man'/>
+          <manpage title='defaultdomain' section='5' manpath='/usr/share/man'/>
+        </documentation>
+      </template>
+    </instance>
+    <instance name='node' enabled='true'>
+      <exec_method name='start' type='method' exec='/lib/svc/method/identity-node' timeout_seconds='60'/>
+      <template>
+        <common_name>
+          <loctext xml:lang='C'>system identity (nodename)</loctext>
+        </common_name>
+        <documentation>
+          <manpage title='nodename' section='5' manpath='/usr/share/man'/>
+        </documentation>
+      </template>
+    </instance>
+    <stability value='Unstable'/>
+  </service>
+  <service name='system/manifest-import' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='fs' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/filesystem/minimal'/>
+    </dependency>
+    <exec_method name='start' type='method' exec='/lib/svc/method/manifest-import' timeout_seconds='1800'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='3'/>
+    <property_group name='startd' type='framework'>
+      <propval name='duration' type='astring' value='transient'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>service manifest import</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='smf_bootstrap' section='7' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='system/svc/global' type='service' version='0'>
+    <create_default_instance enabled='false'/>
+    <single_instance/>
+    <exec_method name='start' type='method' exec=':true' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='tm_pgpatnt_general' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Basic information about a service instance which is supplied by the service author, sometimes modified by the administrator, and consumed by SMF and the service&apos;s restarter.'/>
+      <propval name='name' type='astring' value='general'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='framework'/>
+    </property_group>
+    <property_group name='tm_pgpatt_dependency' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='A dependency declares a required condition for a service instance to start or stay running.  It is defined by the service author and consumed by SMF.'/>
+      <propval name='name' type='astring' value=''/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='dependency'/>
+    </property_group>
+    <property_group name='tm_pgpatt_template_pg_pattern' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Template data about property groups.  This information is provided in the manifest by the service author and should not be modified directly.'/>
+      <propval name='name' type='astring' value=''/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='template_pg_pattern'/>
+    </property_group>
+    <property_group name='tm_pgpatt_template_prop_pattern' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Template data about properties.  This information is provided in the manifest by the service author and should not be modified directly.'/>
+      <propval name='name' type='astring' value=''/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='template_prop_pattern'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_method_context' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Specifies the default execution context for all service methods.  It is defined by the service author, may be augmented by an administrator, and is consumed by the service&apos;s restarter.'/>
+      <propval name='name' type='astring' value='method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='framework'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_firewall_context' type='template_pg_pattern'>
+      <propval name='common_name_C' type='ustring' value='Static definition'/>
+      <propval name='description_C' type='ustring' value='Service static network and firewall definition.'/>
+      <propval name='name' type='astring' value='firewall_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='com.sun,fw_definition'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_firewall_config' type='template_pg_pattern'>
+      <propval name='common_name_C' type='ustring' value='Firewall configuration'/>
+      <propval name='description_C' type='ustring' value='Service firewall configuration.'/>
+      <propval name='name' type='astring' value='firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='com.sun,fw_configuration'/>
+    </property_group>
+    <property_group name='tm_pgpatt_notify_params' type='template_pg_pattern'>
+      <propval name='common_name_C' type='ustring' value='FMA and SMF notification parameters'/>
+      <propval name='description_C' type='ustring' value='Parameters for notification of FMA events and SMF state transitions.'/>
+      <propval name='name' type='astring' value=''/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='all'/>
+      <propval name='type' type='astring' value='notify_params'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_general_enabled' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The service instance is expected to be started once all of its dependencies are satisfied.  If this property is not defined, the restarter will not be notified about this service instance.'/>
+      <propval name='name' type='astring' value='enabled'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_general'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_general_restarter' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The restarter responsible for managing this service instance.  If the property is unset, the default restarter, svc.startd, is assumed.'/>
+      <propval name='name' type='astring' value='restarter'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_general'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='fmri'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_general_single_instance' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Only one instance of this service may be run.  This behavior is unimplemented, and obsolete.'/>
+      <propval name='name' type='astring' value='single_instance'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_general'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_t_dependency_entities' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='18446744073709551615'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The services, service instances, or files used to calculate this dependency.'/>
+      <propval name='name' type='astring' value='entities'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_dependency'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='fmri'/>
+    </property_group>
+    <property_group name='tm_proppat_t_dependency_external' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='This dependency was declared by the service defined in entities.  It will be removed only when that service is deleted.'/>
+      <propval name='name' type='astring' value='external'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_dependency'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_t_dependency_grouping' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='constraints'/>
+      <propval name='description_C' type='ustring' value='How to decide whether this dependency is satisfied.'/>
+      <propval name='name' type='astring' value='grouping'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_dependency'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MV4GG3DVMRSV6YLMNQ------_description_C' type='ustring' value='Satisfied when all of the cited services are disabled, in the maintenance state, or when cited services or files are not present.'/>
+      <propval name='value_N5YHI2LPNZQWYX3BNRWA----_description_C' type='ustring' value='Satisfied if the cited services are running (online or degraded) or will not run without administrative action (disabled, maintenance, not present, or offline waiting for dependencies which will not start without administrative action).'/>
+      <propval name='value_OJSXC5LJOJSV6YLMNQ------_description_C' type='ustring' value='Satisfied when all cited services are running (online or degraded), or when all indicated files are present.'/>
+      <propval name='value_OJSXC5LJOJSV6YLOPE------_description_C' type='ustring' value='Satisfied when one of the cited services is running (online or degraded), or when at least one of the indicated files is present.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='require_all'/>
+          <value_node value='require_any'/>
+          <value_node value='optional_all'/>
+          <value_node value='exclude_all'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_t_dependency_restart_on' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='constraints'/>
+      <propval name='description_C' type='ustring' value='Determines whether to restart the service due to a dependency refresh, restart, or failure.'/>
+      <propval name='name' type='astring' value='restart_on'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_dependency'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MVZHE33S_description_C' type='ustring' value='Restart only if the dependency encounters an error, such as an uncorrectable hardware error, or a software error such as a core dump.'/>
+      <propval name='value_NZXW4ZI-_description_C' type='ustring' value='Never restart due to dependency refresh, restart, or failure.'/>
+      <propval name='value_OJSWM4TFONUA----_description_C' type='ustring' value='Restart if the dependency encounters an error, is explicitly restarted, or explicitly refreshed.'/>
+      <propval name='value_OJSXG5DBOJ2A----_description_C' type='ustring' value='Restart if the dependency encounters an error or is explicitly restarted.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='none'/>
+          <value_node value='error'/>
+          <value_node value='restart'/>
+          <value_node value='refresh'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_t_dependency_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='constraints'/>
+      <propval name='description_C' type='ustring' value='The type of the dependency: service or file.'/>
+      <propval name='name' type='astring' value='type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_dependency'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_OBQXI2A-_description_C' type='ustring' value='Depend on the existance of a file path.'/>
+      <propval name='value_ONSXE5TJMNSQ----_description_C' type='ustring' value='Depend on services or instances.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='service'/>
+          <value_node value='path'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_t_template_pg_pattern_name' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Optional name of a property group which is described by this template.  No name means the name is wildcarded.'/>
+      <propval name='name' type='astring' value='name'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_pg_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_pg_pattern_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Optional type of property groups which are described by this template.  No type means that the type is wildcarded.'/>
+      <propval name='name' type='astring' value='type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_pg_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_pg_pattern_required' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='If true, entities without a property group which matches this pattern are considered invalid.'/>
+      <propval name='name' type='astring' value='required'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_pg_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_pg_pattern_target' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The services or service instances to which this template should be applied.'/>
+      <propval name='name' type='astring' value='target'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_pg_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MFWGY---_description_C' type='ustring' value='All services and instances on the system.  &quot;all&quot; may only be set on the global service.'/>
+      <propval name='value_MRSWYZLHMF2GK---_description_C' type='ustring' value='All instances which currently define this service as their restarter.'/>
+      <propval name='value_NFXHG5DBNZRWK---_description_C' type='ustring' value='This instance, or any instance of this service.'/>
+      <propval name='value_ORUGS4Y-_description_C' type='ustring' value='The service or instance on which the property group resides.'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='this'/>
+          <value_node value='instance'/>
+          <value_node value='delegate'/>
+          <value_node value='all'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_name' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Name of property this template applies to.'/>
+      <propval name='name' type='astring' value='name'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_pg_pattern' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Name of property group that describes the enclosing property group pattern.'/>
+      <propval name='name' type='astring' value='pg_pattern'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_required' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Defines whether a property matched by this template is required.'/>
+      <propval name='name' type='astring' value='required'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The type that a property which this template refers to should be.'/>
+      <propval name='name' type='astring' value='type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_visibility' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The visibility of this property, which is readwrite by default.  Visibility is only a cue to the user interface, and will not be explicitly enforced by SMF.'/>
+      <propval name='name' type='astring' value='visibility'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_NBUWIZDFNY------_description_C' type='ustring' value='Hidden in default user interface views.'/>
+      <propval name='value_OJSWCZDPNZWHS---_description_C' type='ustring' value='Expected to be read only in most user interfaces.'/>
+      <propval name='value_OJSWCZDXOJUXIZI-_description_C' type='ustring' value='Expected to be manipulated in many user interfaces.'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='hidden'/>
+          <value_node value='readonly'/>
+          <value_node value='readwrite'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_cardinality_min' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Minimum number of required values.'/>
+      <propval name='name' type='astring' value='cardinality_min'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='count'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_cardinality_max' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Maximum number of required values.'/>
+      <propval name='name' type='astring' value='cardinality_max'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_internal_separators' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='18446744073709551615'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='List of separator characters for values.'/>
+      <propval name='name' type='astring' value='internal_separators'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_constraint_name' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='18446744073709551615'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Values the property is expected to be constrained to.'/>
+      <propval name='name' type='astring' value='constraint_name'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_constraint_range' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='18446744073709551615'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Ranges the property is expected to be constrained to.'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='constraint_range'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_choices_range' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='18446744073709551615'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Ranges a user should be offered as a choice for this property.'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='choices_range'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_choices_name' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='18446744073709551615'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Values a users should be offered as a choice for this property.'/>
+      <propval name='name' type='astring' value='choices_name'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_t_template_prop_pattern_choices_include_values' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Whether the choices should include the defined constraints or values.'/>
+      <propval name='name' type='astring' value='choices_include_values'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_template_prop_pattern'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MNXW443UOJQWS3TUOM------_description_C' type='ustring' value='Include all defined constraints as choices.'/>
+      <propval name='value_OZQWY5LFOM------_description_C' type='ustring' value='Include all defined values as choices.'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='constraints'/>
+          <value_node value='values'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_working_directory' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The working directory to launch the method from.  &quot;:default&quot; can be used as a token to indicate the home directory of the user specified by the credential or profile.'/>
+      <propval name='name' type='astring' value='working_directory'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_project' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The project ID in numeric or text form.  &quot;:default&quot; can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.'/>
+      <propval name='name' type='astring' value='project'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_resource_pool' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The resource pool name in which to launch the method.  &quot;:default&quot; can be used&#10;as a token to indicate the pool specified in the project(5) entry given in&#10;the project attribute.'/>
+      <propval name='name' type='astring' value='resource_pool'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_security_flags' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the security flags as defined in security-flags(7).'/>
+      <propval name='name' type='astring' value='security_flags'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_user' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The user ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='user'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_group' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The group ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='group'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_supp_groups' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='An optional string that specifies the supplemental group memberships by ID,&#10;in numeric or text form.'/>
+      <propval name='name' type='astring' value='supp_groups'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the privilege set as defined in privileges(7).'/>
+      <propval name='name' type='astring' value='privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_limit_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the limit privilege set as defined in&#10;privileges(7).'/>
+      <propval name='name' type='astring' value='limit_privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_use_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='A boolean that specifies whether the profile should be used instead of the&#10;user, group, privileges, and limit_privileges properties.'/>
+      <propval name='name' type='astring' value='use_profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_method_context_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The name of an RBAC (role-based access control) profile which, along with the&#10;method executable, identifies an entry in exec_attr(5).'/>
+      <propval name='name' type='astring' value='profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_method_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_context_name' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Service name'/>
+      <propval name='description_C' type='ustring' value='IANA name or RPC name for non-inetd service, equivalent to inetd/name property. For RPC services, the value of this property is not an IANA name but is either an RPC program number or name, see rpc(5).'/>
+      <propval name='name' type='astring' value='name'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_context_isrpc' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='RPC service'/>
+      <propval name='description_C' type='ustring' value='A boolean property where a &quot;true&quot; value indicates an RPC service, equivalent to inetd/isrpc property.'/>
+      <propval name='name' type='astring' value='isrpc'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_context_ipf_method' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Custom firewall script'/>
+      <propval name='description_C' type='ustring' value='A script that generates ipf rules for a service. Services that require custom IPfilter configuration can use this mechanism to generate and supply their own ipf rules.  The firewall framework does not generate rules for services that has this property definition but expect these services to provide their own rules.'/>
+      <propval name='name' type='astring' value='ipf_method'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_context'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_policy' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='values'/>
+      <propval name='common_name_C' type='ustring' value='Firewall policy'/>
+      <propval name='description_C' type='ustring' value='Service firewall policy.'/>
+      <propval name='name' type='astring' value='policy'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MFWGY33X_description_C' type='ustring' value='Allow access to entities specified in &apos;apply_to&apos; property.'/>
+      <propval name='value_MRSW46I-_description_C' type='ustring' value='Deny access to entities specified in &apos;apply_to&apos; property.'/>
+      <propval name='value_NZXW4ZI-_description_C' type='ustring' value='No firewall (allow all).'/>
+      <propval name='value_OVZWKX3HNRXWEYLM_description_C' type='ustring' value='Apply Global Default policy, specified in network/ipfilter for the service. This is the default value.'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value='use_global'/>
+          <value_node value='none'/>
+          <value_node value='deny'/>
+          <value_node value='allow'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_block_policy' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='values'/>
+      <propval name='common_name_C' type='ustring' value='Firewall block policy'/>
+      <propval name='description_C' type='ustring' value='Service firewall block policy.'/>
+      <propval name='name' type='astring' value='block_policy'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_NZXW4ZI-_description_C' type='ustring' value='Block by dropping packets.'/>
+      <propval name='value_OJSXI5LSNY------_description_C' type='ustring' value='Block by returning RST or ICMP messages.'/>
+      <propval name='value_OVZWKX3HNRXWEYLM_description_C' type='ustring' value='Apply Global Default block policy, specified in network/ipfilter for the service. This is the default value.'/>
+      <propval name='visibility' type='astring' value='readwrite'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value='use_global'/>
+          <value_node value='none'/>
+          <value_node value='return'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_apply_to' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Apply policy to'/>
+      <propval name='description_C' type='ustring' value='The source host and network IPv4 addresses, incoming network interfaces, and ippools to deny if the policy is set to deny, or accept if the policy is set to accept.'/>
+      <propval name='name' type='astring' value='apply_to'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_apply_to_6' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Apply policy to'/>
+      <propval name='description_C' type='ustring' value='The source host and network IPv6 addresses, incoming network interfaces, and ippools to deny if the policy is set to deny, or accept if the policy is set to accept.'/>
+      <propval name='name' type='astring' value='apply_to_6'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_exceptions' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Make exceptions to'/>
+      <propval name='description_C' type='ustring' value='The source host and network IPv4 addresses, incoming network interfaces, and ippools to exempt from the set policy. That is, those to accept if the policy is set to deny, or to deny if the policy is set to accept.'/>
+      <propval name='name' type='astring' value='exceptions'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_exceptions_6' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Make exceptions to'/>
+      <propval name='description_C' type='ustring' value='The source host and network IPv6 addressess, incoming network interfaces, and ippools to exempt from the set policy. That is, those to accept if the policy is set to deny, or to deny if the policy is set to accept.'/>
+      <propval name='name' type='astring' value='exceptions_6'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_target' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Apply policy to'/>
+      <propval name='description_C' type='ustring' value='The destination host and network IPv4 addresses, and ippools to deny if the policy is set to deny, or accept if the policy is set to accept.'/>
+      <propval name='name' type='astring' value='target'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_firewall_config_target6' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='Apply policy to'/>
+      <propval name='description_C' type='ustring' value='The destination host and network IPv6 addresses, and ippools to deny if the policy is set to deny, or accept if the policy is set to accept.'/>
+      <propval name='name' type='astring' value='target6'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_firewall_config'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_t_notify_params_smtp,active' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='smtp notification active'/>
+      <propval name='description_C' type='ustring' value='Notifcation mechanism smtp active status.'/>
+      <propval name='name' type='astring' value='smtp,active'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_notify_params'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_t_notify_params_smtp,to' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='smtp notification recipient'/>
+      <propval name='description_C' type='ustring' value='Recipient for smtp notification mechanism.'/>
+      <propval name='name' type='astring' value='smtp,to'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_notify_params'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_t_notify_params_smtp,reply-to' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='smtp notification reply-to'/>
+      <propval name='description_C' type='ustring' value='Header reply-to for smtp notification mechanism.'/>
+      <propval name='name' type='astring' value='smtp,reply-to'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_notify_params'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_t_notify_params_snmp,active' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='snmp notification active'/>
+      <propval name='description_C' type='ustring' value='Notifcation mechanism snmp active status.'/>
+      <propval name='name' type='astring' value='snmp,active'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_notify_params'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_t_notify_params_syslog,active' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='syslog notification active'/>
+      <propval name='description_C' type='ustring' value='Notifcation mechanism syslog active status.'/>
+      <propval name='name' type='astring' value='syslog,active'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatt_notify_params'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>system-wide configuration definitions</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='smf' section='7' manpath='/usr/share/man'/>
+        <manpage title='smf_template' section='7' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='system/svc/restarter' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <exec_method name='start' type='method' exec=':true' timeout_seconds='0'/>
+    <exec_method name='stop' type='method' exec=':true' timeout_seconds='0'/>
+    <property_group name='tm_pgpatnt_restarter' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Communicate restarter-set status of the service.'/>
+      <propval name='name' type='astring' value='restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='delegate'/>
+      <propval name='type' type='astring' value='framework'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_options' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Specify options for the svc.startd restarter.'/>
+      <propval name='name' type='astring' value='options'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='this'/>
+      <propval name='type' type='astring' value='application'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_system' type='template_pg_pattern'>
+      <propval name='name' type='astring' value='system'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='this'/>
+      <propval name='type' type='astring' value='framework'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_startd' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='Information about how a service instance is managed by svc.startd, which is supplied by the service author, sometimes modified by the administrator.'/>
+      <propval name='name' type='astring' value='startd'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='delegate'/>
+      <propval name='type' type='astring' value='framework'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_start' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='The start method defines how svc.startd should start the instance.'/>
+      <propval name='name' type='astring' value='start'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='target' type='astring' value='delegate'/>
+      <propval name='type' type='astring' value='method'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_stop' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='The stop method defines how svc.startd should stop the instance.'/>
+      <propval name='name' type='astring' value='stop'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='target' type='astring' value='delegate'/>
+      <propval name='type' type='astring' value='method'/>
+    </property_group>
+    <property_group name='tm_pgpatnt_refresh' type='template_pg_pattern'>
+      <propval name='description_C' type='ustring' value='The refresh method defines how svc.startd should upload new configuration to the service without interrupting its operation.'/>
+      <propval name='name' type='astring' value='refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='target' type='astring' value='delegate'/>
+      <propval name='type' type='astring' value='method'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_alt_logfile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The logfile for restarter actions on this service and any direct output from its methods which occurred before the /var filesystem was available.'/>
+      <propval name='name' type='astring' value='alt_logfile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_logfile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The logfile for restarter actions on this service and any direct output from its methods.'/>
+      <propval name='name' type='astring' value='logfile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_contract' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Primary process contract for a &apos;contract&apos; or &apos;child&apos; service.'/>
+      <propval name='name' type='astring' value='contract'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_start_pid' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='PID last launched as the start method for this service.'/>
+      <propval name='name' type='astring' value='start_pid'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_start_method_timestamp' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Time the start method was last run.'/>
+      <propval name='name' type='astring' value='start_method_timestamp'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='time'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_auxiliary_state' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Restarter-set auxiliary information about the current state.'/>
+      <propval name='name' type='astring' value='auxiliary_state'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_auxiliary_fmri' type='template_prop_pattern'>
+      <propval name='description_C' type='ustring' value='Auxiliary fmri information for service state diagnosis.'/>
+      <propval name='name' type='astring' value='auxiliary_fmri'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_state_timestamp' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Time the current state was reached.'/>
+      <propval name='name' type='astring' value='state_timestamp'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='time'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_state' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The current state of this service instance.'/>
+      <propval name='name' type='astring' value='state'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MRSWO4TBMRSWI---_description_C' type='ustring' value='The instance is enabled and running or available to run. The instance, however, is functioning at a limited capacity in comparison to normal operation.'/>
+      <propval name='value_MRUXGYLCNRSWI---_description_C' type='ustring' value='The instance is disabled.'/>
+      <propval name='value_N5TGM3DJNZSQ----_description_C' type='ustring' value='The instance is enabled, but not yet running or available to run.  The most common reason for service instances to be in this state is because one or more of their dependencies are not satisfied.'/>
+      <propval name='value_N5XGY2LOMU------_description_C' type='ustring' value='The instance is online and running.'/>
+      <propval name='value_NVQWS3TUMVXGC3TDMU------_description_C' type='ustring' value='The instance is enabled, but not able to run.  Administrative action is required to restore the instance to offline and subsequent states.'/>
+      <propval name='value_OVXGS3TJORUWC3DJPJSWI---_description_C' type='ustring' value='The initial state for all instances before svc.startd has had a chance to evaluate on them.  Instances are in this state when their restarter has not yet started.'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='online'/>
+          <value_node value='offline'/>
+          <value_node value='uninitialized'/>
+          <value_node value='degraded'/>
+          <value_node value='disabled'/>
+          <value_node value='maintenance'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_restarter_next_state' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The next expected state of this instance.'/>
+      <propval name='name' type='astring' value='next_state'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_restarter'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MRSWO4TBMRSWI---_description_C' type='ustring' value='The instance will be enabled and availble to run, although in a limited capacity.'/>
+      <propval name='value_MRUXGYLCNRSWI---_description_C' type='ustring' value='The instance will be disabled.'/>
+      <propval name='value_N5TGM3DJNZSQ----_description_C' type='ustring' value='The instance has been temporarily stopped.  Most instances will leave this state once their dependencies are satisfied.'/>
+      <propval name='value_N5XGY2LOMU------_description_C' type='ustring' value='The instance is being started, and will soon be online and running.  This transition may fail and the instance may end up in offiline or maintenance instead.'/>
+      <propval name='value_NVQWS3TUMVXGC3TDMU------_description_C' type='ustring' value='The instance will be in maintenance, and administrative action will be required to restore the instance to offline and subsequent states.'/>
+      <propval name='value_NZXW4ZI-_description_C' type='ustring' value='The instance is not currently transitioning between states.'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='online'/>
+          <value_node value='offline'/>
+          <value_node value='degraded'/>
+          <value_node value='disabled'/>
+          <value_node value='maintenance'/>
+          <value_node value='none'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_options_boot_messages' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='constraints'/>
+      <propval name='description_C' type='ustring' value='Define verbosity of messages to print to the console during boot.'/>
+      <propval name='name' type='astring' value='boot_messages'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_options'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_OF2WSZLU_description_C' type='ustring' value='Issue console messages only on service failures.'/>
+      <propval name='value_OZSXEYTPONSQ----_description_C' type='ustring' value='Print a message per service started to indicate success or failure.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='quiet'/>
+          <value_node value='verbose'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_options_logging' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='constraints'/>
+      <propval name='description_C' type='ustring' value='Control the level of global service logging for svc.startd.'/>
+      <propval name='name' type='astring' value='logging'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_options'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MRSWE5LH_description_C' type='ustring' value='Send debug messages to svc.startd&apos;s global logfile, error messages requiring administrative intervention to the console, syslog, and the logfile, and a message per service started to the console.'/>
+      <propval name='value_OF2WSZLU_description_C' type='ustring' value='Send error messages requiring administrative intervention to console, syslog, and svc.startd&apos;s global logfile.'/>
+      <propval name='value_OZSXEYTPONSQ----_description_C' type='ustring' value='Sends a message per service started to the console, error messages requiring administrative intervention to console, syslog, and svc.startd&apos;s global logfile, and information about errors which do not require intervention to the logfile.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='quiet'/>
+          <value_node value='verbose'/>
+          <value_node value='debug'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_options_milestone' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='An FRMI which defines the milestone used as the default boot level.'/>
+      <propval name='name' type='astring' value='milestone'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_options'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MFWGY---_description_C' type='ustring' value='Start all enabled services.'/>
+      <propval name='value_NZXW4ZI-_description_C' type='ustring' value='Start no services.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='svc:/milestone/single-user:default'/>
+          <value_node value='svc:/milestone/multi-user:default'/>
+          <value_node value='svc:/milestone/multi-user-server:default'/>
+          <value_node value='all'/>
+          <value_node value='none'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_options_info_events_all' type='template_prop_pattern'>
+      <propval name='description_C' type='ustring' value='Override notification parameters and raise Information Events on all state transitions'/>
+      <propval name='name' type='astring' value='info_events_all'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_options'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+      <propval name='visibility' type='astring' value='hidden'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_system_reconfigure' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Indicates that a reconfiguration reboot has been requested.'/>
+      <propval name='name' type='astring' value='reconfigure'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_system'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+      <propval name='visibility' type='astring' value='readonly'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_startd_duration' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='constraints'/>
+      <propval name='description_C' type='ustring' value='Defines the service&apos;s model.'/>
+      <propval name='name' type='astring' value='duration'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_startd'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MNUGS3DE_description_C' type='ustring' value='A service which runs for the lifetime of the child process, and is restarted when that process exits.'/>
+      <propval name='value_MNXW45DSMFRXI---_description_C' type='ustring' value='A standard system daemon, which runs forever to provide a service.  It is not considered online until the start method process exits, though child processes are monitored for errors.'/>
+      <propval name='value_ORZGC3TTNFSW45A-_description_C' type='ustring' value='The service is online as soon as its start method returns -- child processes are not monitored.'/>
+      <property name='constraint_name' type='astring'>
+        <astring_list>
+          <value_node value='contract'/>
+          <value_node value='transient'/>
+          <value_node value='child'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_startd_ignore_error' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='A list of events which should not be considered service errors by svc.startd.'/>
+      <propval name='name' type='astring' value='ignore_error'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_startd'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_MNXXEZI-_description_C' type='ustring' value='svc.startd should ignore coredumps from subprocesses.'/>
+      <propval name='value_MNXXEZJMONUWO3TBNQ------_description_C' type='ustring' value='svc.startd should ignore coredumps and signals sent from outside the service.'/>
+      <propval name='value_ONUWO3TBNQ------_description_C' type='ustring' value='svc.startd should ignore signals sent from outside the service.'/>
+      <propval name='value_ONUWO3TBNQWGG33SMU------_description_C' type='ustring' value='svc.startd should ignore coredumps and signals sent from outside the service.'/>
+      <propval name='values_name' type='astring' value='signal,core'/>
+      <property name='choices_name' type='astring'>
+        <astring_list>
+          <value_node value='core'/>
+          <value_node value='signal'/>
+          <value_node value='core,signal'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_startd_need_session' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The instance should be launched in its own session per setpgrp(2).'/>
+      <propval name='name' type='astring' value='need_session'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_startd'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_startd_utmpx_prefix' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The instance requires that svc.startd create a valid utmpx entry prior to start method execution.'/>
+      <propval name='name' type='astring' value='utmpx_prefix'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_startd'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_exec' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='values'/>
+      <propval name='common_name_C' type='ustring' value='method executable'/>
+      <propval name='description_C' type='ustring' value='The method executable may be a script, program, or keyword.'/>
+      <propval name='name' type='astring' value='exec'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_HJ2HE5LF_description_C' type='ustring' value='Always returns SMF_EXIT_OK. This token should be used when the start method is unnecessary for the particular service implementation.'/>
+      <propval name='value_HJVWS3DMEBNS243JM5XGC3C5_description_C' type='ustring' value='Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common pkill invocations.'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value=':true'/>
+          <value_node value=':kill [-signal]'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='constraint_name' type='astring' value='method'/>
+      <propval name='description_C' type='ustring' value='A method may only be of type method.'/>
+      <propval name='name' type='astring' value='type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_timeout_seconds' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.'/>
+      <propval name='name' type='astring' value='timeout_seconds'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='value_FUYQ----_common_name_C' type='ustring' value='infinite (legacy)'/>
+      <propval name='value_FUYQ----_description_C' type='ustring' value='This method will never time out.  0 is the preferred value.'/>
+      <propval name='value_GA------_common_name_C' type='ustring' value='infinite'/>
+      <propval name='value_GA------_description_C' type='ustring' value='This method will never time out.'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value='0'/>
+          <value_node value='-1'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_working_directory' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The working directory to launch the method from.  &quot;:default&quot; can be used as a token to indicate the home directory of the user specified by the credential or profile.'/>
+      <propval name='name' type='astring' value='working_directory'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_project' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.'/>
+      <propval name='name' type='astring' value='project'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_resource_pool' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method context resource pool'/>
+      <propval name='description_C' type='ustring' value='The resource pool name on which to launch the method.  :default can be used&#10;as a token to indicate the pool specified in the project(5) entry given in&#10;the project attribute.'/>
+      <propval name='name' type='astring' value='resource_pool'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_security_flags' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential security flags'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the security flags as defined in security-flags(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='security_flags'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_user' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential user'/>
+      <propval name='description_C' type='ustring' value='The user ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='user'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_group' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential group'/>
+      <propval name='description_C' type='ustring' value='The group ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='group'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_supp_groups' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential supplemental groups'/>
+      <propval name='description_C' type='ustring' value='An optional string that specifies the supplemental group memberships by ID,&#10;in numeric or text form.'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='supp_groups'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential privileges'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the privilege set as defined in privileges(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_limit_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential limit privilege set'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the limit privilege set as defined in&#10;privileges(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='limit_privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_use_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='A boolean that specifies whether the profile should be used instead of the&#10;user, group, privileges, and limit_privileges properties.'/>
+      <propval name='name' type='astring' value='use_profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method profile RBAC profile specification'/>
+      <propval name='description_C' type='ustring' value='The name of an RBAC (role-based access control) profile which, along with the&#10;method executable, identifies an entry in exec_attr(5).'/>
+      <propval name='name' type='astring' value='profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_start_environment' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='method environment variables'/>
+      <propval name='description_C' type='ustring' value='Environment variables to insert into the environment of the method, in the&#10;form of a number of NAME=value strings.'/>
+      <propval name='name' type='astring' value='environment'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_start'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_exec' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='values'/>
+      <propval name='common_name_C' type='ustring' value='method executable'/>
+      <propval name='description_C' type='ustring' value='The method executable may be a script, program, or keyword.'/>
+      <propval name='name' type='astring' value='exec'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_HJ2HE5LF_description_C' type='ustring' value='Always returns SMF_EXIT_OK. This token should be used when the stop method is unnecessary for the particular service implementation.'/>
+      <propval name='value_HJVWS3DMEBNS243JM5XGC3C5_description_C' type='ustring' value='Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common pkill invocations.'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value=':true'/>
+          <value_node value=':kill [-signal]'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='constraint_name' type='astring' value='method'/>
+      <propval name='description_C' type='ustring' value='A method may only be of type method.'/>
+      <propval name='name' type='astring' value='type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_timeout_seconds' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.'/>
+      <propval name='name' type='astring' value='timeout_seconds'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='value_FUYQ----_common_name_C' type='ustring' value='infinite (legacy)'/>
+      <propval name='value_FUYQ----_description_C' type='ustring' value='This method will never time out.  0 is the preferred value.'/>
+      <propval name='value_GA------_common_name_C' type='ustring' value='infinite'/>
+      <propval name='value_GA------_description_C' type='ustring' value='This method will never time out.'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value='0'/>
+          <value_node value='-1'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_working_directory' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The working directory to launch the method from.  &quot;:default&quot; can be used as a token to indicate the home directory of the user specified by the credential or profile.'/>
+      <propval name='name' type='astring' value='working_directory'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_project' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.'/>
+      <propval name='name' type='astring' value='project'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_resource_pool' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method context resource pool'/>
+      <propval name='description_C' type='ustring' value='The resource pool name on which to launch the method.  :default can be used&#10;as a token to indicate the pool specified in the project(5) entry given in&#10;the project attribute.'/>
+      <propval name='name' type='astring' value='resource_pool'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_security_flags' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential security flags'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the security flags as defined in security-flags(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='security_flags'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_user' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential user'/>
+      <propval name='description_C' type='ustring' value='The user ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='user'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_group' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential group'/>
+      <propval name='description_C' type='ustring' value='The group ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='group'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_supp_groups' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential supplemental groups'/>
+      <propval name='description_C' type='ustring' value='An optional string that specifies the supplemental group memberships by ID,&#10;in numeric or text form.'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='supp_groups'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential privileges'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the privilege set as defined in privileges(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_limit_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential limit privilege set'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the limit privilege set as defined in&#10;privileges(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='limit_privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_use_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='A boolean that specifies whether the profile should be used instead of the&#10;user, group, privileges, and limit_privileges properties.'/>
+      <propval name='name' type='astring' value='use_profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method profile RBAC profile specification'/>
+      <propval name='description_C' type='ustring' value='The name of an RBAC (role-based access control) profile which, along with the&#10;method executable, identifies an entry in exec_attr(5).'/>
+      <propval name='name' type='astring' value='profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_stop_environment' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='method environment variables'/>
+      <propval name='description_C' type='ustring' value='Environment variables to insert into the environment of the method, in the&#10;form of a number of NAME=value strings.'/>
+      <propval name='name' type='astring' value='environment'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_stop'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_exec' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='choices_include_values' type='astring' value='values'/>
+      <propval name='common_name_C' type='ustring' value='method executable'/>
+      <propval name='description_C' type='ustring' value='The method executable may be a script, program, or keyword.'/>
+      <propval name='name' type='astring' value='exec'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+      <propval name='value_HJ2HE5LF_description_C' type='ustring' value='Always returns SMF_EXIT_OK.'/>
+      <propval name='value_HJVWS3DMEBNS243JM5XGC3C5_description_C' type='ustring' value='Sends the specified signal, which is SIGTERM by default, to all processes in the primary instance contract. Always returns SMF_EXIT_OK. This token should be used to replace common kill -HUP invocations.'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value=':true'/>
+          <value_node value=':kill [-signal]'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_type' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='constraint_name' type='astring' value='method'/>
+      <propval name='description_C' type='ustring' value='A method may only be of type method.'/>
+      <propval name='name' type='astring' value='type'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_timeout_seconds' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='Number of seconds before the method is considered unresponsive.  After the method timeout expires, the method will be killed.'/>
+      <propval name='name' type='astring' value='timeout_seconds'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='true'/>
+      <propval name='type' type='astring' value='count'/>
+      <propval name='value_FUYQ----_common_name_C' type='ustring' value='infinite (legacy)'/>
+      <propval name='value_FUYQ----_description_C' type='ustring' value='This method will never time out.  0 is the preferred value.'/>
+      <propval name='value_GA------_common_name_C' type='ustring' value='infinite'/>
+      <propval name='value_GA------_description_C' type='ustring' value='This method will never time out.'/>
+      <property name='values_name' type='astring'>
+        <astring_list>
+          <value_node value='0'/>
+          <value_node value='-1'/>
+        </astring_list>
+      </property>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_working_directory' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The working directory to launch the method from.  &quot;:default&quot; can be used as a token to indicate the home directory of the user specified by the credential or profile.'/>
+      <propval name='name' type='astring' value='working_directory'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_project' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='The project ID in numeric or text form.  :default can be used as a token to indicate a project identified by getdefaultproj(3PROJECT) for the user whose uid is used to launch the method.'/>
+      <propval name='name' type='astring' value='project'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_resource_pool' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method context resource pool'/>
+      <propval name='description_C' type='ustring' value='The resource pool name on which to launch the method.  :default can be used&#10;as a token to indicate the pool specified in the project(5) entry given in&#10;the project attribute.'/>
+      <propval name='name' type='astring' value='resource_pool'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_security_flags' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method security flags'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the security flags as defined in security-flags(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='security_flags'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_user' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential user'/>
+      <propval name='description_C' type='ustring' value='The user ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='user'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_group' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential group'/>
+      <propval name='description_C' type='ustring' value='The group ID in numeric or text form.'/>
+      <propval name='name' type='astring' value='group'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_supp_groups' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential supplemental groups'/>
+      <propval name='description_C' type='ustring' value='An optional string that specifies the supplemental group memberships by ID,&#10;in numeric or text form.'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='supp_groups'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential privileges'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the privilege set as defined in privileges(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_limit_privileges' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method credential limit privilege set'/>
+      <propval name='description_C' type='ustring' value='An optional string specifying the limit privilege set as defined in&#10;privileges(7).'/>
+      <propval name='internal_separators' type='astring' value=','/>
+      <propval name='name' type='astring' value='limit_privileges'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_use_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='description_C' type='ustring' value='A boolean that specifies whether the profile should be used instead of the&#10;user, group, privileges, and limit_privileges properties.'/>
+      <propval name='name' type='astring' value='use_profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='boolean'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_profile' type='template_prop_pattern'>
+      <propval name='cardinality_max' type='count' value='1'/>
+      <propval name='cardinality_min' type='count' value='1'/>
+      <propval name='common_name_C' type='ustring' value='method profile RBAC profile specification'/>
+      <propval name='description_C' type='ustring' value='The name of an RBAC (role-based access control) profile which, along with the&#10;method executable, identifies an entry in exec_attr(5).'/>
+      <propval name='name' type='astring' value='profile'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <property_group name='tm_proppat_nt_refresh_environment' type='template_prop_pattern'>
+      <propval name='common_name_C' type='ustring' value='method environment variables'/>
+      <propval name='description_C' type='ustring' value='Environment variables to insert into the environment of the method, in the&#10;form of a number of NAME=value strings.'/>
+      <propval name='name' type='astring' value='environment'/>
+      <propval name='pg_pattern' type='astring' value='tm_pgpatnt_refresh'/>
+      <propval name='required' type='boolean' value='false'/>
+      <propval name='type' type='astring' value='astring'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>master restarter</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='svc.startd' section='8' manpath='/usr/share/man'/>
+        <manpage title='smf_method' section='7' manpath='/usr/share/man'/>
+        <manpage title='smf' section='7' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+  <service name='system/utmp' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='milestone' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/sysconfig'/>
+    </dependency>
+    <dependent name='utmpd_multi-user' restart_on='none' grouping='optional_all'>
+      <service_fmri value='svc:/milestone/multi-user'/>
+    </dependent>
+    <exec_method name='start' type='method' exec='/lib/svc/method/svc-utmpd' timeout_seconds='60'/>
+    <exec_method name='stop' type='method' exec=':kill' timeout_seconds='60'/>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>utmpx monitoring</loctext>
+      </common_name>
+      <documentation>
+        <manpage title='utmpd' section='8' manpath='/usr/share/man'/>
+        <manpage title='utmpx' section='5' manpath='/usr/share/man'/>
+      </documentation>
+    </template>
+  </service>
+</service_bundle>
