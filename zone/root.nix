@@ -101,6 +101,21 @@ let
 
   gateFileList = pkgs.writeText "zone-root-gate-files" gateFiles;
 
+  # vmadm (checkDatasetProvisionable in the platform's /usr/vm/node_modules/VM.js) provisions a joyent-brand zone
+  # only from an image whose /var/zoneinit/zoneinit.json declares features.var_svc_provisioning, the promise that
+  # the zone turns /var/svc/provisioning into provision_success itself. Here the platform's mdata-fetch enables
+  # mdata:execute, which does that (/lib/svc/method/mdata-execute). Without the file vmadm says "provisioning
+  # dataset <image> with brand joyent is not supported". The same declaration the recipe-v2 image carried.
+  zoneinitJson = pkgs.writeText "zoneinit.json" ''
+    {
+      "version": "1.5.1",
+      "features": {
+        "var_svc_provisioning": true,
+        "reboot": true
+      }
+    }
+  '';
+
   # /etc/nixos/system.nix of a zone from this image: ./example/system.nix without that zone's host-specific
   # settings, so it evaluates to the system profile ./image.nix ships
   nixosSystem = pkgs.writeText "system.nix" ''
@@ -114,7 +129,7 @@ let
 in
 pkgs.runCommand "illumos-zone-root"
   {
-    inherit gate gateFileList sshdConfig nixosSystem;
+    inherit gate gateFileList sshdConfig nixosSystem zoneinitJson;
     seedDb = "${seed}/repository.db";
     siteProfile = ./site.xml;
     etcProfile = ./profile;
@@ -215,6 +230,8 @@ pkgs.runCommand "illumos-zone-root"
     f 0600 "$seedDb" etc/svc/repository.db
     f 0444 "$siteProfile" etc/svc/profile/site.xml
     l ${profileLink}/lib/svc/manifest/site/nix-daemon.xml var/svc/manifest/site/nix-daemon.xml
+    # what vmadm reads from the image before it provisions a zone (see zoneinitJson)
+    f 0644 "$zoneinitJson" var/zoneinit/zoneinit.json
 
     # --- Nix --------------------------------------------------------------------------------------------------
     f 0644 "$etcProfile" etc/profile

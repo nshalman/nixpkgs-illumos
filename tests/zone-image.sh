@@ -6,6 +6,9 @@
 #   1. The inputs build, the script makes a stream and a manifest whose sha1 and size match the stream, and the
 #      stream receives.
 #   2. Modes: /etc/shadow 0400, /etc/svc/repository.db 0600, /tmp and /var/tmp 1777, /nix/store 1775 group 30000.
+#      vmadm will provision a joyent-brand zone from it: /var/zoneinit/zoneinit.json declares
+#      features.var_svc_provisioning (checkDatasetProvisionable in /usr/vm/node_modules/VM.js; without it,
+#      "provisioning dataset ... with brand joyent is not supported").
 #   3. In a chroot of the received root, with /usr, /lib, /sbin, /dev and /proc lofs-mounted from this zone as the
 #      brand mounts them from the global zone:
 #      - root's shell is the system profile's bash, and nixbld has the 32 build users as members;
@@ -75,7 +78,14 @@ else
 fi
 R="$(zfs get -H -o value mountpoint "$recv")/root"
 
-# --- 2. modes ----------------------------------------------------------------------------------------------
+# --- 2. modes, and what vmadm checks -------------------------------------------------------------------------
+
+zi="$R/var/zoneinit/zoneinit.json"
+if [ -f "$zi" ] && [ "$(nix eval --impure --expr "(builtins.fromJSON (builtins.readFile $zi)).features.var_svc_provisioning or false" 2>/dev/null)" = true ]; then
+	ok "zoneinit.json declares features.var_svc_provisioning, as vmadm requires of a joyent-brand image"
+else
+	bad "no /var/zoneinit/zoneinit.json with features.var_svc_provisioning: vmadm will not provision from the image"
+fi
 
 mode() { stat -c '%a %g' "$R/$1"; }
 for check in "etc/shadow 400 0" "etc/svc/repository.db 600 0" "tmp 1777 0" "var/tmp 1777 0" "nix/store 1775 30000"; do
