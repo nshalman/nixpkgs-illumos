@@ -39,6 +39,9 @@
   assembler ? "${binutils-unwrapped}/bin/as",
   # The link-editor gcc is configured with (--with-ld), or null to look it up at run time (see above).
   linker ? null,
+  # Also build the 32-bit runtime libraries (-m32), as illumos-extra's gcc 10 does: 64-bit ones in lib/amd64,
+  # 32-bit ones in lib.
+  multilib ? false,
 }:
 
 let
@@ -123,7 +126,7 @@ stdenv.mkDerivation {
       --enable-languages=c,c++ \
       --enable-shared \
       --disable-nls \
-      --disable-multilib \
+      --${if multilib then "enable" else "disable"}-multilib \
       CFLAGS="-g -O2 -m64" CXXFLAGS="-g -O2 -m64" \
       CFLAGS_FOR_TARGET="$targetFlags" CXXFLAGS_FOR_TARGET="$targetFlags" \
       LDFLAGS="-Wl,-R$lib/lib/amd64"
@@ -167,6 +170,24 @@ stdenv.mkDerivation {
              "$lib"/lib/amd64/libcc1.*; do
       if [ -e "$f" ]; then mv "$f" "$out/lib/amd64/"; fi
     done
+  ''
+  + lib.optionalString multilib ''
+    # The 32-bit runtime libraries, installed beside lib/gcc and lib/amd64, go to $lib/lib the same way. The link
+    # maps the driver passes to ld (libgcc-unwind.map, clearcap.map; `-M %s...` in the link spec) are the compiler's
+    # and stay: the driver looks for them in its own lib directory.
+    for f in "$out"/lib/*; do
+      case "''${f##*/}" in
+        gcc | amd64 | *.map) ;;
+        *) mv "$f" "$lib/lib/" ;;
+      esac
+    done
+    find "$lib/lib" -maxdepth 1 -name '*.la' -delete
+    for f in "$lib"/lib/*-gdb.py "$lib"/lib/libasan.* "$lib"/lib/libubsan.* \
+             "$lib"/lib/libtsan.* "$lib"/lib/liblsan.* "$lib"/lib/libsanitizer.spec; do
+      if [ -e "$f" ]; then mv "$f" "$out/lib/"; fi
+    done
+  ''
+  + ''
     runHook postInstall
   '';
 

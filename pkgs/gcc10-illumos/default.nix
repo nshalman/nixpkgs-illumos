@@ -7,7 +7,7 @@
 # /usr/bin/ld. Both honour LD_ALTEXEC.
 #
 # Differences from illumos-extra's gcc 10 (Makefile.gcc): --with-sysroot, --with-ld naming illumos-ld, prefix in the
-# store instead of /usr/gcc/10, --disable-multilib.
+# store instead of /usr/gcc/10. Like theirs it is multilib: 64-bit runtime libraries in lib/amd64, 32-bit ones in lib.
 {
   callPackage,
   fetchurl,
@@ -19,4 +19,5 @@ callPackage ../gcc-illumos {
   release = import ../gcc-illumos/10.nix { inherit fetchurl; };
   assembler = "${binutils-strap}/bin/as";
   linker = "${illumos-ld}/bin/ld";
+  multilib = true;
 }
