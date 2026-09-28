@@ -7,8 +7,8 @@
 {
   nixpkgs ? builtins.fetchTarball {
     # the illumos-26.05 branch of github.com/nshalman/nixpkgs
-    url = "https://github.com/nshalman/nixpkgs/archive/05cb5c5f50aa89c0e0303d103f64ef09361882b9.tar.gz";
-    sha256 = "1g54zphkidah61frv7j8pp3qzq7jj9zxd09cgs09kmz6cjmk7qbs";
+    url = "https://github.com/nshalman/nixpkgs/archive/4eee97ee70a159d8d78a47df7b1a8500c38e2652.tar.gz";
+    sha256 = "1is5fz8ym2z68vyk1ywh9ilipa3y9fw49b8dci539q84wx76d7m7";
   },
   bootstrapUrl ? null,
   bootstrapFiles ? import ./bootstrap/files.nix { baseUrl = bootstrapUrl; },
