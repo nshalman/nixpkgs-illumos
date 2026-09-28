@@ -1,9 +1,10 @@
 # gcc10-illumos, the compiler SmartOS builds illumos with, called directly the way illumos' build calls its compilers
 # (not through the cc-wrapper):
-#   programs:    it is gcc 10.4.0 configured with binutils-strap's gas; a C and a C++ (throw/catch) program build
-#                as 64-bit and as 32-bit programs,
-#                run, ask nothing newer of libc than the floor, and find libc on the running system and the C++
-#                runtime in the store;
+#   programs:    it is gcc 10.4.0 configured with binutils-strap's gas; like illumos-extra's, what it compiles uses
+#                the build host's headers and libc (a program using a libc function newer than the 2021 sysroot
+#                builds and runs), while gcc 10 itself and its runtime libraries ask nothing newer of libc than the
+#                floor; a C and a C++ (throw/catch) program build as 64-bit and as 32-bit programs, run, and find
+#                libc on the running system and the C++ runtime in the store;
 #   illumos-ld:  it builds real illumos-gate code: the link-editor (pkgs/illumos-ld, gate sources compiled with
 #                the gate's own headers) with gcc 10 as $CC; that package's install check links a shared object
 #                with the result.
@@ -26,6 +27,20 @@ in
     check "gcc reports 10.4.0" '$cc -dumpfullversion | grep -qx 10.4.0'
     check "configured with binutils-strap's gas" '$cc -v 2>&1 | grep -q -- "--with-as=${pkgs.binutils-strap}/bin/as"'
     check "the assembler it runs is gas 2.34" '$($cc -print-prog-name=as) --version | grep -q "GNU assembler (GNU Binutils) 2.34"'
+
+    # What it compiles uses the build host's headers and libc, as illumos-extra's gcc 10 does: dprintf is declared
+    # in the host's stdio.h and is in its libc (ILLUMOS_0.55), neither of which the 2021 sysroot has.
+    printf '#include <stdio.h>\nint main(void) { dprintf(1, "hello from the host libc\\n"); return 0; }\n' >host.c
+    check "a program using the build host's libc builds (dprintf)" '$cc -m64 -O2 -Werror=implicit-function-declaration host.c -o host 2>host.err || { cat host.err; false; }'
+    check "and runs" './host | grep -x "hello from the host libc" >/dev/null'
+    check "and asks the host's libc for ILLUMOS_0.55" '/usr/bin/pvs -r host | grep "ILLUMOS_0.55" >/dev/null'
+    # gcc 10 itself is built against the sysroot: its runtime libraries and its compiler proper ask nothing newer of
+    # libc than the floor
+    for o in ${gcc10.lib}/lib/amd64/libstdc++.so.6 ${gcc10.lib}/lib/libstdc++.so.6 ${gcc10.lib}/lib/amd64/libgcc_s.so.1 \
+             ${gcc10.lib}/lib/libgcc_s.so.1 $($cc -print-prog-name=cc1) $($cc -print-prog-name=cc1plus) $cc; do
+      check "$(basename $o): no libc interface above ILLUMOS_0.${toString floor}" \
+        '! /usr/bin/pvs -r $o | /usr/bin/egrep -o "ILLUMOS_0\.[0-9]+" | awk -F. "\$2 > ${toString floor}" | grep . >/dev/null'
+    done
 
     printf '#include <stdio.h>\nint main(void) { puts("hello from C"); return 0; }\n' >hello.c
     cat >hello.cc <<'CXX'

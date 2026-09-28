@@ -10,6 +10,10 @@
 # So both the compiler (stages 2 and 3 are built by gcc itself) and its output need nothing newer than the
 # sysroot's libc.
 #
+# With runtimeSysroot (gcc10-illumos: "/"), gcc itself is still built that way (--with-build-sysroot), but what it
+# compiles uses the run-time sysroot's headers and libraries: the build host's, as for illumos-extra's gcc 10, whose
+# output targets the system it is built on. Its include-fixed is remade from those headers after installation.
+#
 # The sysroot is illumos-libc, the published sysroot plus header backports, not the pristine one. fixincludes keeps
 # its own copy of several headers (sys/feature_tests.h among them) and that copy is found before the sysroot's, so
 # a gcc configured against the pristine sysroot hides header fixes made later. The price: a backport that touches
@@ -42,11 +46,20 @@
   # Also build the 32-bit runtime libraries (-m32), as illumos-extra's gcc 10 does: 64-bit ones in lib/amd64,
   # 32-bit ones in lib.
   multilib ? false,
+  # Where what this gcc compiles finds its headers and libraries at run time, or null for the sysroot (see above).
+  # "/" makes it the build host's, as for illumos-extra's gcc 10; gcc and its runtime libraries are still built
+  # against the sysroot (--with-build-sysroot).
+  runtimeSysroot ? null,
 }:
 
 let
   target = "x86_64-pc-solaris2.11";
   withLd = lib.optionalString (linker != null) " --with-ld=${linker}";
+  sysrootFlags =
+    if runtimeSysroot == null then
+      "--with-sysroot=${illumos-libc}"
+    else
+      "--with-sysroot=${runtimeSysroot} --with-build-sysroot=${illumos-libc}";
   inherit (release) mpfr gmp mpc;
 in
 stdenv.mkDerivation {
@@ -120,7 +133,7 @@ stdenv.mkDerivation {
       --prefix="$out" \
       --enable-bootstrap \
       --build=${target} --host=${target} --target=${target} \
-      --with-sysroot=${illumos-libc} \
+      ${sysrootFlags} \
       --without-gnu-ld${withLd} \
       --with-gnu-as --with-as=${assembler} \
       --enable-languages=c,c++ \
@@ -186,6 +199,16 @@ stdenv.mkDerivation {
              "$lib"/lib/libtsan.* "$lib"/lib/liblsan.* "$lib"/lib/libsanitizer.spec; do
       if [ -e "$f" ]; then mv "$f" "$out/lib/"; fi
     done
+  ''
+  + lib.optionalString (runtimeSysroot != null) ''
+    # include-fixed holds the system headers fixincludes had to fix, and it is searched before the system's own; the
+    # build made it from the sysroot's. What this gcc compiles uses the run-time sysroot's headers, so remake it
+    # from those with gcc's own mkheaders, as when a gcc is moved to another system's headers. They are read from
+    # the build host, as illumos-extra's gcc reads them when it is built.
+    conf=$(echo $out/lib/gcc/${target}/*/install-tools/mkheaders.conf)
+    sed -i 's|^SYSTEM_HEADER_DIR=.*|SYSTEM_HEADER_DIR="${lib.removeSuffix "/" runtimeSysroot}/usr/include"|' $conf
+    grep -x 'SYSTEM_HEADER_DIR="${lib.removeSuffix "/" runtimeSysroot}/usr/include"' $conf
+    $(echo $out/libexec/gcc/${target}/*/install-tools/mkheaders) $out
   ''
   + ''
     runHook postInstall

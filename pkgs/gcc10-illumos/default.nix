@@ -6,8 +6,10 @@
 # illumos-ld, the link-editor built from the pinned illumos-gate commit, where illumos-extra names the build host's
 # /usr/bin/ld. Both honour LD_ALTEXEC.
 #
-# Differences from illumos-extra's gcc 10 (Makefile.gcc): --with-sysroot, --with-ld naming illumos-ld, prefix in the
-# store instead of /usr/gcc/10. Like theirs it is multilib: 64-bit runtime libraries in lib/amd64, 32-bit ones in lib.
+# Like illumos-extra's gcc 10, what it compiles uses the build host's headers and libc (runtimeSysroot "/"), and its
+# include-fixed is made from the build host's headers; and it is multilib: 64-bit runtime libraries in lib/amd64,
+# 32-bit ones in lib. Differences from theirs (Makefile.gcc): gcc itself and its runtime libraries are built against
+# the sysroot (--with-build-sysroot), --with-ld names illumos-ld, prefix in the store instead of /usr/gcc/10.
 {
   callPackage,
   fetchurl,
@@ -20,4 +22,5 @@ callPackage ../gcc-illumos {
   assembler = "${binutils-strap}/bin/as";
   linker = "${illumos-ld}/bin/ld";
   multilib = true;
+  runtimeSysroot = "/";
 }
