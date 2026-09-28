@@ -5,10 +5,13 @@
 # libsunw_ssl (.so.1.0.0, libsunw1x_* links) in lib with links in usr/lib, lib/64, the headers under opt/1x/openssl,
 # and libcrypto.a as .build/libsunw1x_crypto.a.
 #
-# `configure` is the patched Configure with its @@ placeholders filled in by sed with the Makefile's values. The
-# Makefile empties AUTOCONF_ENV but not AUTOCONF_ENV.64, so the 32-bit configure runs with no environment and the
-# 64-bit one with CC, CXX, CPPFLAGS, CFLAGS.64, LDFLAGS.64 and LIBS.64, CFLAGS.64 written as their recipe writes it.
-# make runs serially, as there (PARALLEL is empty). The strap directory in the flags is this package's own output
+# `configure` is the patched Configure with its @@ placeholders filled in by sed with the Makefile's values, so both
+# word sizes get the Makefile's flags from there. make runs serially, as there (PARALLEL is empty).
+#
+# illumos-extra bug, reproduced but without effect here: as for openssl3, the Makefile empties AUTOCONF_ENV but not
+# AUTOCONF_ENV.64, so the 64-bit configure also gets CC, CXX, CPPFLAGS, CFLAGS.64 (with the same \\" quoting),
+# LDFLAGS.64 and LIBS.64 in its environment. OpenSSL 1.0.2's Configure reads no environment at all (patched or not),
+# so they change nothing. The strap directory in the flags is this package's own output
 # (see ./default.nix). Configure's perl is nixpkgs' (theirs: the build host's /usr/bin/perl).
 {
   stdenv,

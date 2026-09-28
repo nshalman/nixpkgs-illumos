@@ -5,8 +5,10 @@
 #
 # NSS's make is not run under `env -`, so it sees what the top-level make exports; of that, STRAP, DESTDIR and
 # PKG_CONFIG_LIBDIR are given here (STRAP=strap keeps the patched shlibsign from adding the strap directory to
-# LD_LIBRARY_PATH). NSPR_CONFIGURE_ENV names $(CXX.32), a variable the Makefile never sets, so NSPR is configured
-# with an empty CXX, as there. The strap directory in the flags is this package's own output (see ./default.nix).
+# LD_LIBRARY_PATH). The strap directory in the flags is this package's own output (see ./default.nix).
+#
+# illumos-extra bug, reproduced: NSPR_CONFIGURE_ENV names $(CXX.32) (and $(CXX.64)), variables the Makefile never
+# sets (presumably GXX.32 and GXX.64 were meant), so NSPR is configured with an empty CXX.
 {
   stdenv,
   strapBin,

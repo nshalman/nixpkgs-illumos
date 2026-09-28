@@ -7,8 +7,12 @@
 # out as that package's part of proto.strap, and tests/smartos-strap.nix compares it with SmartOS's own
 # proto.strap built from the same commit (`reference`).
 #
-# illumos-extra's install scripts are ksh93 scripts, most of them without errexit, so a failed copy goes unnoticed
-# there; here they run under bash -e and fail the build.
+# What looks like a bug in illumos-extra's build is marked where it is restated, so `grep "illumos-extra bug"` lists
+# them: "illumos-extra bug, reproduced:" where the package is built as theirs is anyway (bug-for-bug, to match their
+# proto.strap), "illumos-extra bug, not reproduced:" where it is not, with the reason.
+#
+# illumos-extra bug, not reproduced: illumos-extra's install scripts are ksh93 scripts, most of them without
+# errexit, so a failed copy goes unnoticed there; here they run under bash -e and fail the build.
 #
 # Where illumos-extra writes a RUNPATH into the strap directory (-R$(DESTDIR)/usr/lib -R$(DESTDIR)/lib), a package
 # here names its own output and those of the strap packages it links against.

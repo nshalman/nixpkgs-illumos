@@ -6,12 +6,17 @@
 # 64-bit openssl and CA.pl, and libcrypto.a as .build/libsunw_crypto.a.
 #
 # Its `configure` is Configure with @@CC@@, @@CFLAGS@@ and the other placeholders replaced, but OpenSSL 3's Configure
-# has none (checked below), so the Makefile's flags reach configure only through its environment. The Makefile
-# empties AUTOCONF_ENV but not AUTOCONF_ENV.64: the 32-bit build gets no environment (the compiler is the target's
-# plain `gcc`, found first on PATH in the strap's usr/bin, with the target's own flags), the 64-bit one gets CC,
-# CXX, CPPFLAGS, CFLAGS.64, LDFLAGS.64 (with the strap RUNPATH) and LIBS.64, which Configure takes. CFLAGS.64 is
-# written as their recipe writes it: the shell leaves -DPK11_LIB_LOCATION=\/usr/lib/64/libpkcs11.so.1\ and the
-# -Wno-stringop-truncation after it as one word.
+# has none (checked below), so the Makefile's flags reach configure only through its environment.
+#
+# illumos-extra bug, reproduced: the Makefile empties AUTOCONF_ENV but not AUTOCONF_ENV.64. The 32-bit build gets no
+# environment (the compiler is the target's plain `gcc`, found first on PATH in the strap's usr/bin, without
+# -fno-aggressive-loop-optimizations, with the target's own flags and no strap RUNPATH); the 64-bit one gets CC,
+# CXX, CPPFLAGS, CFLAGS.64 (-Werror included), LDFLAGS.64 (with the strap RUNPATH) and LIBS.64, which Configure
+# takes. The comparison with their proto.strap shows it: only their 64-bit binaries carry the strap RUNPATH.
+#
+# illumos-extra bug, reproduced: CFLAGS.64 is written as their recipe writes it, with -DPK11_LIB_LOCATION=\\"...\\"
+# inside a double-quoted shell word; the shell leaves -DPK11_LIB_LOCATION=\/usr/lib/64/libpkcs11.so.1\ and the
+# -Wno-stringop-truncation after it as one word, so that warning stays on (and -Werror applies to it).
 #
 # Differences, on purpose: Configure's perl is nixpkgs' (theirs: the build host's /usr/bin/perl), and make runs
 # with -j (theirs: PARALLEL is empty).

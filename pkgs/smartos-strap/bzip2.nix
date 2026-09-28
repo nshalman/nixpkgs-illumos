@@ -4,9 +4,9 @@
 # installed by bzip2/install-bzip2 (programs stripped, bzgrep run by ksh, hard links for bunzip2, bzcat, bzegrep,
 # bzfgrep, bzless, bzcmp).
 #
-# One difference, on purpose: Makefile.com adds -L$(DESTDIR)/usr/lib -L$(DESTDIR)/lib, but the makefile runs under
-# `env -`, so DESTDIR is empty there and those name the build host's /usr/lib and /lib. Against the sysroot that
-# would link the host's libraries, so they are left out. Nothing else is linked: only libbz2 (-L.) and libc.
+# illumos-extra bug, not reproduced: Makefile.com adds -L$(DESTDIR)/usr/lib -L$(DESTDIR)/lib, but the makefile runs
+# under `env -`, so DESTDIR is empty there and those name the build host's /usr/lib and /lib. Against the sysroot
+# that would link the host's libraries, so they are left out. Nothing else is linked: only libbz2 (-L.) and libc.
 {
   stdenv,
   strapBin,

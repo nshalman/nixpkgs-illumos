@@ -1,5 +1,8 @@
-# idnkit 2.3 as illumos-extra builds it, only in the strap (idnkit/Makefile, STRAP_ONLY): 32 bits, no CFLAGS at all
-# (the Makefile sets none), installed by its own `make install`.
+# idnkit 2.3 as illumos-extra builds it, only in the strap (idnkit/Makefile, STRAP_ONLY): 32 bits, installed by its
+# own `make install`.
+#
+# illumos-extra bug, reproduced (probably an oversight): the Makefile sets no CFLAGS, and Makefile.defs passes
+# CFLAGS="" to configure, so idnkit is compiled without optimization.
 { mkStrapAutoconf }:
 
 mkStrapAutoconf {

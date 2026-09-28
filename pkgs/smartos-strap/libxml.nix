@@ -4,8 +4,11 @@
 # 32-bit build only (LIBS.64 is empty); installed by libxml/install-libxml2{,-64}: the library in lib with links in
 # usr/lib, the headers, libxml.m4 and two manuals, and the 64-bit xmllint and xmlcatalog, stripped.
 #
-# The Makefile's LIBXML2_LDFLAGS, with its mapfile, is added to LDFLAGS, which neither configure nor make is given,
-# so it has no effect there either.
+# illumos-extra bug, reproduced: the Makefile's LIBXML2_LDFLAGS (-zdefs, -ztext, -zcombreloc and its mapfile) is
+# added to LDFLAGS, which neither configure nor make is given (AUTOCONF_LDFLAGS is empty), so the library is linked
+# without them: no mapfile, no symbol versioning from it.
+#
+# illumos-extra bug, reproduced: LIBS (-lpthread -lc) is set for the 32-bit build only; LIBS.64 stays empty.
 #
 # autoreconf is nixpkgs' autoconf, automake and libtool (theirs: pkgsrc's). nixpkgs' aclocal finds macros
 # through ACLOCAL_PATH, which is kept through `env -`.

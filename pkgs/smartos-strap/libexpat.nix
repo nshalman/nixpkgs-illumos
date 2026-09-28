@@ -1,7 +1,9 @@
 # expat as illumos-extra builds it for the strap (libexpat/Makefile): 32 and 64 bits, installed by
 # libexpat/install-sfw{,-64}: the library and the libexpat.so{,.0,.1} links in usr/lib and usr/lib/amd64, the two
-# headers in usr/include. Makefile's CFLAGS (-g -fPIC) reach only the 32-bit build; CFLAGS.64 is empty. Left out:
-# INSTALL="/usr/ucb/install -c", which only `make install` would use.
+# headers in usr/include. Left out: INSTALL="/usr/ucb/install -c", which only `make install` would use.
+#
+# illumos-extra bug, reproduced: the Makefile's CFLAGS (-g -fPIC) reach only the 32-bit build; CFLAGS.64 is empty, so
+# the 64-bit library is built without -g (libtool adds -fPIC for the shared library in both).
 { mkStrapAutoconf }:
 
 mkStrapAutoconf {
