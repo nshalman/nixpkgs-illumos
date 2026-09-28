@@ -2,19 +2,20 @@
 # Compare a strap package built here with its part of SmartOS's own proto.strap, made by illumos-extra's
 # install_strap at the same commit.
 #
-#   tests/strap-compare.sh REFERENCE-DIR OURS-DIR PATH-REGEX
+#   tests/strap-compare.sh REFERENCE-DIR OURS-DIR PATH-REGEX [EXPECTED-REGEX]
 #
 # REFERENCE-DIR is the unpacked proto.strap (pkgs/smartos-strap: reference), OURS-DIR a package's output laid out as
 # its slice of proto.strap, and PATH-REGEX (grep -E, anchored by the caller) selects that slice of the reference
 # by relative path. Every file and symbolic link in the slice and in OURS-DIR is described on one line, and the two
-# descriptions have to be equal:
+# descriptions have to be equal, except for the paths EXPECTED-REGEX matches, whose differences are shown and
+# accepted (the caller says why):
 #   symbolic link   its target, as written, with the strap and gcc directories named as for RUNPATH; with
 #                   FOLLOW_STORE_LINKS set, a link into another store path is described as the file it points at
 #   ELF file        whether executable, class, type, SONAME, NEEDED entries in order, RUNPATH, the version
 #                   definitions and the symbols each one exports
 #   static library  whether executable, its members and the global symbols they define
 #   text file       whether executable, sha256, after naming the strap and gcc directories as for RUNPATH
-#                   (libtool archives name them)
+#                   (libtool archives name them) and replacing build dates (theirs have their build's) by <date>
 #   *.chk           whether executable only (NSS's signatures of its libraries)
 #   any other file  whether executable, sha256
 # Modes are reduced to the executable bit: the store keeps no more than that.
@@ -23,23 +24,33 @@
 # Not compared, because they cannot match: the code itself (another build of the same compiler and sources, linked
 # against another libc), the .comment section, and where RUNPATH entries point. RUNPATH is compared after naming
 # the strap directory <strap>/ (theirs: the build cache directory; ours: any smartos-strap package in the store)
-# and gcc 10's runtime libraries <gcc>/ (theirs: /usr/gcc/10; ours: GCC_LIB, gcc10-illumos's lib output).
+# and gcc 10's runtime libraries <gcc>/ (theirs: /usr/gcc/10; ours: GCC_LIB, gcc10-illumos's lib output); the
+# compiler itself (GCC_OUT, gcc10-illumos) is <strap>/usr/gcc/10, where theirs is.
 set -euo pipefail
 
-if [ $# -ne 3 ]; then
-  echo "usage: $0 REFERENCE-DIR OURS-DIR PATH-REGEX" >&2
+if [ $# -ne 3 ] && [ $# -ne 4 ]; then
+  echo "usage: $0 REFERENCE-DIR OURS-DIR PATH-REGEX [EXPECTED-REGEX]" >&2
   exit 2
 fi
-ref=$1 ours=$2 regex=$3
+ref=$1 ours=$2 regex=$3 expected=${4:-}
 oursReal=$(cd "$ours" && pwd -P)
 gccLib=${GCC_LIB:-/nonexistent}
+gccOut=${GCC_OUT:-/nonexistent}
 
 runpath() {
   sed -E \
     -e 's#/opt/SmartOS/build-cache/[^/]+/[^/]+/[0-9a-f]{40}/+#<strap>/#g' \
     -e 's#/nix/store/[a-z0-9]{32}-smartos-strap-[^/:]*/+#<strap>/#g' \
+    -e "s#${gccOut}/#<strap>/usr/gcc/10/#g" \
     -e 's#/usr/gcc/10/#<gcc>/#g' \
     -e "s#${gccLib}/#<gcc>/#g"
+}
+
+# Build stamps, which theirs have from their build: dates (a manual's .TH line, `date` output) become <date>
+stamps() {
+  sed -E \
+    -e 's#^(\.TH .*)"[0-9]{4}-[0-9]{2}-[0-9]{2}"#\1"<date>"#' \
+    -e 's#[A-Z][a-z]{2} [A-Z][a-z]{2} [ 0-9][0-9] [0-9]{2}:[0-9]{2}:[0-9]{2}( [A-Z]{3,4})? [0-9]{4}#<date>#g'
 }
 
 # A package here has several strap directories (its own and its dependencies'), which all become <strap>/; keep the
@@ -100,7 +111,7 @@ describe() {
       "$(/usr/bin/nm -Pg "$f" 2>/dev/null | awk '$2 ~ /^[A-Z]$/ && $2 != "U" { print $1 }' | LC_ALL=C sort -u | tr '\n' ' ')"
   elif grep -Iq . "$f" 2>/dev/null || [ ! -s "$f" ]; then
     # text, e.g. a libtool archive: compared with the strap and gcc directories named as for RUNPATH
-    printf 'text %s %s\n' "$mode" "$(runpath <"$f" | sha256sum | cut -d' ' -f1)"
+    printf 'text %s %s\n' "$mode" "$(runpath <"$f" | stamps | sha256sum | cut -d' ' -f1)"
   else
     printf 'file %s %s\n' "$mode" "$(sha256sum <"$f" | cut -d' ' -f1)"
   fi
@@ -124,9 +135,18 @@ if [ ! -s "$tmp/reference" ]; then
   echo "FAIL the reference has nothing matching $regex" >&2
   exit 1
 fi
-if diff -u "$tmp/reference" "$tmp/ours"; then
+if diff -u "$tmp/reference" "$tmp/ours" >"$tmp/diff"; then
   echo "ok   $(wc -l <"$tmp/ours") files and links match the reference"
-else
-  echo "FAIL differences from the reference (- theirs, + ours)"
+  exit 0
+fi
+cat "$tmp/diff"
+# the paths that differ, and those of them not expected to
+sed -n '/^[-+][^-+]/{ s/^[-+]//; s/\t.*//; p; }' "$tmp/diff" | sort -u >"$tmp/differ"
+if [ -n "$expected" ]; then grep -Ev "$expected" "$tmp/differ" >"$tmp/unexpected" || true; else cp "$tmp/differ" "$tmp/unexpected"; fi
+if [ -s "$tmp/unexpected" ]; then
+  echo "FAIL differences from the reference (- theirs, + ours) in:"
+  sed 's/^/       /' "$tmp/unexpected"
   exit 1
 fi
+echo "ok   $(wc -l <"$tmp/ours") files and links match the reference, except the expected differences above in:"
+sed 's/^/       /' "$tmp/differ"

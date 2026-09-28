@@ -9,13 +9,16 @@ let
   strap = pkgs.smartos-strap;
   inherit (strap) gcc gcc10-illumos reference;
 
-  compare =
-    name: pkg: regex:
+  # compare NAME PKG REGEX: PKG against the reference's paths matching REGEX. compareExpecting also takes the paths
+  # whose differences are expected (each caller says why).
+  compareExpecting =
+    name: pkg: regex: expected:
     pkgs.runCommand "smartos-strap-${name}-compare" { } ''
-      GCC_LIB=${gcc10-illumos.lib} bash ${./strap-compare.sh} ${reference} ${pkg} '${regex}' >report 2>&1 || {
-        cat report; exit 1; }
+      GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} bash ${./strap-compare.sh} ${reference} ${pkg} \
+        '${regex}' '${expected}' >report 2>&1 || { cat report; exit 1; }
       cat report; cp report $out
     '';
+  compare = name: pkg: regex: compareExpecting name pkg regex "";
 
   # PROGRAM (C source) built against PKG for each word size in BITS with the given libraries, run, and its output
   # checked; a library it needs has to resolve into PKG.
@@ -102,7 +105,7 @@ in
   adjunct = pkgs.runCommand "smartos-strap-adjunct-compare" { } ''
     regex=$(cd ${strap.adjunct} && find . \( -type f -o -type l \) | sed -e 's#^\./##' -e 's/[][\.*^$+?(){}|]/\\&/g' \
       -e 's/^/^/' -e 's/$/$/' | paste -sd'|')
-    GCC_LIB=${gcc10-illumos.lib} bash ${./strap-compare.sh} ${reference} ${strap.adjunct} "$regex" >report 2>&1 || {
+    GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} bash ${./strap-compare.sh} ${reference} ${strap.adjunct} "$regex" >report 2>&1 || {
       cat report; exit 1; }
     cat report; cp report $out
   '';
