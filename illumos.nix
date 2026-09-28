@@ -67,6 +67,8 @@ import nixpkgs {
       gcc10-illumos = final.callPackage ./pkgs/gcc10-illumos { };
       # SmartOS's proto.strap: illumos-extra's strap packages built by that gcc 10.
       smartos-strap = final.callPackage ./pkgs/smartos-strap { };
+      # illumos as SmartOS builds it (illumos-joyent), with that proto.strap.
+      smartos-illumos = final.callPackage ./pkgs/smartos-illumos { };
     })
   ];
 }
