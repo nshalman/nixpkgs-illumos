@@ -93,6 +93,9 @@ lib.makeScope newScope (self: {
   perl = self.callPackage ./perl.nix { };
   node = self.callPackage ./node.nix { };
 
+  # the whole of proto.strap
+  proto = self.callPackage ./proto.nix { };
+
   # The illumos-adjunct tarball smartos-live extracts into proto.strap after the strap build (tools/build_strap):
   # prebuilt libraries and headers (glib, dbus, net-snmp, trousers, python headers, ...) that illumos builds against.
   # Opaque binaries, taken as they are (smartos-live default.configure-build, ILLUMOS_ADJUNCT_TARBALL_URL).

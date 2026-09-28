@@ -213,4 +213,20 @@ in
     echo "ok   cpp expands a macro"
     touch $out
   '';
+
+  # The whole tree, every path of the reference: the packages in place, with the files a later package replaces
+  # (openssl3's links over openssl1x's, the adjunct last). Differences accepted, besides perl's and node's above:
+  # the toolchain, whose differences from illumos-extra's are known and open (not shown to be harmless):
+  #   usr/gnu          binutils-strap is 64-bit without a program prefix (theirs: 32-bit, g-prefixed, tool
+  #                    directory i386-pc-solaris2.11); proto.nix links the g-names
+  #   usr/gcc/10       gcc10-illumos: configured against the sysroot, prefix in the store, no libtool archives,
+  #                    fixincludes run on the 2021 sysroot, runtime libraries not edited by gcc-strapfix
+  #   gcclibs.tar.gz   those runtime libraries, archived
+  proto = pkgs.runCommand "smartos-strap-proto-compare" { } ''
+    FOLLOW_STORE_LINKS=1 GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} bash ${./strap-compare.sh} \
+      ${reference} ${strap.proto} '.' \
+      '^usr/gnu/|^usr/gcc/10/|^gcclibs\.tar\.gz$|^usr/node/0\.10/include/node/config\.gypi$|^usr/perl5/5\.12/lib/i86pc-solaris-64int/CORE/config\.h$' \
+      >report 2>&1 || { cat report; exit 1; }
+    cat report; cp report $out
+  '';
 }
