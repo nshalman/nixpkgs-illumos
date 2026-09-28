@@ -167,8 +167,7 @@ in
     touch $out
   '';
 
-  # CORE/config.h records the build: the host's uname, and the signals of the headers perl was configured against
-  # (SIG_NAME, SIG_NUM, SIG_SIZE: their platform's, one more than in the 2021 sysroot's)
+  # CORE/config.h records the build host's uname (host name and platform release)
   perl = compareExpecting "perl" strap.perl "^usr/perl5/" "^usr/perl5/5\\.12/lib/i86pc-solaris-64int/CORE/config\\.h$";
   # the strap perl runs, loads an XS module and reports its strap configuration
   perl-use = pkgs.runCommand "smartos-strap-perl-run" { } ''
