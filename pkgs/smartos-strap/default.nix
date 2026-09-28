@@ -19,7 +19,8 @@
   fetchurl,
   runCommand,
   gcc10-illumos,
-  # nixpkgs' perl, for the builds that run perl (the build host's /usr/bin/perl there)
+  # nixpkgs' perl, for the builds that run perl (the build host's /usr/bin/perl there); inside the scope `perl` is the
+  # strap perl 5.12, which the other packages do not use
   perl,
 }:
 
@@ -45,6 +46,13 @@ lib.makeScope newScope (self: {
   strapBin = runCommand "smartos-strap-usr-bin" { } ''
     mkdir -p $out/bin
     for f in gcc g++ cpp; do ln -s ${gcc10-illumos}/bin/$f $out/bin/$f; done
+  '';
+
+  # The platform's dtrace, which perl and node run at build time (dtrace -h, -G) as they do in illumos-extra: an
+  # input from the build host, outside the store.
+  platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
+    mkdir -p $out/bin
+    ln -s /usr/sbin/dtrace $out/bin/dtrace
   '';
 
   # -L and -R for the strap libraries a package links against (Makefile.defs' SYSLIBDIRS, /usr/lib and /lib, under
@@ -82,6 +90,8 @@ lib.makeScope newScope (self: {
   openssl1x = self.callPackage ./openssl1x.nix { inherit perl; };
   openssl3 = self.callPackage ./openssl3.nix { inherit perl; };
   nss-nspr = self.callPackage ./nss-nspr.nix { inherit perl; };
+  perl = self.callPackage ./perl.nix { };
+  node = self.callPackage ./node.nix { };
 
   # The illumos-adjunct tarball smartos-live extracts into proto.strap after the strap build (tools/build_strap):
   # prebuilt libraries and headers (glib, dbus, net-snmp, trousers, python headers, ...) that illumos builds against.

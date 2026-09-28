@@ -167,6 +167,34 @@ in
     touch $out
   '';
 
+  # CORE/config.h records the build: the host's uname, and the signals of the headers perl was configured against
+  # (SIG_NAME, SIG_NUM, SIG_SIZE: their platform's, one more than in the 2021 sysroot's)
+  perl = compareExpecting "perl" strap.perl "^usr/perl5/" "^usr/perl5/5\\.12/lib/i86pc-solaris-64int/CORE/config\\.h$";
+  # the strap perl runs, loads an XS module and reports its strap configuration
+  perl-use = pkgs.runCommand "smartos-strap-perl-run" { } ''
+    p=${strap.perl}/usr/perl5/5.12/bin/perl
+    /usr/bin/elfdump -e $p | grep ELFCLASS32 >/dev/null
+    $p -MConfig -MDigest::MD5=md5_hex -e 'print "$Config{version} $Config{use64bitint} $Config{usedtrace} ", md5_hex("abc"), "\n"' | tee out
+    grep -x '5.12.3 define define 900150983cd24fb0d6963f7d28e17f72' out >/dev/null
+    echo "ok   perl 5.12.3 runs an XS module"
+    touch $out
+  '';
+
+  # config.gypi records the python gyp ran with: pkgsrc's there, nixpkgs' (its store path removed) here
+  node = compareExpecting "node" strap.node "^usr/node/" "^usr/node/0\\.10/include/node/config\\.gypi$";
+  # the strap node runs, with its OpenSSL and zlib bindings; python 2.7 was only for building it
+  node-use = pkgs.runCommand "smartos-strap-node-run" { exportReferencesGraph = [ "closure" strap.node ]; } ''
+    n=${strap.node}/usr/node/0.10/bin/node
+    /usr/bin/ldd $n
+    $n -e 'var h = require("crypto").createHash("sha256").update("abc").digest("hex").slice(0, 8);
+      console.log([process.version, process.versions.openssl, process.versions.zlib, h].join(" "));' | tee out
+    grep -x 'v0.10.26 1.0.2u 1.3.1 ba7816bf' out >/dev/null
+    echo "ok   node 0.10.26 hashes with OpenSSL 1.0.2u and has zlib 1.3.1"
+    if grep -e '-python-' closure; then echo "FAIL python is in node's closure"; exit 1; fi
+    echo "ok   python is not in node's closure"
+    touch $out
+  '';
+
   # the adjunct is extracted last, so every file of it is in the reference as it is
   adjunct = pkgs.runCommand "smartos-strap-adjunct-compare" { } ''
     regex=$(cd ${strap.adjunct} && find . \( -type f -o -type l \) | sed -e 's#^\./##' -e 's/[][\.*^$+?(){}|]/\\&/g' \

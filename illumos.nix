@@ -37,7 +37,11 @@ import nixpkgs {
         illumosPackages = import ./pkgs;
       }
     );
-  config = { };
+  config = {
+    # SmartOS's strap node.js 0.10 (pkgs/smartos-strap/node.nix) is built with gyp, which needs python 2. Build time
+    # only: nothing installed refers to it.
+    permittedInsecurePackages = [ "python-2.7.18.12" ];
+  };
   overlays = [
     (final: prev: {
       nixVersions = prev.nixVersions.extend (
