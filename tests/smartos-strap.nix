@@ -101,6 +101,72 @@ in
     touch $out
   '';
 
+  libxml = compare "libxml" strap.libxml "^(usr/)?lib/(amd64/)?libxml2\\.|^usr/include/libxml2/|^usr/share/aclocal/libxml\\.m4$|^usr/share/man/man1/xml|^usr/bin/xml";
+  libxml-use = use "libxml" strap.libxml [ 32 64 ] "-I${strap.libxml}/usr/include/libxml2 -lxml2" ''
+    #include <stdio.h>
+    #include <libxml/parser.h>
+    #include <libxml/tree.h>
+    int main(void) {
+      const char *doc = "<a><b>strap</b></a>";
+      xmlDocPtr d = xmlReadMemory(doc, 19, "t.xml", NULL, 0);
+      if (d == NULL) return 1;
+      xmlChar *s = xmlNodeGetContent(xmlDocGetRootElement(d));
+      printf("%s %s\n", LIBXML_DOTTED_VERSION, s);
+      return 0;
+    }
+  '' "2.13.8 strap";
+
+  # lib/libsunw_{crypto,ssl}.so are openssl3's in the reference (it installs after this); lib/64 and etc/sfw/openssl
+  # are the same links from both.
+  openssl1x = compare "openssl1x" strap.openssl1x "^(usr/)?lib/(amd64/)?(libsunw_(crypto|ssl)\\.so\\.1\\.0\\.0|libsunw1x_(crypto|ssl)\\.so)$|^lib/64$|^etc/sfw/openssl$|^opt/1x/|^\\.build/libsunw1x_crypto\\.a$";
+  openssl1x-use = use "openssl1x" strap.openssl1x [ 32 64 ] "-I${strap.openssl1x}/opt/1x -lsunw1x_crypto" ''
+    #include <stdio.h>
+    #include <openssl/evp.h>
+    #include <openssl/crypto.h>
+    int main(void) {
+      unsigned char md[EVP_MAX_MD_SIZE];
+      unsigned int n, i;
+      if (!EVP_Digest("abc", 3, md, &n, EVP_sha256(), NULL)) return 1;
+      printf("%s ", SSLeay_version(SSLEAY_VERSION));
+      for (i = 0; i < 4; i++) printf("%02x", md[i]);
+      printf("\n");
+      return 0;
+    }
+  '' "OpenSSL 1.0.2u  20 Dec 2019 ba7816bf";
+
+  # openssl1x installs libsunw_{crypto,ssl}.so too; openssl3's links are the ones in the reference, and only its
+  # headers are in usr/include/openssl (1.0.2's are under opt/1x).
+  openssl3 = compare "openssl3" strap.openssl3 "^(usr/)?lib/(amd64/)?(lib(crypto|ssl)-smartos\\.|libsunw_(crypto|ssl)\\.so$)|^lib/64$|^etc/openssl/openssl\\.cnf$|^etc/sfw/openssl$|^usr/include/openssl/|^usr/(sfw/)?bin/(openssl|CA\\.pl)$|^\\.build/libsunw_crypto\\.a$";
+  openssl3-use = use "openssl3" strap.openssl3 [ 32 64 ] "-lcrypto-smartos" ''
+    #include <stdio.h>
+    #include <string.h>
+    #include <openssl/evp.h>
+    #include <openssl/crypto.h>
+    int main(void) {
+      unsigned char md[EVP_MAX_MD_SIZE];
+      unsigned int n, i;
+      if (!EVP_Digest("abc", 3, md, &n, EVP_sha256(), NULL)) return 1;
+      printf("%s ", OpenSSL_version(OPENSSL_VERSION_STRING));
+      for (i = 0; i < 4; i++) printf("%02x", md[i]);
+      printf("\n");
+      return 0;
+    }
+  '' "3.5.8 ba7816bf";
+
+  nss-nspr = compare "nss-nspr" strap.nss-nspr "^usr/lib/mps/|^usr/include/mps/|^usr/bin/(amd64/)?certutil$|^usr/share/man/man1/certutil\\.1$";
+  # certutil makes a new database and lists it: NSPR, NSS, softoken and sqlite at work
+  nss-nspr-use = pkgs.runCommand "smartos-strap-nss-nspr-run" { } ''
+    for c in ${strap.nss-nspr}/usr/bin/certutil ${strap.nss-nspr}/usr/bin/amd64/certutil; do
+      /usr/bin/ldd $c
+      rm -rf db; mkdir db
+      $c -N -d sql:db --empty-password
+      $c -L -d sql:db | tee out
+      grep "Certificate Nickname" out >/dev/null
+      echo "ok   $c makes and lists a database"
+    done
+    touch $out
+  '';
+
   # the adjunct is extracted last, so every file of it is in the reference as it is
   adjunct = pkgs.runCommand "smartos-strap-adjunct-compare" { } ''
     regex=$(cd ${strap.adjunct} && find . \( -type f -o -type l \) | sed -e 's#^\./##' -e 's/[][\.*^$+?(){}|]/\\&/g' \

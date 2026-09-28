@@ -78,6 +78,10 @@ lib.makeScope newScope (self: {
   idnkit = self.callPackage ./idnkit.nix { };
   bzip2 = self.callPackage ./bzip2.nix { };
   cpp = self.callPackage ./cpp.nix { };
+  libxml = self.callPackage ./libxml.nix { };
+  openssl1x = self.callPackage ./openssl1x.nix { inherit perl; };
+  openssl3 = self.callPackage ./openssl3.nix { inherit perl; };
+  nss-nspr = self.callPackage ./nss-nspr.nix { inherit perl; };
 
   # The illumos-adjunct tarball smartos-live extracts into proto.strap after the strap build (tools/build_strap):
   # prebuilt libraries and headers (glib, dbus, net-snmp, trousers, python headers, ...) that illumos builds against.
