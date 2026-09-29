@@ -24,4 +24,7 @@ lib.makeScope newScope (self: {
 
   # the tools stage, with SmartOS's proto.strap from this repo
   tools = self.callPackage ./tools.nix { };
+
+  # the rest of `dmake setup`: closed binaries, headers and mapfiles into the proto area
+  setup = self.callPackage ./setup.nix { };
 })
