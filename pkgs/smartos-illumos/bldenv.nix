@@ -35,6 +35,8 @@
 
 # DIR: where the command starts, under the tree (e.g. usr/src/tools); COMMAND: what bldenv runs there;
 # installPhase and installCheckPhase for the step's output; extra: other derivation attributes.
+# extraEnv: lines added to illumos.sh (each ending in a newline); afterBldenv: a command run in the tree after bldenv,
+# as build_illumos runs nightly (environment assignments may lead it, as for env).
 {
   pname,
   description,
@@ -42,6 +44,8 @@
   command,
   installPhase,
   installCheckPhase,
+  extraEnv ? "",
+  afterBldenv ? null,
   extra ? { },
 }:
 
@@ -156,7 +160,7 @@ stdenv.mkDerivation (
       BISON=${bison}/bin/bison;			export BISON
       GM4=${gnum4}/bin/m4;				export GM4
       LD_TOXIC_PATH="\$ROOT/lib:\$ROOT/usr/lib";	export LD_TOXIC_PATH
-      EOF
+      ${extraEnv}EOF
 
       # build_illumos: MAKE names the build host's dmake; the command runs with /opt/local/bin (here: nixpkgs' tools)
       # appended to bldenv's PATH. It runs from a user's shell with CC and CXX unset; here it gets no environment
@@ -166,7 +170,12 @@ stdenv.mkDerivation (
       env -i HOME="$HOME" PATH=/usr/bin:/usr/sbin SHELL=/usr/bin/bash MAKE=${dmake-bootstrap}/bin/dmake \
       /usr/bin/ksh93 ./usr/src/tools/scripts/bldenv illumos.sh \
         "cd \$CODEMGR_WS/${dir} && export PATH=\"\$PATH:${toolPath}\" && ${command}"
-      cd ..
+      ${lib.optionalString (afterBldenv != null) ''
+        # build_illumos then unexports MAKE and runs nightly with this PATH (/opt/onbld/bin and /opt/SUNWspro/bin are
+        # absent here)
+        env -i HOME="$HOME" PATH=/opt/onbld/bin:/sbin:/usr/sbin:/usr/bin:/usr/ccs/bin:/opt/SUNWspro/bin:${toolPath} \
+          SHELL=/usr/bin/bash ${afterBldenv}
+      ''}cd ..
       runHook postBuild
     '';
 
@@ -178,7 +187,7 @@ stdenv.mkDerivation (
     # illumos ELF: leave it as the link-editor wrote it.
     dontFixup = true;
 
-    passthru = { inherit nativeAdjunct; };
+    passthru = { inherit nativeAdjunct command; };
 
     meta = {
       inherit description;
