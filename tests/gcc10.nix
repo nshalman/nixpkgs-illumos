@@ -5,7 +5,8 @@
 #                the build host's headers and libc (a program using a libc function newer than the 2021 sysroot
 #                builds and runs), while gcc 10 itself and its runtime libraries ask nothing newer of libc than the
 #                floor; a C and a C++ (throw/catch) program build as 64-bit and as 32-bit programs, run, and find
-#                libc on the running system and the C++ runtime in the store;
+#                libc and the C++ runtime on the running system (SmartOS ships gcc 10's in /usr/lib), with
+#                illumos-extra's gcc 10's RUNPATH, /usr/gcc/10/lib (amd64 for 64-bit);
 #   illumos-ld:  it builds real illumos-gate code: the link-editor (pkgs/illumos-ld, gate sources compiled with
 #                the gate's own headers) with gcc 10 as $CC; that package's install check links a shared object
 #                with the result.
@@ -64,8 +65,8 @@ in
     # Both ABIs, as illumos-extra's gcc 10 builds for both (multilib: 32-bit runtime libraries in lib, 64-bit in
     # lib/amd64) and the strap libraries are built with -m32 and -m64.
     for bits in 64 32; do
-      if [ $bits = 64 ]; then rtld=/usr/lib/amd64/ld.so.1 class=ELFCLASS64 libc=/lib/64/ rt=${gcc10.lib}/lib/amd64/
-      else rtld=/usr/lib/ld.so.1 class=ELFCLASS32 libc=/lib/ rt=${gcc10.lib}/lib/; fi
+      if [ $bits = 64 ]; then rtld=/usr/lib/amd64/ld.so.1 class=ELFCLASS64 libc=/lib/64/ rt=/usr/lib/64/ runpath=/usr/gcc/10/lib/amd64
+      else rtld=/usr/lib/ld.so.1 class=ELFCLASS32 libc=/lib/ rt=/usr/lib/ runpath=/usr/gcc/10/lib; fi
       pc=hello-c$bits pcxx=hello-cxx$bits
       $cc -m$bits -O2 -g hello.c -o $pc 2>$pc.err || { cat $pc.err; fail=1; echo "FAIL $pc builds"; continue; }
       $cxx -m$bits -O2 -g hello.cc -o $pcxx 2>$pcxx.err || { cat $pcxx.err; fail=1; echo "FAIL $pcxx builds"; continue; }
@@ -81,8 +82,10 @@ in
           '! /usr/bin/pvs -r $p | /usr/bin/egrep -o "ILLUMOS_0\.[0-9]+" | awk -F. "\$2 > ${toString floor}" | grep >/dev/null .'
         check "$p: libc resolves to the running system" \
           '/usr/bin/ldd $p | grep "libc\.so\.1" | grep >/dev/null "=>[[:space:]]*$libc"'
+        check "$p: RUNPATH is illumos-extra's gcc 10's, $runpath" \
+          '[ "$(/usr/bin/elfdump -d $p | awk "\$2 == \"RUNPATH\" { print \$4 }")" = "$runpath" ]'
       done
-      check "$pcxx: C++ runtime resolves inside gcc 10's lib output" \
+      check "$pcxx: C++ runtime resolves to the running system's" \
         '[ "$(/usr/bin/ldd $pcxx | /usr/bin/egrep "libstdc\+\+\.so|libgcc_s\.so" | grep -c "=>[[:space:]]*$rt[^/]*$")" = 2 ]'
     done
     [ $fail -eq 0 ]

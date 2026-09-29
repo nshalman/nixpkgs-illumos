@@ -7,8 +7,9 @@
 # /usr/bin/ld. Both honour LD_ALTEXEC.
 #
 # Like illumos-extra's gcc 10, what it compiles uses the build host's headers and libc (runtimeSysroot "/"), and its
-# include-fixed is made from the build host's headers; and it is multilib: 64-bit runtime libraries in lib/amd64,
-# 32-bit ones in lib. Differences from theirs (Makefile.gcc): gcc itself and its runtime libraries are built against
+# include-fixed is made from the build host's headers; what it links gets their RUNPATH, /usr/gcc/10/lib (amd64 for
+# 64-bit), so illumos built with it records no store path, and finds the C++ runtime SmartOS ships in /usr/lib; and
+# it is multilib: 64-bit runtime libraries in lib/amd64, 32-bit ones in lib. Differences from theirs (Makefile.gcc): gcc itself and its runtime libraries are built against
 # the sysroot (--with-build-sysroot), --with-ld names illumos-ld, prefix in the store instead of /usr/gcc/10.
 {
   callPackage,
@@ -23,4 +24,5 @@ callPackage ../gcc-illumos {
   linker = "${illumos-ld}/bin/ld";
   multilib = true;
   runtimeSysroot = "/";
+  runpath = "/usr/gcc/10/lib";
 }

@@ -50,6 +50,11 @@
   # "/" makes it the build host's, as for illumos-extra's gcc 10; gcc and its runtime libraries are still built
   # against the sysroot (--with-build-sysroot).
   runtimeSysroot ? null,
+  # The RUNPATH what this gcc links gets (-R, 32-bit; the amd64 subdirectory for 64-bit), or null for its runtime
+  # libraries' directory in the store (./ld-flags.patch). illumos-extra's gcc 10 gives /usr/gcc/10/lib, where SmartOS
+  # ships nothing: programs find the C++ runtime SmartOS ships in /usr/lib (gcc10-illumos). Linking still finds this
+  # gcc's own libraries (-Y P, -L).
+  runpath ? null,
 }:
 
 let
@@ -85,7 +90,9 @@ stdenv.mkDerivation {
   # GCC's build sets its own flags for each stage; the wrapper's would only reach stage 1.
   hardeningDisable = [ "all" ];
 
-  postPatch = ''
+  postPatch = lib.optionalString (runpath != null) ''
+    substituteInPlace gcc/config/sol2.h --replace-fail "-R @NIX_GCC_PREFIX@/lib" "-R ${runpath}"
+  '' + ''
     substituteInPlace gcc/config/sol2.h --replace-fail @NIX_GCC_PREFIX@ "$lib"
 
     # GCC's configure picks these up as in-tree dependencies.
