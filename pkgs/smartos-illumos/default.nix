@@ -30,4 +30,7 @@ lib.makeScope newScope (self: {
 
   # the AST message tools the nightly builds the AST libraries' message catalogs with
   msgcc = self.callPackage ./msgcc.nix { };
+
+  # the nightly build: the proto area
+  nightly = self.callPackage ./nightly.nix { };
 })
