@@ -19,6 +19,7 @@
   lib,
   stdenv,
   symlinkJoin,
+  writeShellScriptBin,
   src,
   dmake-bootstrap,
   smartos-strap,
@@ -65,9 +66,16 @@ let
       sqlite
     ];
   };
+  # flex runs the first m4 on PATH, ahead of the GNU m4 it was built with, and nightly's PATH has /usr/ccs/bin and
+  # /usr/bin, where m4 is the system's, which flex's -P options break (cmd/acpi/iasl). M4 in the environment is the
+  # m4 flex runs; it is set for flex alone, since under MAKEFLAGS=ek an exported M4 would replace the gate's $(M4),
+  # the system m4 that libelf and sendmail's cf use.
+  flexGm4 = writeShellScriptBin "flex" ''
+    M4=${gnum4}/bin/m4 exec ${flex}/bin/flex "$@"
+  '';
   # the pkgsrc tools smartos-live's build appends to PATH (/opt/local/bin)
   toolPath = lib.makeBinPath [
-    flex
+    flexGm4
     bison
     gnum4
     gettext
@@ -141,7 +149,7 @@ stdenv.mkDerivation (
       PRIMARY_CCC="gcc10,${proto}/usr/gcc/10/bin/g++,gnu";	export PRIMARY_CCC
       SHADOW_CCS=" smatch,\$BUILD_TOOLS/onbld/bin/\$MACH/smatch,smatch";	export SHADOW_CCS
       SHADOW_CCCS="";					export SHADOW_CCCS
-      FLEX=${flex}/bin/flex;				export FLEX
+      FLEX=${flexGm4}/bin/flex;				export FLEX
       GNUXGETTEXT=${gettext}/bin/xgettext;		export GNUXGETTEXT
       PYTHON3=${python312}/bin/python3.12;		export PYTHON3
       PYTHON3_VERSION=3.12;				export PYTHON3_VERSION
