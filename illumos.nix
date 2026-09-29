@@ -71,6 +71,8 @@ import nixpkgs {
       smartos-illumos = final.callPackage ./pkgs/smartos-illumos { };
       # a pre-built OpenJDK 11 to bootstrap OpenJDK from source
       tribblix-jdk-bin = final.callPackage ./pkgs/tribblix-jdk-bin { };
+      # OpenJDK 11 built from source with the illumos port, headless; SmartOS builds illumos' Java parts with JDK 11
+      openjdk11-illumos = final.callPackage ./pkgs/openjdk11-illumos { };
     })
   ];
 }
