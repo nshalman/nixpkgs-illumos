@@ -61,6 +61,15 @@ let
       sqlite
     ];
   };
+  # the pkgsrc tools smartos-live's build appends to PATH (/opt/local/bin)
+  toolPath = lib.makeBinPath [
+    flex
+    bison
+    gnum4
+    gettext
+    perlXml
+    python312
+  ];
 in
 stdenv.mkDerivation (
   {
@@ -156,16 +165,7 @@ stdenv.mkDerivation (
       cd illumos
       env -i HOME="$HOME" PATH=/usr/bin:/usr/sbin SHELL=/usr/bin/bash MAKE=${dmake-bootstrap}/bin/dmake \
       /usr/bin/ksh93 ./usr/src/tools/scripts/bldenv illumos.sh \
-        "cd \$CODEMGR_WS/${dir} && export PATH=\"\$PATH:${
-          lib.makeBinPath [
-            flex
-            bison
-            gnum4
-            gettext
-            perlXml
-            python312
-          ]
-        }\" && ${command}"
+        "cd \$CODEMGR_WS/${dir} && export PATH=\"\$PATH:${toolPath}\" && ${command}"
       cd ..
       runHook postBuild
     '';
