@@ -19,6 +19,9 @@ lib.makeScope newScope (self: {
   # A make to build make with: the gate's tools stage builds its own dmake with dmake.
   dmake-bootstrap = self.callPackage ./dmake-bootstrap.nix { };
 
+  # a step of the build as tools/build_illumos runs it (bldenv illumos.sh)
+  mkBldenvStep = self.callPackage ./bldenv.nix { };
+
   # the tools stage, with SmartOS's proto.strap from this repo
   tools = self.callPackage ./tools.nix { };
 })
