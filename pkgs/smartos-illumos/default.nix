@@ -27,4 +27,7 @@ lib.makeScope newScope (self: {
 
   # the rest of `dmake setup`: closed binaries, headers and mapfiles into the proto area
   setup = self.callPackage ./setup.nix { };
+
+  # the AST message tools the nightly builds the AST libraries' message catalogs with
+  msgcc = self.callPackage ./msgcc.nix { };
 })
