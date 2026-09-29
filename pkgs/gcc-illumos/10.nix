@@ -4,8 +4,11 @@
 # (sha1 2378fec3…), and the mpfr, gmp and mpc tarballs match illumos-extra's sha1 files.
 #
 # Patches: illumos-extra's single gcc 10 patch is 1000-ld-flags.patch, of which ./ld-flags.patch is the Nix
-# version (library paths under the store instead of /usr/gcc/10). The next three are this repo's gcc 14 patches,
+# version (library paths under the store instead of /usr/gcc/10). The next two are this repo's gcc 14 patches,
 # which apply unchanged. Left out:
+#   - ./ts-errno.patch: it predefines _TS_ERRNO, for the Nix toolchain's libraries; this gcc is illumos-extra's,
+#     which does not, and the gate's standalone code builds without libc's thread-safe errno (libumem's standalone
+#     link fails on ___errno).
 #   - ./asm-debug-prefix-map.patch: it hands %(asm_debug) to the assembler for compiled code, and gcc 10's
 #     ASM_DEBUG_SPEC (gcc/gcc.c) holds --gdwarf2 for any -g, so gas makes a line table of its own beside cc1's
 #     .file/.loc directives ("Error: file number 1 already allocated", libstdc++'s eh_globals.cc in stage 1). What
@@ -36,6 +39,5 @@
     ./ld-flags.patch
     ./madvise-decl.patch
     ./no-ccs-exec-prefix.patch
-    ./ts-errno.patch
   ];
 }

@@ -1,6 +1,7 @@
 # gcc10-illumos, the compiler SmartOS builds illumos with, called directly the way illumos' build calls its compilers
 # (not through the cc-wrapper):
-#   programs:    it is gcc 10.4.0 configured with binutils-strap's gas; like illumos-extra's, what it compiles uses
+#   programs:    it is gcc 10.4.0 configured with binutils-strap's gas, predefining the macros illumos-extra's gcc 10
+#                predefines (compared with the reference proto.strap's); like illumos-extra's, what it compiles uses
 #                the build host's headers and libc (a program using a libc function newer than the 2021 sysroot
 #                builds and runs), while gcc 10 itself and its runtime libraries ask nothing newer of libc than the
 #                floor; a C and a C++ (throw/catch) program build as 64-bit and as 32-bit programs, run, and find
@@ -27,6 +28,14 @@ in
     check "gcc reports 10.4.0" '$cc -dumpfullversion | grep -qx 10.4.0'
     check "configured with binutils-strap's gas" '$cc -v 2>&1 | grep -q -- "--with-as=${pkgs.binutils-strap}/bin/as"'
     check "the assembler it runs is gas 2.34" '$($cc -print-prog-name=as) --version | grep -q "GNU assembler (GNU Binutils) 2.34"'
+
+    # It predefines what illumos-extra's gcc 10 predefines, for 32- and 64-bit code. (The gate's standalone code
+    # links without libc: libumem's standalone build fails on ___errno under -D_TS_ERRNO.)
+    for m in -m32 -m64; do
+      $cc $m -dM -E - </dev/null | sort >ours$m
+      ${pkgs.smartos-strap.reference}/usr/gcc/10/bin/gcc $m -dM -E - </dev/null | sort >ref$m
+      check "predefined macros ($m) are illumos-extra's gcc 10's" 'diff ref$m ours$m'
+    done
 
     # What it compiles uses the build host's headers and libc, as illumos-extra's gcc 10 does: dprintf is declared
     # in the host's stdio.h and is in its libc (ILLUMOS_0.55), neither of which the 2021 sysroot has.
