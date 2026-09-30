@@ -15,7 +15,7 @@ mkStrapAutoconf {
   nativeBuildInputs = [ perl ];
   cppflags = "-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE";
   cflags = "-g";
-  install = ''
-    DESTDIR=$out VERS=libidn-1.11-32strap bash -e ./install-sfw
+  install = suffix: ''
+    DESTDIR=$out VERS=libidn-1.11-32${suffix} bash -e ./install-sfw
   '';
 }

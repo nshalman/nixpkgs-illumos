@@ -17,8 +17,8 @@ mkStrapAutoconf {
   ];
   cppflags = "-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_HAVE_EXPAT_CONFIG_H";
   cflags = "-g -fPIC";
-  install = ''
-    DESTDIR=$out VERS=expat-2.8.2-32strap bash -e ./install-sfw
-    DESTDIR=$out VERS=expat-2.8.2-64strap MACH64=amd64 bash -e ./install-sfw-64
+  install = suffix: ''
+    DESTDIR=$out VERS=expat-2.8.2-32${suffix} bash -e ./install-sfw
+    DESTDIR=$out VERS=expat-2.8.2-64${suffix} MACH64=amd64 bash -e ./install-sfw-64
   '';
 }

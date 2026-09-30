@@ -8,6 +8,12 @@
 #   - make -j under `env -` with V=1 (OVERRIDES), then the package's install step.
 # <strap> is the proto.strap directory there. Here it is this package's own output followed by those of the strap
 # packages it depends on (`deps`), so that RUNPATHs and libtool archives name the same places.
+#
+# With strap = false, a non-strap build (pkgs/smartos-extra): the directories are <ver>-32 / <ver>-64, <strap> in
+# CPPFLAGS and LDFLAGS is their DESTDIR, smartos-live's proto area (here: this package's output, the packages it
+# depends on, then illumosProto, the illumos build's proto area), and LDFLAGS carries GENLDFLAGS (-zassert-deflib
+# -zfatal-warnings) after the library directories. A package's pname "smartos-strap-X" becomes "smartos-extra-X", and
+# its `install` may be a function of the directories' suffix ("strap" or "").
 {
   lib,
   stdenv,
@@ -15,6 +21,8 @@
   illumosExtra,
   gcc,
   gxx,
+  strap ? true,
+  illumosProto ? null,
 }:
 
 {
@@ -44,7 +52,8 @@
   # AUTOCONF_CFLAGS / AUTOCONF_LDFLAGS set empty: CFLAGS / LDFLAGS not given to configure at all
   passCflags ? true,
   passLdflags ? true,
-  # the install step, run in the copy of the illumos-extra directory with $out as DESTDIR
+  # the install step, run in the copy of the illumos-extra directory with $out as DESTDIR; a string, or a function
+  # of the build directories' suffix
   install,
   nativeBuildInputs ? [ ],
   # other derivation attributes (preConfigure hooks, meta, ...)
@@ -52,7 +61,10 @@
 }:
 
 let
-  strapDirs = [ "$out" ] ++ map toString deps;
+  suffix = lib.optionalString strap "strap";
+  strapDirs = [ "$out" ] ++ map toString deps ++ lib.optional (!strap) illumosProto;
+  # Makefile.defs GENLDFLAGS
+  genLdFlags = lib.optionalString (!strap) " -Wl,-zassert-deflib -Wl,-zfatal-warnings";
   cppFlags = lib.concatMapStringsSep " " (d: "-isystem ${d}/usr/include") strapDirs + " ${cppflags}";
   libDirs =
     b: lib.concatMapStringsSep " " (d: if b == 64 then "-L${d}/usr/lib/64 -L${d}/lib/64" else "-L${d}/usr/lib -L${d}/lib") strapDirs;
@@ -60,14 +72,15 @@ let
     cc = "${gcc} -m${toString b}";
     cxx = "${gxx} -m${toString b}";
     cflags = if b == 64 then cflags64 else cflags;
-    ldflags = "${libDirs b} ${if b == 64 then ldflags64 else ldflags}";
+    ldflags = "${libDirs b}${genLdFlags} ${if b == 64 then ldflags64 else ldflags}";
     libs = if b == 64 then libs64 else libs;
   };
   forBits = f: lib.concatMapStrings (b: f b (flagsFor b)) bits;
 in
 stdenv.mkDerivation (
   {
-    inherit pname version nativeBuildInputs;
+    pname = if strap then pname else "smartos-extra-" + lib.removePrefix "smartos-strap-" pname;
+    inherit version nativeBuildInputs;
     src = illumosExtra;
 
     unpackPhase = ''
@@ -90,11 +103,11 @@ stdenv.mkDerivation (
             patch -d .unpack${toString b}/${ver} -p1 <"$p"
           done
         ''}
-        mv .unpack${toString b}/${ver} ${ver}-${toString b}strap
+        mv .unpack${toString b}/${ver} ${ver}-${toString b}${suffix}
         rmdir .unpack${toString b}
-        d=${ver}-${toString b}strap
+        d=${ver}-${toString b}${suffix}
         ${if frob == null then "chmod 755 $d/configure" else frob}
-        touch ${ver}-${toString b}strap/configure
+        touch ${ver}-${toString b}${suffix}/configure
       ''
     )
     + ''
@@ -106,7 +119,7 @@ stdenv.mkDerivation (
     ''
     + forBits (
       b: f: ''
-        (cd ${ver}-${toString b}strap && env -i PATH="$PATH" PKG_CONFIG_LIBDIR= \
+        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR= \
           CC="${f.cc}${lib.optionalString cppInCC " ${cppFlags}"}" CPPFLAGS="${cppFlags}" CXX="${f.cxx}" \
           ${lib.optionalString passCflags "CFLAGS=\"${f.cflags}\""} ${lib.optionalString passLdflags "LDFLAGS=\"${f.ldflags}\""} \
           LIBS="${f.libs}" ./configure --prefix=/usr ${lib.escapeShellArgs configureFlags})
@@ -121,7 +134,7 @@ stdenv.mkDerivation (
     ''
     + forBits (
       b: _: ''
-        (cd ${ver}-${toString b}strap && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1)
+        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1)
       ''
     )
     + ''
@@ -130,7 +143,7 @@ stdenv.mkDerivation (
 
     installPhase = ''
       runHook preInstall
-      ${install}
+      ${if lib.isFunction install then install suffix else install}
       runHook postInstall
     '';
 

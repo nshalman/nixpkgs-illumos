@@ -7,15 +7,26 @@
 # illumos-extra bug, not reproduced: Makefile.com adds -L$(DESTDIR)/usr/lib -L$(DESTDIR)/lib, but the makefile runs
 # under `env -`, so DESTDIR is empty there and those name the build host's /usr/lib and /lib. Against the sysroot
 # that would link the host's libraries, so they are left out. Nothing else is linked: only libbz2 (-L.) and libc.
+#
+# With strap = false, as illumos-extra builds it for the platform (pkgs/smartos-extra): the same build, in a directory
+# without the strap suffix. Makefile.com's non-strap additions (GENLDFLAGS) do not take effect there either: under
+# `env -` STRAP is empty, so its `ifneq ($(STRAP),strap)` holds in both builds, and GENLDFLAGS, set only in
+# Makefile.defs, is empty. Nor does the build name the proto area: it compiles against the compiler's own headers.
 {
+  lib,
   stdenv,
   strapBin,
   illumosExtra,
   gcc,
+  strap ? true,
 }:
 
+let
+  # the build directory (bzip2/Makefile VER)
+  dir = "bzip2-1.0.6${lib.optionalString strap "strap"}";
+in
 stdenv.mkDerivation {
-  pname = "smartos-strap-bzip2";
+  pname = if strap then "smartos-strap-bzip2" else "smartos-extra-bzip2";
   version = "1.0.6";
 
   src = illumosExtra;
@@ -31,13 +42,13 @@ stdenv.mkDerivation {
     cd ie/bzip2
     mkdir .unpack
     tar xzf bzip2-1.0.6.tar.gz -C .unpack --no-same-owner
-    mv .unpack/bzip2-1.0.6 bzip2-1.0.6strap
+    mv .unpack/bzip2-1.0.6 ${dir}
     rmdir .unpack
-    (cd bzip2-1.0.6strap && patch -p1 <../bzip2.patch)
-    cp bzip2-1.0.6strap/Makefile bzip2-1.0.6strap/Makefile.dist
+    (cd ${dir} && patch -p1 <../bzip2.patch)
+    cp ${dir}/Makefile ${dir}/Makefile.dist
     for m in i386 amd64; do
-      mkdir bzip2-1.0.6strap/$m
-      cp makefile.build bzip2-1.0.6strap/$m/Makefile
+      mkdir ${dir}/$m
+      cp makefile.build ${dir}/$m/Makefile
     done
     runHook postUnpack
   '';
@@ -51,14 +62,14 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd bzip2-1.0.6strap/i386 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m32")
-    (cd bzip2-1.0.6strap/amd64 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m64")
+    (cd ${dir}/i386 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m32")
+    (cd ${dir}/amd64 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m64")
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    DESTDIR=$out bash -e ./install-bzip2 $PWD/bzip2-1.0.6strap
+    DESTDIR=$out bash -e ./install-bzip2 $PWD/${dir}
     runHook postInstall
   '';
 

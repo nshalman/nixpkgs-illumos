@@ -2,16 +2,32 @@
 # --shared, the shared library linked by the strap gcc with illumos-extra's mapfile (the SUNW_1.x and SMARTOS_0.1
 # symbol versions), then installed by libz/install-zlib{,-64}: the library in lib, links to it in usr/lib, the two
 # headers in usr/include. No dependencies, so no include or library directories beyond the compiler's own.
+#
+# With strap = false, as illumos-extra builds it for the platform (a non-strap build, pkgs/smartos-extra): against
+# illumosProto, the proto area of the illumos build, where theirs has smartos-live's proto, with GENLDFLAGS
+# (-zassert-deflib -zfatal-warnings: nothing may come from the build host's /lib or /usr/lib) and no RUNPATH.
 {
+  lib,
   stdenv,
   strapBin,
   illumosExtra,
   gcc,
   libDirFlags,
+  strap ? true,
+  illumosProto ? null,
 }:
 
+let
+  # the build directories' suffix (Makefile.defs VER.32, VER.64)
+  suffix = lib.optionalString strap "strap";
+  # Makefile.defs GENLDFLAGS
+  genLdFlags = lib.optionalString (!strap) " -Wl,-zassert-deflib -Wl,-zfatal-warnings";
+  # the directories that stand for theirs, DESTDIR: this package's output, then (non-strap) the illumos proto area
+  protoDirs = [ "$out" ] ++ lib.optional (!strap) illumosProto;
+  includeFlags = lib.concatMapStringsSep " " (d: "-isystem ${d}/usr/include") protoDirs;
+in
 stdenv.mkDerivation {
-  pname = "smartos-strap-libz";
+  pname = if strap then "smartos-strap-libz" else "smartos-extra-libz";
   version = "1.3.1";
 
   src = illumosExtra;
@@ -30,7 +46,7 @@ stdenv.mkDerivation {
     for bits in 32 64; do
       mkdir .unpack
       tar xzf zlib-1.3.1.tar.gz -C .unpack --no-same-owner
-      mv .unpack/zlib-1.3.1 zlib-1.3.1-''${bits}strap
+      mv .unpack/zlib-1.3.1 zlib-1.3.1-''${bits}${suffix}
       rmdir .unpack
     done
     runHook postUnpack
@@ -43,7 +59,7 @@ stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     for bits in 32 64; do
-      (cd zlib-1.3.1-''${bits}strap && env -i PATH="$PATH" CC="${gcc} -m$bits -isystem $out/usr/include" ./configure --prefix=/usr --shared)
+      (cd zlib-1.3.1-''${bits}${suffix} && env -i PATH="$PATH" CC="${gcc} -m$bits ${includeFlags}" ./configure --prefix=/usr --shared)
     done
     runHook postConfigure
   '';
@@ -51,19 +67,19 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     for bits in 32 64; do
-      if [ $bits = 32 ]; then libs="${libDirFlags 32 "-L" [ "$out" ]}"; runpath="${libDirFlags 32 "-R" [ "$out" ]}"
-      else libs="${libDirFlags 64 "-L" [ "$out" ]}"; runpath="${libDirFlags 64 "-R" [ "$out" ]}"; fi
-      (cd zlib-1.3.1-''${bits}strap && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 \
-        LDSHARED="${gcc} -m$bits -shared -Wl,-h,libz.so.1 -Wl,-zdefs -Wl,-ztext -Wl,-zcombreloc -Wl,-M,../mapfile $libs $runpath -lc" \
-        LDFLAGS="$libs -L. -lc")
+      if [ $bits = 32 ]; then libs="${libDirFlags 32 "-L" protoDirs}"; runpath="${lib.optionalString strap (libDirFlags 32 "-R" protoDirs)}"
+      else libs="${libDirFlags 64 "-L" protoDirs}"; runpath="${lib.optionalString strap (libDirFlags 64 "-R" protoDirs)}"; fi
+      (cd zlib-1.3.1-''${bits}${suffix} && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 \
+        LDSHARED="${gcc} -m$bits -shared -Wl,-h,libz.so.1 -Wl,-zdefs -Wl,-ztext -Wl,-zcombreloc -Wl,-M,../mapfile${genLdFlags} $libs $runpath -lc" \
+        LDFLAGS="$libs${genLdFlags} -L. -lc")
     done
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    DESTDIR=$out VERS=zlib-1.3.1-32strap bash -e ./install-zlib
-    DESTDIR=$out VERS=zlib-1.3.1-64strap MACH64=amd64 bash -e ./install-zlib-64
+    DESTDIR=$out VERS=zlib-1.3.1-32${suffix} bash -e ./install-zlib
+    DESTDIR=$out VERS=zlib-1.3.1-64${suffix} MACH64=amd64 bash -e ./install-zlib-64
     runHook postInstall
   '';
 
