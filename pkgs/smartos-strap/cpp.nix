@@ -4,16 +4,32 @@
 #
 # Their YACC is pkgsrc's /opt/local/bin/yacc; here it is byacc. Believed, not checked: that pkgsrc's `yacc` is
 # byacc as well.
+#
+# With strap = false, as illumos-extra builds it for the platform (pkgs/smartos-extra): cpp itself rather than cppstrap,
+# compiled against the proto area (illumosProto) and linked with GENLDFLAGS (-zassert-deflib -zfatal-warnings).
 {
+  lib,
   stdenv,
   strapBin,
   illumosExtraSrc,
   gcc,
   byacc,
+  libDirFlags,
+  strap ? true,
+  illumosProto ? null,
 }:
 
+let
+  # the suffix of the program and object names (cpp/Makefile PROG, OBJS)
+  s = lib.optionalString strap "strap";
+  # their DESTDIR: this package's output, then (non-strap) the illumos proto area
+  protoDirs = [ "$out" ] ++ lib.optional (!strap) illumosProto;
+  includeFlags = lib.concatMapStringsSep " " (d: "-isystem ${d}/usr/include") protoDirs;
+  genLdFlags = lib.optionalString (!strap) " -Wl,-zassert-deflib -Wl,-zfatal-warnings";
+in
+
 stdenv.mkDerivation {
-  pname = "smartos-strap-cpp";
+  pname = if strap then "smartos-strap-cpp" else "smartos-extra-cpp";
   version = "0-unstable-illumos-extra-5850d8e9";
 
   src = illumosExtraSrc [ "cpp" ];
@@ -34,16 +50,16 @@ stdenv.mkDerivation {
     runHook preBuild
     yacc cpy.y
     cc="${gcc} -m32"
-    $cc -isystem $out/usr/include -O2 -c cpp.c -o cpp.ostrap
-    $cc -isystem $out/usr/include -O2 -c y.tab.c -o y.tab.ostrap
-    $cc -L$out/usr/lib -L$out/lib -o cppstrap cpp.ostrap y.tab.ostrap
+    $cc ${includeFlags} -O2 -c cpp.c -o cpp.o${s}
+    $cc ${includeFlags} -O2 -c y.tab.c -o y.tab.o${s}
+    $cc ${libDirFlags 32 "-L" protoDirs}${genLdFlags} -o cpp${s} cpp.o${s} y.tab.o${s}
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     mkdir -p $out/usr/lib
-    install -m 0755 cppstrap $out/usr/lib/cpp
+    install -m 0755 cpp${s} $out/usr/lib/cpp
     runHook postInstall
   '';
 

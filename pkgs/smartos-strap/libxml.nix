@@ -47,8 +47,8 @@ mkStrapAutoconf {
     "--with-legacy"
     "--with-aix-soname=svr4"
   ];
-  install = ''
-    DESTDIR=$out bash -e ./install-libxml2 libxml2-v2.13.8-32strap
-    DESTDIR=$out bash -e ./install-libxml2-64 libxml2-v2.13.8-64strap
+  install = suffix: ''
+    DESTDIR=$out bash -e ./install-libxml2 libxml2-v2.13.8-32${suffix}
+    DESTDIR=$out bash -e ./install-libxml2-64 libxml2-v2.13.8-64${suffix}
   '';
 }

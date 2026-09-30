@@ -4,7 +4,7 @@
 #   - configure run in that directory under `env -` (PATH alone) with AUTOCONF_ENV: PKG_CONFIG_LIBDIR empty,
 #     CC/CXX the strap compilers with -m32 or -m64, CPPFLAGS (-isystem <strap>/usr/include plus the package's),
 #     CFLAGS (the package's; the 64-bit build takes CFLAGS.64, usually empty), LDFLAGS (-L<strap>/usr/lib
-#     -L<strap>/lib, /64 for 64 bits, plus the package's), LIBS; and --prefix=/usr;
+#     -L<strap>/lib, /64 for 64 bits, plus the package's), LIBS; and --prefix (AUTOCONF_PREFIX, /usr);
 #   - make -j (PARALLEL) under `env -` with V=1 (OVERRIDES), then the package's install step.
 # <strap> is the proto.strap directory there. Here it is this package's own output followed by those of the strap
 # packages it depends on (`deps`), so that RUNPATHs and libtool archives name the same places.
@@ -45,6 +45,13 @@
   libs ? "",
   libs64 ? "",
   configureFlags ? [ ],
+  # AUTOCONF_OPTS.64 +=: more configure flags for the 64-bit build
+  configureFlags64 ? [ ],
+  # AUTOCONF_PREFIX
+  prefix ? "/usr",
+  # the tarball has more at its top than VER (theirs: `-rmdir .unpack32`, make ignores the failure); false: the
+  # unpack directory has to be left empty
+  unpackLeftovers ? false,
   # FROB_SENTINEL, run in the unpacked source ($d is its directory); null: make configure executable
   frob ? null,
   # AUTOCONF_CC is CC="$(GCC.32) $(CPPFLAGS)": CPPFLAGS in CC as well
@@ -79,6 +86,7 @@ let
   flagsFor = b: {
     cc = "${gcc} -m${toString b}";
     cxx = "${gxx} -m${toString b}";
+    configureFlags = configureFlags ++ lib.optionals (b == 64) configureFlags64;
     cflags = if b == 64 then cflags64 else cflags;
     ldflags = "${libDirs b}${genLdFlags} ${if b == 64 then ldflags64 else ldflags}";
     libs = if b == 64 then libs64 else libs;
@@ -119,7 +127,7 @@ stdenv.mkDerivation (
           done
         ''}
         mv .unpack${toString b}/${ver} ${ver}-${toString b}${suffix}
-        rmdir .unpack${toString b}
+        rmdir .unpack${toString b}${lib.optionalString unpackLeftovers " || true"}
         d=${ver}-${toString b}${suffix}
         ${if frob == null then "chmod 755 $d/configure" else frob}
         touch ${ver}-${toString b}${suffix}/configure
@@ -137,7 +145,7 @@ stdenv.mkDerivation (
         (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR= \
           CC="${f.cc}${lib.optionalString cppInCC " ${cppFlags}"}" CPPFLAGS="${cppFlags}" CXX="${f.cxx}" \
           ${lib.optionalString passCflags "CFLAGS=\"${f.cflags}\""} ${lib.optionalString passLdflags "LDFLAGS=\"${f.ldflags}\""} \
-          LIBS="${f.libs}"${envWords} ./configure --prefix=/usr ${lib.escapeShellArgs configureFlags})
+          LIBS="${f.libs}"${envWords} ./configure --prefix=${prefix} ${lib.escapeShellArgs f.configureFlags})
       ''
     )
     + ''
