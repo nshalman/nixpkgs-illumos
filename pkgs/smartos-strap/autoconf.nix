@@ -12,8 +12,8 @@
 # With strap = false, a non-strap build (pkgs/smartos-extra): the directories are <ver>-32 / <ver>-64, <strap> in
 # CPPFLAGS and LDFLAGS is their DESTDIR, smartos-live's proto area (here: this package's output, the packages it
 # depends on, then illumosProto, the illumos build's proto area), and LDFLAGS carries GENLDFLAGS (-zassert-deflib
-# -zfatal-warnings) after the library directories. A package's pname "smartos-strap-X" becomes "smartos-extra-X", and
-# its `install` may be a function of the directories' suffix ("strap" or "").
+# -zfatal-warnings) after the library directories. A package's pname "smartos-strap-X" becomes "smartos-extra-X"
+# (other names are kept), and its `install` may be a function of the directories' suffix ("strap" or "").
 {
   lib,
   stdenv,
@@ -79,7 +79,11 @@ let
 in
 stdenv.mkDerivation (
   {
-    pname = if strap then pname else "smartos-extra-" + lib.removePrefix "smartos-strap-" pname;
+    pname =
+      if strap || !lib.hasPrefix "smartos-strap-" pname then
+        pname
+      else
+        "smartos-extra-" + lib.removePrefix "smartos-strap-" pname;
     inherit version nativeBuildInputs;
     src = illumosExtra;
 
