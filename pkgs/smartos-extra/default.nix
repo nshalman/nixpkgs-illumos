@@ -31,6 +31,10 @@ lib.makeScope newScope (self: {
   libexpat = smartos-strap.libexpat.override { mkStrapAutoconf = self.mkAutoconf; };
   libidn = smartos-strap.libidn.override { mkStrapAutoconf = self.mkAutoconf; };
 
+  openssl3 = smartos-strap.openssl3.override {
+    strap = false;
+    inherit (self) illumosProto;
+  };
   libidn2 = self.callPackage ./libidn2.nix { };
   xz = self.callPackage ./xz.nix { };
 })

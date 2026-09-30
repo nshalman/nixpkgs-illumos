@@ -132,4 +132,25 @@ in
       return 0;
     }
   '' "2.3.4 xn--bcher-kva.example";
+
+  # The builder's platform (joyent_20260723T000757Z) ships OpenSSL 3.0.21, the pinned illumos-extra 3.5.8: newer
+  # symbol versions (OPENSSL_SMARTOS_3.1.0 and on), a newer openssl.cnf, and openssl as a 64-bit command only
+  # (install-sfw-64, "64-bit commands only, now"), where the platform's is 32-bit.
+  openssl3 = compareExpecting "openssl3" extra.openssl3 "^lib/(amd64/)?lib(crypto|ssl)-smartos\\.|^usr/bin/openssl$|^etc/openssl/openssl\\.cnf$"
+    "^lib/(amd64/)?lib(crypto|ssl)-smartos\\.so\\.3$|^usr/bin/openssl$|^etc/openssl/openssl\\.cnf$";
+  openssl3-use = use "openssl3" extra.openssl3 [ 32 64 ] "-lcrypto-smartos" ''
+    #include <stdio.h>
+    #include <string.h>
+    #include <openssl/evp.h>
+    #include <openssl/crypto.h>
+    int main(void) {
+      unsigned char md[EVP_MAX_MD_SIZE];
+      unsigned int n, i;
+      if (!EVP_Digest("abc", 3, md, &n, EVP_sha256(), NULL)) return 1;
+      printf("%s ", OpenSSL_version(OPENSSL_VERSION_STRING));
+      for (i = 0; i < 4; i++) printf("%02x", md[i]);
+      printf("\n");
+      return 0;
+    }
+  '' "3.5.8 ba7816bf";
 }
