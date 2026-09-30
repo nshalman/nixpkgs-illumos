@@ -357,6 +357,22 @@ in
     }
   '' "OpenSSL 1.0.2u  20 Dec 2019 ba7816bf";
 
+  nss-nspr = compare "nss-nspr" extra.nss-nspr "^usr/lib/mps/|^usr/bin/certutil$|^usr/share/man/man1/certutil\\.1$";
+  # certutil (32-bit, the one the platform ships) makes a new database and lists it: NSPR, NSS, softoken and sqlite
+  # at work, from this package (its RUNPATH names the build host's /usr/lib/mps)
+  nss-nspr-use = pkgs.runCommand "smartos-extra-nss-nspr-run" { } ''
+    c=${extra.nss-nspr}/usr/bin/certutil
+    export LD_LIBRARY_PATH=${extra.nss-nspr}/usr/lib/mps
+    /usr/bin/ldd $c | tee ldd
+    grep "libnss3.so =>.*${extra.nss-nspr}/" ldd >/dev/null
+    mkdir db
+    $c -N -d sql:db --empty-password
+    $c -L -d sql:db | tee out
+    grep "Certificate Nickname" out >/dev/null
+    echo "ok   certutil makes and lists a database"
+    touch $out
+  '';
+
   # No file the platform takes from a package (the manifest's f entries) names the store. In a text file (a script,
   # configuration) such a path would be dead on the platform. In a binary it is a build location, of the kind the
   # platform's binaries carry for their build too (debug information's include directories, vim's embedded compile
