@@ -5,7 +5,7 @@
 #     CC/CXX the strap compilers with -m32 or -m64, CPPFLAGS (-isystem <strap>/usr/include plus the package's),
 #     CFLAGS (the package's; the 64-bit build takes CFLAGS.64, usually empty), LDFLAGS (-L<strap>/usr/lib
 #     -L<strap>/lib, /64 for 64 bits, plus the package's), LIBS; and --prefix=/usr;
-#   - make -j under `env -` with V=1 (OVERRIDES), then the package's install step.
+#   - make -j (PARALLEL) under `env -` with V=1 (OVERRIDES), then the package's install step.
 # <strap> is the proto.strap directory there. Here it is this package's own output followed by those of the strap
 # packages it depends on (`deps`), so that RUNPATHs and libtool archives name the same places.
 #
@@ -53,8 +53,11 @@
   passCflags ? true,
   passLdflags ? true,
   # the install step, run in the copy of the illumos-extra directory with $out as DESTDIR; a string, or a function
-  # of the build directories' suffix
-  install,
+  # of the build directories' suffix; null for Makefile.targ's install_autoconf (`make install` with DESTDIR in each
+  # build directory)
+  install ? null,
+  # make -j (theirs: PARALLEL = -j$(MAX_JOBS)); false where the package sets PARALLEL empty
+  parallel ? true,
   nativeBuildInputs ? [ ],
   # other derivation attributes (preConfigure hooks, meta, ...)
   extra ? { },
@@ -138,7 +141,7 @@ stdenv.mkDerivation (
     ''
     + forBits (
       b: _: ''
-        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1)
+        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make${lib.optionalString parallel " -j$NIX_BUILD_CORES"} V=1)
       ''
     )
     + ''
@@ -147,7 +150,16 @@ stdenv.mkDerivation (
 
     installPhase = ''
       runHook preInstall
-      ${if lib.isFunction install then install suffix else install}
+      ${
+        if install == null then
+          forBits (b: _: ''
+            (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make V=1 DESTDIR=$out install)
+          '')
+        else if lib.isFunction install then
+          install suffix
+        else
+          install
+      }
       runHook postInstall
     '';
 
