@@ -517,6 +517,19 @@ in
     touch $out
   '';
 
+  mdb_v8 = compare "mdb_v8" extra.mdb_v8 "^usr/lib/mdb/proc/(amd64/)?v8\\.so$";
+  # the dmods: CTF, mdb's module entry point, and the version tag the release target builds with git (theirs:
+  # "release, from cbec173"), for both word sizes
+  mdb_v8-use = pkgs.runCommand "smartos-extra-mdb_v8-check" { } ''
+    for d in ${extra.mdb_v8}/usr/lib/mdb/proc/v8.so ${extra.mdb_v8}/usr/lib/mdb/proc/amd64/v8.so; do
+      /usr/bin/elfdump -c $d | grep "sh_name: \\.SUNW_ctf$" >/dev/null
+      /usr/bin/nm $d | grep "_mdb_init$" >/dev/null
+      /usr/bin/strings -a $d | grep -x "release, from cbec173" >/dev/null
+    done
+    echo "ok   both v8.so have CTF, _mdb_init and the release tag"
+    touch $out
+  '';
+
   # No file the platform takes from a package (the manifest's f entries) names the store. In a text file (a script,
   # configuration) such a path would be dead on the platform. In a binary it is a build location, of the kind the
   # platform's binaries carry for their build too (debug information's include directories, vim's embedded compile

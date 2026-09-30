@@ -171,6 +171,7 @@ lib.makeScope newScope (self: {
   openlldp = self.callPackage ./openlldp.nix { };
   ntp = self.callPackage ./ntp.nix { };
   openssh = self.callPackage ./openssh.nix { };
+  mdb_v8 = self.callPackage ./mdb_v8.nix { };
   bash = self.callPackage ./bash.nix { };
   less = self.callPackage ./less.nix { };
   gtar = self.callPackage ./gtar.nix { };
