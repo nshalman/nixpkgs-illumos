@@ -7,6 +7,8 @@
 #   gcc 10 (gcc-illumos-*, compiler or runtime libraries): /usr/gcc/10, then slashes
 #   a platform package (smartos-extra-*, this one or a dependency): /proto, then slashes (their DESTDIR)
 #   a strap package (smartos-strap-*): /proto.strap, then slashes
+#   python (python-*), a build-time tool whose path a program records (node's process.config): /opt/local, then
+#     slashes, where their build host has it (pkgsrc)
 # Any other store path is left as it is. A run of slashes names the same place as one.
 use strict;
 use warnings;
@@ -23,6 +25,7 @@ sub replacement {
   elsif ($name =~ /^gcc-illumos-/) { $prefix = "/usr/gcc/10" }
   elsif ($name =~ /^smartos-extra-/) { $prefix = "/proto" }
   elsif ($name =~ /^smartos-strap-/) { $prefix = "/proto.strap" }
+  elsif ($name =~ /^python-/) { $prefix = "/opt/local" }
   else { return $path }
   return $prefix . ("/" x (length($path) - length($prefix)));
 }

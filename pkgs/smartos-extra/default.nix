@@ -71,15 +71,27 @@ lib.makeScope newScope (self: {
   # paths are left in and leak into the platform's files (tests/smartos-extra.nix no-store-paths then fails on them).
   mapStorePaths = true;
 
-  # what is done to each package below once it is built
+  # What is done to each package below: perl on PATH, as their build host has /usr/bin/perl on PATH for every package
+  # (configure scripts check for it, manuals are made with it: bind, coreutils, curl, wget); then, with
+  # mapStorePaths, the store paths mapped away after the install.
   finishPackage =
     pkg:
-    if !self.mapStorePaths then
-      pkg
-    else
-      pkg.overrideAttrs (old: {
-        postInstall = (old.postInstall or "") + ''
+    pkg.overrideAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ perl ];
+      postInstall =
+        (old.postInstall or "")
+        + lib.optionalString self.mapStorePaths ''
           ${perl}/bin/perl ${./map-store-paths.pl} $out | while IFS= read -r f; do
+            # a library NSS has signed (its .chk beside it) no longer matches its signature once mapped, and only FIPS
+            # mode would notice: fail instead
+            case "$f" in
+              *.so)
+                if [ -e "''${f%.so}.chk" ]; then
+                  echo "$f is signed (''${f%.so}.chk) and was changed" >&2
+                  exit 1
+                fi
+                ;;
+            esac
             if /usr/bin/elfdump -d "$f" 2>/dev/null | grep ' CHECKSUM ' >/dev/null; then
               mode=$(stat -c %a "$f")
               chmod u+w "$f"
@@ -88,7 +100,7 @@ lib.makeScope newScope (self: {
             fi
           done
         '';
-      });
+    });
 
   # first, before the other packages (PRIMARY_COMPILER fixup)
   gcc10 = self.callPackage ./gcc10.nix { };
@@ -130,7 +142,7 @@ lib.makeScope newScope (self: {
   less = self.callPackage ./less.nix { };
   gtar = self.callPackage ./gtar.nix { };
   gzip = self.callPackage ./gzip.nix { };
-  coreutils = self.callPackage ./coreutils.nix { inherit perl; };
+  coreutils = self.callPackage ./coreutils.nix { };
   rsync = self.callPackage ./rsync.nix { };
   uuid = self.callPackage ./uuid.nix { };
   socat = self.callPackage ./socat.nix { };
