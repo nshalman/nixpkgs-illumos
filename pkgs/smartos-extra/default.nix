@@ -53,9 +53,23 @@ lib.makeScope newScope (self: {
     libDirFlags
     ;
 
+  # the strap's autoconf packages, built the non-strap way, against the illumos proto area or (mkAutoconfAgainst) a
+  # view of it
+  mkAutoconfAgainst =
+    illumosProto:
+    smartos-strap.callPackage ../smartos-strap/autoconf.nix {
+      strap = false;
+      inherit illumosProto;
+    };
+  mkAutoconf = self.mkAutoconfAgainst self.illumosProto;
+
+  # what is done to each package below once it is built
+  finishPackage = pkg: pkg;
+
   # first, before the other packages (PRIMARY_COMPILER fixup)
   gcc10 = self.callPackage ./gcc10.nix { };
-
+}
+// lib.mapAttrs (_: self.finishPackage) {
   libz = smartos-strap.libz.override {
     strap = false;
     inherit (self) illumosProto;
@@ -66,15 +80,6 @@ lib.makeScope newScope (self: {
     inherit (self) illumosProto;
   };
 
-  # the strap's autoconf packages, built the non-strap way, against the illumos proto area or (mkAutoconfAgainst) a
-  # view of it
-  mkAutoconfAgainst =
-    illumosProto:
-    smartos-strap.callPackage ../smartos-strap/autoconf.nix {
-      strap = false;
-      inherit illumosProto;
-    };
-  mkAutoconf = self.mkAutoconfAgainst self.illumosProto;
   libexpat = smartos-strap.libexpat.override { mkStrapAutoconf = self.mkAutoconf; };
   libidn = smartos-strap.libidn.override { mkStrapAutoconf = self.mkAutoconf; };
   # before libz in their build (SUBDIRS order), so without it, as the platform's libxml2 is
