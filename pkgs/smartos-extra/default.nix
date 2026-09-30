@@ -109,6 +109,10 @@ lib.makeScope newScope (self: {
   # before libz in their build (SUBDIRS order), so without it, as the platform's libxml2 is
   libxml = smartos-strap.libxml.override { mkStrapAutoconf = self.mkAutoconf; };
 
+  perl = smartos-strap.perl.override {
+    strap = false;
+    inherit (self) illumosProto;
+  };
   nss-nspr = smartos-strap.nss-nspr.override {
     strap = false;
     inherit (self) illumosProto;

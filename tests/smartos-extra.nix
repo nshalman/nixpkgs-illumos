@@ -373,6 +373,21 @@ in
     touch $out
   '';
 
+  # Expected: NTP/Util.pm is ntp's, installed into this tree by that later package; Config.pm records the compiler's
+  # path, a build location (theirs their strap's usr/bin/gcc, ours gcc's store path mapped to /usr/gcc/10).
+  perl = compareExpecting "perl" extra.perl "^usr/perl5/"
+    "^usr/perl5/5\\.12/lib/NTP/Util\\.pm$|^usr/perl5/5\\.12/lib/i86pc-solaris-64int/Config\\.pm$";
+  # Its @INC is the platform's /usr/perl5/5.12 (the build host has one too): this package's lib directories are put
+  # first, and an XS module (POSIX) has to load from them
+  perl-use = pkgs.runCommand "smartos-extra-perl-run" { } ''
+    l=${extra.perl}/usr/perl5/5.12/lib
+    ${extra.perl}/usr/perl5/5.12/bin/perl -I$l/i86pc-solaris-64int -I$l -MConfig -MPOSIX -e \
+      'print join(" ", $Config{version}, $Config{installprefix}, $INC{"POSIX.pm"}, POSIX::floor(2.5)), "\n"' | tee out
+    grep -x "5.12.3 /usr/perl5/5.12 $l/i86pc-solaris-64int/POSIX.pm 2" out >/dev/null
+    echo "ok   perl 5.12.3, configured for /usr/perl5/5.12, loads POSIX from this package"
+    touch $out
+  '';
+
   # No file the platform takes from a package (the manifest's f entries) names the store. In a text file (a script,
   # configuration) such a path would be dead on the platform. In a binary it is a build location, of the kind the
   # platform's binaries carry for their build too (debug information's include directories, vim's embedded compile
