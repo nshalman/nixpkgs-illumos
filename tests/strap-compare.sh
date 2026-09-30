@@ -57,10 +57,12 @@ runpath() {
     -e "s#${gccLib}/#<gcc>/#g"
 }
 
-# Build stamps, which theirs have from their build: dates (a manual's .TH line, `date` output) become <date>
+# Build stamps, which theirs have from their build: dates (a manual's .TH line, the date quoted or not; `date` output)
+# become <date>
 stamps() {
   sed -E \
     -e 's#^(\.TH .*)"[0-9]{4}-[0-9]{2}-[0-9]{2}"#\1"<date>"#' \
+    -e 's#^(\.TH [^ ]+ [^ ]+ )[0-9]{4}-[0-9]{2}-[0-9]{2}( |$)#\1<date>\2#' \
     -e 's#[A-Z][a-z]{2} [A-Z][a-z]{2} [ 0-9][0-9] [0-9]{2}:[0-9]{2}:[0-9]{2}( [A-Z]{3,4})? [0-9]{4}#<date>#g'
 }
 
