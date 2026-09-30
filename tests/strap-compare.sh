@@ -20,6 +20,8 @@
 #   any other file  whether executable, sha256
 # Modes are reduced to the executable bit: the store keeps no more than that. With IGNORE_MODES set they are not
 # compared at all (shown as .): a platform takes its modes from its manifest, not from the proto area.
+# With IGNORE_RUNPATHS set, RUNPATH and RPATH are left out of ELF descriptions (for files whose search paths are known
+# to differ, the caller says why).
 # Directories are left out: proto.strap's are shared by every package.
 #
 # With PATH_LIST set (a file of relative paths, one per line), the files and links compared, on both sides, are the
@@ -117,7 +119,8 @@ describe() {
     class=$(/usr/bin/elfdump -e "$f" | awk '/ei_class:/ { print $2; exit }')
     type=$(/usr/bin/elfdump -e "$f" | awk '/e_type:/ { print $2; exit }')
     dyn=$(/usr/bin/elfdump -d "$f" 2>/dev/null |
-      awk '$2 == "SONAME" || $2 == "NEEDED" || $2 == "RUNPATH" || $2 == "RPATH" { printf "%s=%s ", $2, $4 }' | runpath | dedup_runpath)
+      awk -v paths="${IGNORE_RUNPATHS:+no}" '$2 == "SONAME" || $2 == "NEEDED" ||
+        (paths != "no" && ($2 == "RUNPATH" || $2 == "RPATH")) { printf "%s=%s ", $2, $4 }' | runpath | dedup_runpath)
     printf 'elf %s %s %s %s' "$mode" "$class" "$type" "$dyn"
     # pvs -ds: a version definition is indented by one tab and ends in ':' or ';'; its symbols follow, indented by two
     # tabs, each ending in ';'
