@@ -14,7 +14,7 @@
 {
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
 }:
 
@@ -50,7 +50,7 @@ stdenv.mkDerivation {
   pname = "smartos-strap-perl";
   version = "5.12.3";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "perl" ];
 
   unpackPhase = ''
     runHook preUnpack

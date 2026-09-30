@@ -16,7 +16,7 @@
 {
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   gxx,
   libDirFlags,
@@ -36,7 +36,7 @@ stdenv.mkDerivation {
   pname = "smartos-strap-openssl1x";
   version = "1.0.2u";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "openssl1x" ];
 
   nativeBuildInputs = [ perl ];
 

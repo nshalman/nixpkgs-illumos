@@ -19,7 +19,6 @@
 {
   lib,
   newScope,
-  fetchFromGitHub,
   fetchurl,
   runCommand,
   gcc10-illumos,
@@ -30,13 +29,27 @@
 
 lib.makeScope newScope (self: {
   # illumos-extra: the package sources (tarballs are committed in the repository, except gcc's), patches and
-  # install scripts. smartos-live's strap cache is keyed by this commit.
-  illumosExtra = fetchFromGitHub {
-    owner = "TritonDataCenter";
-    repo = "illumos-extra";
-    rev = "5850d8e9f17443bbe42eb24739c8f3c2f268ae60";
+  # install scripts. smartos-live's strap cache is keyed by this commit. Fetched during evaluation (the GitHub
+  # archive, the same tree fetchFromGitHub makes), so that illumosExtraSrc can take parts of it.
+  illumosExtra = builtins.fetchTarball {
+    url = "https://github.com/TritonDataCenter/illumos-extra/archive/5850d8e9f17443bbe42eb24739c8f3c2f268ae60.tar.gz";
     sha256 = "0i1kdwz7rqv2s22fry1nl6yc6inmkfslv3p275fvs0bi4i1zjyrc";
   };
+
+  # The part of illumos-extra a package's build reads: install.subr and the package's own directories (DIRS). A copy
+  # in the store named by its contents, so that a package is rebuilt when those change and not whenever the pinned
+  # commit moves.
+  illumosExtraSrc =
+    dirs:
+    let
+      root = toString self.illumosExtra;
+      rel = p: lib.removePrefix "${root}/" (toString p);
+    in
+    builtins.path {
+      path = self.illumosExtra;
+      name = "illumos-extra-${lib.concatStringsSep "-" dirs}";
+      filter = p: _: rel p == "install.subr" || lib.any (d: rel p == d || lib.hasPrefix "${d}/" (rel p)) dirs;
+    };
 
   # The compilers as illumos-extra's Makefile.defs names them in a strap build (GCCBIN, GXXBIN): the strap gcc
   # with -fno-aggressive-loop-optimizations, "as we ship some rather downrev software".

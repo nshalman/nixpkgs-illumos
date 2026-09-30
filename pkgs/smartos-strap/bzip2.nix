@@ -16,7 +16,7 @@
   lib,
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   strap ? true,
 }:
@@ -29,7 +29,7 @@ stdenv.mkDerivation {
   pname = if strap then "smartos-strap-bzip2" else "smartos-extra-bzip2";
   version = "1.0.6";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "bzip2" ];
 
   unpackPhase = ''
     runHook preUnpack

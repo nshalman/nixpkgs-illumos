@@ -12,7 +12,7 @@
 {
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   gxx,
   libDirFlags,
@@ -27,7 +27,7 @@ stdenv.mkDerivation {
   pname = "smartos-strap-nss-nspr";
   version = "3.25";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "nss-nspr" ];
 
   nativeBuildInputs = [ perl ];
 

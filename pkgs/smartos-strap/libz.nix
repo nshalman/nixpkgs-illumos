@@ -10,7 +10,7 @@
   lib,
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   libDirFlags,
   strap ? true,
@@ -22,7 +22,7 @@ let
   suffix = lib.optionalString strap "strap";
   # Makefile.defs GENLDFLAGS
   genLdFlags = lib.optionalString (!strap) " -Wl,-zassert-deflib -Wl,-zfatal-warnings";
-  # the directories that stand for theirs, DESTDIR: this package's output, then (non-strap) the illumos proto area
+  # the directories that stand for their DESTDIR: this package's output, then (non-strap) the illumos proto area
   protoDirs = [ "$out" ] ++ lib.optional (!strap) illumosProto;
   includeFlags = lib.concatMapStringsSep " " (d: "-isystem ${d}/usr/include") protoDirs;
 in
@@ -30,7 +30,7 @@ stdenv.mkDerivation {
   pname = if strap then "smartos-strap-libz" else "smartos-extra-libz";
   version = "1.3.1";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "libz" ];
 
   # The build runs in a copy of illumos-extra's libz directory, as there: the mapfile is ../mapfile from the build
   # directories, and the install scripts read ../install.subr.

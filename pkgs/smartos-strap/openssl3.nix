@@ -29,7 +29,7 @@
   lib,
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   gxx,
   libDirFlags,
@@ -53,7 +53,7 @@ stdenv.mkDerivation {
   pname = if strap then "smartos-strap-openssl3" else "smartos-extra-openssl3";
   version = "3.5.8";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "openssl3" ];
 
   nativeBuildInputs = [ perl ];
 

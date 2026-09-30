@@ -18,7 +18,7 @@
   lib,
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   gxx,
   strap ? true,
@@ -96,7 +96,7 @@ stdenv.mkDerivation (
       else
         "smartos-extra-" + lib.removePrefix "smartos-strap-" pname;
     inherit version nativeBuildInputs;
-    src = illumosExtra;
+    src = illumosExtraSrc [ dir ];
 
     unpackPhase = ''
       runHook preUnpack

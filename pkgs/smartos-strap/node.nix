@@ -20,7 +20,7 @@
   stdenv,
   strapBin,
   platformDtrace,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   gxx,
   gcc10-illumos,
@@ -47,7 +47,7 @@ stdenv.mkDerivation {
   pname = "smartos-strap-node";
   version = "0.10.26";
 
-  src = illumosExtra;
+  src = illumosExtraSrc [ "node.js" ];
 
   nativeBuildInputs = [
     python27

@@ -7,7 +7,7 @@
 {
   stdenv,
   strapBin,
-  illumosExtra,
+  illumosExtraSrc,
   gcc,
   byacc,
 }:
@@ -16,8 +16,8 @@ stdenv.mkDerivation {
   pname = "smartos-strap-cpp";
   version = "0-unstable-illumos-extra-5850d8e9";
 
-  src = illumosExtra;
-  sourceRoot = "source/cpp";
+  src = illumosExtraSrc [ "cpp" ];
+  sourceRoot = "illumos-extra-cpp/cpp";
 
   nativeBuildInputs = [ byacc ];
 
