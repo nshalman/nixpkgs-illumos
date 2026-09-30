@@ -119,4 +119,17 @@ in
     echo "ok   xz round trip, with libjoy_lzma"
     touch $out
   '';
+
+  libidn2 = compare "libidn2" extra.libidn2 "^usr/lib/libjoy_idn2\\.";
+  libidn2-use = use "libidn2" extra.libidn2 [ 32 ] "-ljoy_idn2" ''
+    #include <stdio.h>
+    #include <idn2.h>
+    int main(void) {
+      char *out;
+      if (idn2_to_ascii_8z("b\xc3\xbc" "cher.example", &out, 0) != IDN2_OK) return 1;
+      printf("%s %s\n", idn2_check_version(NULL), out);
+      idn2_free(out);
+      return 0;
+    }
+  '' "2.3.4 xn--bcher-kva.example";
 }

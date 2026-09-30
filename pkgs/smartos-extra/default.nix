@@ -31,5 +31,6 @@ lib.makeScope newScope (self: {
   libexpat = smartos-strap.libexpat.override { mkStrapAutoconf = self.mkAutoconf; };
   libidn = smartos-strap.libidn.override { mkStrapAutoconf = self.mkAutoconf; };
 
+  libidn2 = self.callPackage ./libidn2.nix { };
   xz = self.callPackage ./xz.nix { };
 })
