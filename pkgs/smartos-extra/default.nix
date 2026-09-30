@@ -63,8 +63,32 @@ lib.makeScope newScope (self: {
     };
   mkAutoconf = self.mkAutoconfAgainst self.illumosProto;
 
+  # Store paths in what a package installs are build locations: the proto area's and the compiler's directories in
+  # debug information, compile commands a program embeds, the output file name the link-editor records. The platform's
+  # binaries carry their own build's in the same places. finishPackage maps them away after the install
+  # (./map-store-paths.pl: each to the place it stands for, padded with slashes to the same length, so binaries keep
+  # their layout) and recomputes the DT_CHECKSUM of the ELF files it changed. With mapStorePaths = false the store
+  # paths are left in and leak into the platform's files (tests/smartos-extra.nix no-store-paths then fails on them).
+  mapStorePaths = true;
+
   # what is done to each package below once it is built
-  finishPackage = pkg: pkg;
+  finishPackage =
+    pkg:
+    if !self.mapStorePaths then
+      pkg
+    else
+      pkg.overrideAttrs (old: {
+        postInstall = (old.postInstall or "") + ''
+          ${perl}/bin/perl ${./map-store-paths.pl} $out | while IFS= read -r f; do
+            if /usr/bin/elfdump -d "$f" 2>/dev/null | grep ' CHECKSUM ' >/dev/null; then
+              mode=$(stat -c %a "$f")
+              chmod u+w "$f"
+              /usr/bin/elfedit -e dyn:checksum "$f"
+              chmod "$mode" "$f"
+            fi
+          done
+        '';
+      });
 
   # first, before the other packages (PRIMARY_COMPILER fixup)
   gcc10 = self.callPackage ./gcc10.nix { };

@@ -341,11 +341,11 @@ in
     touch $out
   '';
 
-  # No text file the platform takes from a package (the manifest's f entries: scripts, configuration) names the
-  # store: such a path would be dead on the platform. Binaries that name it are listed, not failed: so far those are
-  # build locations of the kind the platform's binaries carry for their build too (debug information's include
-  # directories, vim's embedded compile commands, the output file name the link-editor records), which tie a
-  # package's closure to the nightly and the compiler; open.
+  # No file the platform takes from a package (the manifest's f entries) names the store. In a text file (a script,
+  # configuration) such a path would be dead on the platform. In a binary it is a build location, of the kind the
+  # platform's binaries carry for their build too (debug information's include directories, vim's embedded compile
+  # commands, the output file name the link-editor records); the scope maps those away (mapStorePaths in
+  # pkgs/smartos-extra), and with that turned off this test fails on them.
   no-store-paths =
     let
       packages = lib.filter (d: lib.isDerivation d && lib.hasPrefix "smartos-extra-" d.name) (lib.attrValues extra);
@@ -362,7 +362,7 @@ in
             echo "FAIL store path in a text file: $pkg/$p"; grep -o "${builtins.storeDir}/[a-z0-9]*-[^/ :]*" "$pkg/$p" | sort -u
             found=$((found + 1))
           else
-            echo "note store path in a binary: $pkg/$p"
+            echo "FAIL store path in a binary: $pkg/$p"; /usr/bin/strings -a "$pkg/$p" | grep -o "${builtins.storeDir}/[a-z0-9]*-[^/ :]*" | sort -u
             binaries=$((binaries + 1))
           fi
         done <list
@@ -370,6 +370,7 @@ in
       echo "$checked shipped files in ${toString (lib.length packages)} packages: $found text files and $binaries binaries naming the store"
       test $checked -gt 0
       test $found = 0
+      test $binaries = 0
       touch $out
     '';
 }
