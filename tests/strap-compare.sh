@@ -11,7 +11,7 @@
 # accepted (the caller says why):
 #   symbolic link   its target, as written, with the strap and gcc directories named as for RUNPATH; with
 #                   FOLLOW_STORE_LINKS set, a link into another store path is described as the file it points at
-#   ELF file        whether executable, class, type, SONAME, NEEDED entries in order, RUNPATH, the version
+#   ELF file        whether executable, class, type, SONAME, NEEDED entries in order, RUNPATH and RPATH, the version
 #                   definitions and the symbols each one exports
 #   static library  whether executable, its members and the global symbols they define
 #   text file       whether executable, sha256, after naming the strap and gcc directories as for RUNPATH
@@ -28,7 +28,7 @@
 # that the platform leaves out). A listed path one side lacks is described as missing.
 #
 # Not compared, because they cannot match: the code itself (another build of the same compiler and sources, linked
-# against another libc), the .comment section, and where RUNPATH entries point. RUNPATH is compared after naming
+# against another libc), the .comment section, and where RUNPATH and RPATH entries point. They are compared after naming
 # the strap directory <strap>/ (theirs: the build cache directory; ours: any smartos-strap package in the store)
 # and gcc 10's runtime libraries <gcc>/ (theirs: /usr/gcc/10; ours: GCC_LIB, gcc10-illumos's lib output); the
 # compiler itself (GCC_OUT, gcc10-illumos) is <strap>/usr/gcc/10, where theirs is.
@@ -51,6 +51,7 @@ gccOut=${GCC_OUT:-/nonexistent}
 runpath() {
   sed -E \
     -e 's#/opt/SmartOS/build-cache/[^/]+/[^/]+/[0-9a-f]{40}/+#<strap>/#g' \
+    -e 's#/root/data/jenkins/workspace/[^/]+/proto\.strap/+#<strap>/#g' \
     -e 's#/nix/store/[a-z0-9]{32}-smartos-strap-[^/:]*/+#<strap>/#g' \
     -e "s#${gccOut}/#<strap>/usr/gcc/10/#g" \
     -e 's#/usr/gcc/10/#<gcc>/#g' \
@@ -67,14 +68,15 @@ stamps() {
 }
 
 # A package here has several strap directories (its own and its dependencies'), which all become <strap>/; keep the
-# first of each repeated RUNPATH entry.
+# first of each repeated RUNPATH and RPATH entry.
 dedup_runpath() {
   awk '{
     for (i = 1; i <= NF; i++) {
-      if ($i ~ /^RUNPATH=/) {
-        n = split(substr($i, 9), e, ":"); out = ""; delete seen
+      if ($i ~ /^(RUNPATH|RPATH)=/) {
+        tag = substr($i, 1, index($i, "=") - 1)
+        n = split(substr($i, length(tag) + 2), e, ":"); out = ""; delete seen
         for (j = 1; j <= n; j++) if (!(e[j] in seen)) { seen[e[j]] = 1; out = out (out == "" ? "" : ":") e[j] }
-        $i = "RUNPATH=" out
+        $i = tag "=" out
       }
     }
     print
@@ -115,7 +117,7 @@ describe() {
     class=$(/usr/bin/elfdump -e "$f" | awk '/ei_class:/ { print $2; exit }')
     type=$(/usr/bin/elfdump -e "$f" | awk '/e_type:/ { print $2; exit }')
     dyn=$(/usr/bin/elfdump -d "$f" 2>/dev/null |
-      awk '$2 == "SONAME" || $2 == "NEEDED" || $2 == "RUNPATH" { printf "%s=%s ", $2, $4 }' | runpath | dedup_runpath)
+      awk '$2 == "SONAME" || $2 == "NEEDED" || $2 == "RUNPATH" || $2 == "RPATH" { printf "%s=%s ", $2, $4 }' | runpath | dedup_runpath)
     printf 'elf %s %s %s %s' "$mode" "$class" "$type" "$dyn"
     # pvs -ds: a version definition is indented by one tab and ends in ':' or ';'; its symbols follow, indented by two
     # tabs, each ending in ';'

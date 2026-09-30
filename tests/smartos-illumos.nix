@@ -1,6 +1,7 @@
 # The SmartOS illumos build (pkgs/smartos-illumos) against what SmartOS itself ships:
-#   runpath: no ELF object in the nightly's proto area names the store in its RUNPATH, and gcc 10's RUNPATH is
-#            illumos-extra's, /usr/gcc/10/lib (amd64 for 64-bit), as on the SmartOS platform (its /usr/bin/ls).
+#   runpath: no ELF object in the nightly's proto area names the store in its RUNPATH or RPATH, and gcc 10's
+#            RUNPATH is illumos-extra's, /usr/gcc/10/lib (amd64 for 64-bit), as on the SmartOS platform (its
+#            /usr/bin/ls).
 #   nix-build tests/smartos-illumos.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
 { pkgs }:
 
@@ -17,14 +18,15 @@ in
       /usr/bin/elfdump -d "$f" >$TMPDIR/dyn
       objects=$((objects + 1))
       rp=$(awk '$2 == "RUNPATH" { print $4 }' $TMPDIR/dyn)
-      case "$rp" in
-        *${builtins.storeDir}*) echo "store path in RUNPATH: $f: $rp"; store=$((store + 1)) ;;
+      rpath=$(awk '$2 == "RPATH" { print $4 }' $TMPDIR/dyn)
+      case "$rp $rpath" in
+        *${builtins.storeDir}*) echo "store path in RUNPATH or RPATH: $f: $rp $rpath"; store=$((store + 1)) ;;
       esac
       case ":$rp:" in
         *:/usr/gcc/10/lib:*|*:/usr/gcc/10/lib/amd64:*) gcc=$((gcc + 1)) ;;
       esac
     done
-    echo "$objects ELF objects, $gcc with gcc 10's RUNPATH, $store naming the store"
+    echo "$objects ELF objects, $gcc with gcc 10's RUNPATH, $store naming the store in RUNPATH or RPATH"
     test $objects -gt 0
     test $gcc -gt 0
     test $store = 0
