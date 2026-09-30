@@ -9,6 +9,8 @@
 {
   lib,
   newScope,
+  fetchurl,
+  requireFile,
   smartos-strap,
   smartos-illumos,
   # nixpkgs' perl, for the builds that run the build host's perl there; a `perl` of this scope's own (illumos-extra's
@@ -19,6 +21,28 @@
 lib.makeScope newScope (self: {
   # the proto area the packages build against: their DESTDIR before illumos-extra installs into it
   illumosProto = "${smartos-illumos.nightly}/proto";
+
+  # SmartOS's own platform from the same illumos-extra commit, for comparison only: release-20260903
+  # (20260903T001557Z), whose gitstatus.json names illumos-extra 5850d8e9 (its illumos-joyent is the release branch's
+  # feb8a55d, not the nightly's 40120018). platformReference is the files a running platform shows, the boot archive's
+  # root with /usr from usr.lgz; making it takes root and lofi (tests/smartos-platform-reference.sh), so it is added
+  # to the store by hand.
+  platformTarball = fetchurl {
+    url = "https://us-central.manta.mnx.io/Joyent_Dev/public/SmartOS/20260903T001557Z/platform-release-20260903-20260903T001557Z.tgz";
+    sha256 = "fe0db94859cff38186b3c99b3d51dc6f6f4d98c10a1b6a66ce04f2cc18d1c2da";
+  };
+  platformReference = requireFile {
+    name = "smartos-platform-20260903T001557Z";
+    hashMode = "recursive";
+    sha256 = "1kqxvmkpgbg97jxl0lwhpiwvc3h09djn1mnklhhskz56dljxjx2v";
+    message = ''
+      The unpacked SmartOS platform release-20260903 is made from its published tarball by a script that needs root
+      and lofi (a zone with /dev/lofictl will do):
+        tests/smartos-platform-reference.sh PLATFORM-TGZ /var/tmp/ref/smartos-platform-20260903T001557Z
+        nix-store --add-fixed --recursive sha256 /var/tmp/ref/smartos-platform-20260903T001557Z
+      where PLATFORM-TGZ is smartos-extra.platformTarball.
+    '';
+  };
 
   # the strap scope's compilers, PATH entries and helpers
   inherit (smartos-strap)

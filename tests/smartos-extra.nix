@@ -1,10 +1,7 @@
-# illumos-extra's platform packages (pkgs/smartos-extra), each against what the SmartOS platform the builder runs
-# ships of it (tests/strap-compare.sh with the build host's root as the reference, limited to the paths
-# illumos-extra's manifest lists as files of the package; modes left out, since the platform takes them from the
-# manifest), and used: a program built by the strap gcc against the package, run.
-#
-# The reference is the running platform, an input from outside the store: its illumos-extra commit is not
-# necessarily the pinned one, and a result is not rebuilt when the platform changes.
+# illumos-extra's platform packages (pkgs/smartos-extra), each against what SmartOS's own platform from the same
+# illumos-extra commit ships of it (tests/strap-compare.sh with smartos-extra.platformReference as the reference,
+# limited to the paths illumos-extra's manifest lists as files of the package; modes left out, since the platform
+# takes them from the manifest), and used: a program built by the strap gcc against the package, run.
 #   nix-build tests/smartos-extra.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
 { pkgs }:
 
@@ -25,7 +22,8 @@ let
       sed 's/\$LIBSTDCXXVER/6.0.28/g' ${illumosExtra}/manifest | awk '$1 == "f" { print $2 }' |
         grep -E '${regex}' >list || true
       ${env} IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
-        bash ${./strap-compare.sh} / ${pkg} '${regex}' '${expected}' >report 2>&1 || { cat report; exit 1; }
+        bash ${./strap-compare.sh} ${extra.platformReference} ${pkg} '${regex}' '${expected}' >report 2>&1 ||
+        { cat report; exit 1; }
       cat report; cp report $out
     '';
   compareExpecting = compareWith "";
@@ -137,11 +135,7 @@ in
     }
   '' "2.3.4 xn--bcher-kva.example";
 
-  # The builder's platform (joyent_20260723T000757Z) ships OpenSSL 3.0.21, the pinned illumos-extra 3.5.8: newer
-  # symbol versions (OPENSSL_SMARTOS_3.1.0 and on), a newer openssl.cnf, and openssl as a 64-bit command only
-  # (install-sfw-64, "64-bit commands only, now"), where the platform's is 32-bit.
-  openssl3 = compareExpecting "openssl3" extra.openssl3 "^lib/(amd64/)?lib(crypto|ssl)-smartos\\.|^usr/bin/openssl$|^etc/openssl/openssl\\.cnf$"
-    "^lib/(amd64/)?lib(crypto|ssl)-smartos\\.so\\.3$|^usr/bin/openssl$|^etc/openssl/openssl\\.cnf$";
+  openssl3 = compare "openssl3" extra.openssl3 "^lib/(amd64/)?lib(crypto|ssl)-smartos\\.|^usr/bin/openssl$|^etc/openssl/openssl\\.cnf$";
   openssl3-use = use "openssl3" extra.openssl3 [ 32 64 ] "-lcrypto-smartos" ''
     #include <stdio.h>
     #include <string.h>
@@ -210,10 +204,7 @@ in
     touch $out
   '';
 
-  # The platform's rsync.1 is 3.4.4's (8 Jun 2026); the pinned tarball's, installed here, is dated 13 Aug 2026, after
-  # the platform was built (23 Jul): an older illumos-extra.
-  rsync = compareExpecting "rsync" extra.rsync "^usr/bin/rsync$|^usr/share/man/man1/rsync\\.1$"
-    "^usr/share/man/man1/rsync\\.1$";
+  rsync = compare "rsync" extra.rsync "^usr/bin/rsync$|^usr/share/man/man1/rsync\\.1$";
   rsync-use = pkgs.runCommand "smartos-extra-rsync-run" { } ''
     mkdir a && seq 1 1000 >a/f
     ${extra.rsync}/usr/bin/rsync -a a/ b/
