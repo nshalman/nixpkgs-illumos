@@ -9,22 +9,26 @@
 { pkgs }:
 
 let
+  inherit (pkgs) lib;
   extra = pkgs.smartos-extra;
   inherit (pkgs.smartos-strap) gcc gcc10-illumos illumosExtra;
 
   # compare NAME PKG REGEX: PKG against the platform's files that illumos-extra's manifest lists and
-  # REGEX matches. compareExpecting also takes the paths whose differences are expected (each caller says why).
-  compareExpecting =
-    name: pkg: regex: expected:
+  # REGEX matches. compareExpecting also takes the paths whose differences are expected (each caller says why);
+  # compareWith takes more of strap-compare.sh's environment first.
+  compareWith =
+    env: name: pkg: regex: expected:
     pkgs.runCommand "smartos-extra-${name}-compare" { } ''
       # f entries only: smartos-live's builder copies those from the proto area and makes the manifest's symbolic
-      # and hard links (s, h) itself (tools/builder/builder.c)
-      awk '$1 == "f" { print $2 }' ${illumosExtra}/manifest |
+      # and hard links (s, h) itself (tools/builder/builder.c); $LIBSTDCXXVER is gcc 10's, as illumos-extra's
+      # manifest target substitutes it
+      sed 's/\$LIBSTDCXXVER/6.0.28/g' ${illumosExtra}/manifest | awk '$1 == "f" { print $2 }' |
         grep -E '${regex}' >list || true
-      IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
+      ${env} IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
         bash ${./strap-compare.sh} / ${pkg} '${regex}' '${expected}' >report 2>&1 || { cat report; exit 1; }
       cat report; cp report $out
     '';
+  compareExpecting = compareWith "";
   compare = name: pkg: regex: compareExpecting name pkg regex "";
 
   # PROGRAM (C source) built against PKG and the illumos proto area for each word size in BITS with the given
@@ -263,4 +267,118 @@ in
     echo "ok   screen runs"
     touch $out
   '';
+
+  dialog = compare "dialog" extra.dialog "^usr/bin/dialog$|^usr/share/man/man1/dialog\\.1$";
+  dialog-use = pkgs.runCommand "smartos-extra-dialog-run" { } ''
+    ${extra.dialog}/usr/bin/dialog --print-version 2>&1 | tee out
+    grep 'Version: 1\.1-20111020' out >/dev/null
+    echo "ok   dialog runs"
+    touch $out
+  '';
+
+  vim = compare "vim" extra.vim "^usr/bin/(vim|vimtutor|xxd)$|^usr/share/vim/|^usr/share/man/man1/(vim|vimdiff|vimtutor|xxd)\\.1$";
+  vim-use = pkgs.runCommand "smartos-extra-vim-run" { } ''
+    export HOME=$PWD
+    printf 'one\ntwo\n' >f
+    ${extra.vim}/usr/bin/vim -u NONE -es -c '%s/two/three/' -c 'wq' f
+    grep -x three f >/dev/null
+    ${extra.vim}/usr/bin/vim --version | head -1 | grep '^VIM - Vi IMproved 9\.2 ' >/dev/null
+    echo abc | ${extra.vim}/usr/bin/xxd -p | grep -x 6162630a >/dev/null
+    echo "ok   vim edits, xxd dumps"
+    touch $out
+  '';
+
+  pbzip2 = compare "pbzip2" extra.pbzip2 "^usr/bin/pbzip2$|^usr/share/man/man1/pbzip2\\.1$";
+  pbzip2-use = pkgs.runCommand "smartos-extra-pbzip2-run" { } ''
+    seq 1 50000 >in
+    # libbz2 on the system's library path, as on the platform
+    LD_LIBRARY_PATH=${extra.bzip2}/usr/lib ${extra.pbzip2}/usr/bin/pbzip2 -c <in >in.bz2
+    LD_LIBRARY_PATH=${extra.bzip2}/usr/lib ${extra.bzip2}/usr/bin/bzcat in.bz2 | cmp - in
+    echo "ok   pbzip2 compresses, bzcat decompresses"
+    touch $out
+  '';
+
+  ncurses = compare "ncurses" extra.ncurses "^usr/bin/g(infocmp|tic|toe|tput|tset)$|^usr/gnu/";
+  ncurses-use = pkgs.runCommand "smartos-extra-ncurses-run" { } ''
+    n=${extra.ncurses}
+    # RUNPATH /usr/gnu/lib names the build host's ncurses: this package's comes first on LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=$n/usr/gnu/lib TERMINFO=$n/usr/gnu/share/terminfo
+    /usr/bin/ldd $n/usr/bin/gtput | grep "libncurses.so.5 =>.*$n/" >/dev/null
+    test "$($n/usr/bin/gtput -T vt100 lines)" = 24
+    $n/usr/bin/ginfocmp -V | grep '^ncurses 5\.7' >/dev/null
+    echo "ok   gtput and ginfocmp run with this ncurses and its terminfo"
+    touch $out
+  '';
+
+  libxml = compare "libxml" extra.libxml "^lib/(amd64/)?libxml2\\.|^usr/bin/xml(lint|catalog)$|^usr/share/man/man1/xml(lint|catalog)\\.1$";
+  libxml-use = use "libxml" extra.libxml [ 32 64 ] "-I${extra.libxml}/usr/include/libxml2 -lxml2" ''
+    #include <stdio.h>
+    #include <libxml/parser.h>
+    #include <libxml/tree.h>
+    int main(void) {
+      const char *doc = "<a><b>extra</b></a>";
+      xmlDocPtr d = xmlReadMemory(doc, 19, "t.xml", NULL, 0);
+      if (d == NULL) return 1;
+      xmlChar *s = xmlNodeGetContent(xmlDocGetRootElement(d));
+      printf("%s %s\n", LIBXML_DOTTED_VERSION, s);
+      return 0;
+    }
+  '' "2.13.8 extra";
+
+  cpp = compare "cpp" extra.cpp "^usr/lib/cpp$";
+  cpp-use = pkgs.runCommand "smartos-extra-cpp-run" { } ''
+    printf '#define X 42\nX\n' | ${extra.cpp}/usr/lib/cpp | grep -x 42 >/dev/null
+    echo "ok   cpp expands a macro"
+    touch $out
+  '';
+
+  # Their runtime libraries' RPATH is their build's proto.strap/usr/gcc/10/lib, ours RUNPATH and RPATH
+  # /usr/gcc/10/lib (see pkgs/smartos-extra/gcc10.nix): search paths are left out of this comparison, and gcc10-use
+  # states ours.
+  gcc10 = compareWith "IGNORE_RUNPATHS=1" "gcc10" extra.gcc10 "^usr/lib/(amd64/)?lib(gcc_s|stdc\\+\\+|ssp)\\.so" "";
+  gcc10-use = pkgs.runCommand "smartos-extra-gcc10-check" { } ''
+    for f in ${extra.gcc10}/usr/lib/libstdc++.so.6.0.28 ${extra.gcc10}/usr/lib/amd64/libstdc++.so.6.0.28; do
+      /usr/bin/elfdump -d $f | awk '$2 == "RUNPATH" || $2 == "RPATH" { print $2, $4 }' | tee paths
+      case $f in
+        */amd64/*) d=/usr/gcc/10/lib/amd64 ;;
+        *) d=/usr/gcc/10/lib ;;
+      esac
+      test "$(cat paths)" = "RUNPATH $d
+    RPATH $d"
+    done
+    echo "ok   libstdc++'s RUNPATH and RPATH are /usr/gcc/10/lib (amd64 for 64-bit)"
+    touch $out
+  '';
+
+  # No text file the platform takes from a package (the manifest's f entries: scripts, configuration) names the
+  # store: such a path would be dead on the platform. Binaries that name it are listed, not failed: so far those are
+  # build locations of the kind the platform's binaries carry for their build too (debug information's include
+  # directories, vim's embedded compile commands, the output file name the link-editor records), which tie a
+  # package's closure to the nightly and the compiler; open.
+  no-store-paths =
+    let
+      packages = lib.filter (d: lib.isDerivation d && lib.hasPrefix "smartos-extra-" d.name) (lib.attrValues extra);
+    in
+    pkgs.runCommand "smartos-extra-no-store-paths" { } ''
+      sed 's/\$LIBSTDCXXVER/6.0.28/g' ${illumosExtra}/manifest | awk '$1 == "f" { print $2 }' >list
+      found=0 binaries=0 checked=0
+      for pkg in ${lib.concatMapStringsSep " " toString packages}; do
+        while IFS= read -r p; do
+          [ -f "$pkg/$p" ] || continue
+          checked=$((checked + 1))
+          grep -a ${builtins.storeDir}/ "$pkg/$p" >/dev/null || continue
+          if grep -I -q . "$pkg/$p" 2>/dev/null; then
+            echo "FAIL store path in a text file: $pkg/$p"; grep -o "${builtins.storeDir}/[a-z0-9]*-[^/ :]*" "$pkg/$p" | sort -u
+            found=$((found + 1))
+          else
+            echo "note store path in a binary: $pkg/$p"
+            binaries=$((binaries + 1))
+          fi
+        done <list
+      done
+      echo "$checked shipped files in ${toString (lib.length packages)} packages: $found text files and $binaries binaries naming the store"
+      test $checked -gt 0
+      test $found = 0
+      touch $out
+    '';
 }

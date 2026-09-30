@@ -20,19 +20,41 @@ lib.makeScope newScope (self: {
   # the proto area the packages build against: their DESTDIR before illumos-extra installs into it
   illumosProto = "${smartos-illumos.nightly}/proto";
 
+  # the strap scope's compilers, PATH entries and helpers
+  inherit (smartos-strap)
+    strapBin
+    illumosExtraSrc
+    gcc
+    gxx
+    libDirFlags
+    ;
+
+  # first, before the other packages (PRIMARY_COMPILER fixup)
+  gcc10 = self.callPackage ./gcc10.nix { };
+
   libz = smartos-strap.libz.override {
     strap = false;
     inherit (self) illumosProto;
   };
   bzip2 = smartos-strap.bzip2.override { strap = false; };
-
-  # the strap's autoconf packages, built the non-strap way
-  mkAutoconf = smartos-strap.callPackage ../smartos-strap/autoconf.nix {
+  cpp = smartos-strap.cpp.override {
     strap = false;
     inherit (self) illumosProto;
   };
+
+  # the strap's autoconf packages, built the non-strap way, against the illumos proto area or (mkAutoconfAgainst) a
+  # view of it
+  mkAutoconfAgainst =
+    illumosProto:
+    smartos-strap.callPackage ../smartos-strap/autoconf.nix {
+      strap = false;
+      inherit illumosProto;
+    };
+  mkAutoconf = self.mkAutoconfAgainst self.illumosProto;
   libexpat = smartos-strap.libexpat.override { mkStrapAutoconf = self.mkAutoconf; };
   libidn = smartos-strap.libidn.override { mkStrapAutoconf = self.mkAutoconf; };
+  # before libz in their build (SUBDIRS order), so without it, as the platform's libxml2 is
+  libxml = smartos-strap.libxml.override { mkStrapAutoconf = self.mkAutoconf; };
 
   openssl3 = smartos-strap.openssl3.override {
     strap = false;
@@ -50,5 +72,9 @@ lib.makeScope newScope (self: {
   gnupg = self.callPackage ./gnupg.nix { };
   tun = self.callPackage ./tun.nix { };
   screen = self.callPackage ./screen.nix { };
+  ncurses = self.callPackage ./ncurses.nix { };
+  dialog = self.callPackage ./dialog.nix { };
+  vim = self.callPackage ./vim.nix { };
+  pbzip2 = self.callPackage ./pbzip2.nix { };
   xz = self.callPackage ./xz.nix { };
 })
