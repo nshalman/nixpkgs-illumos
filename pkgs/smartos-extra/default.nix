@@ -11,6 +11,8 @@
   newScope,
   fetchurl,
   requireFile,
+  runCommand,
+  binutils-strap,
   smartos-strap,
   smartos-illumos,
   # nixpkgs' perl, for the builds that run the build host's perl there; a `perl` of this scope's own (illumos-extra's
@@ -44,9 +46,27 @@ lib.makeScope newScope (self: {
     '';
   };
 
+  # the illumos build's ctfconvert, which illumos-extra's make-ctf is given (smartos-live: CTFBINDIR, the tools
+  # stage's opt/onbld/bin/i386)
+  ctfconvert = "${smartos-illumos.tools}/opt/onbld/bin/i386/ctfconvert";
+
+  # Tools from their build host's PATH that a package names or runs: GNU ar and ld as gar and gld (pkgsrc's names in
+  # /opt/local/bin, which ipmitool's configure sets outright), here the strap's binutils 2.34; and programs of the
+  # platform's /usr/bin that packages look for on PATH (soelim for openldap's manuals; nroff and mandoc, which decide
+  # openssh's manual format), inputs from the build host, as the platform's dtrace is.
+  gnuGTools = runCommand "gnu-ar-ld-g-names" { } ''
+    mkdir -p $out/bin
+    for t in ar ld; do ln -s ${binutils-strap}/bin/$t $out/bin/g$t; done
+  '';
+  hostTools = runCommand "host-usr-bin-tools" { } ''
+    mkdir -p $out/bin
+    for t in soelim nroff mandoc; do ln -s /usr/bin/$t $out/bin/$t; done
+  '';
+
   # the strap scope's compilers, PATH entries and helpers
   inherit (smartos-strap)
     strapBin
+    platformDtrace
     illumosExtraSrc
     gcc
     gxx
@@ -121,6 +141,10 @@ lib.makeScope newScope (self: {
   # before libz in their build (SUBDIRS order), so without it, as the platform's libxml2 is
   libxml = smartos-strap.libxml.override { mkStrapAutoconf = self.mkAutoconf; };
 
+  node = smartos-strap.node.override {
+    strap = false;
+    inherit (self) illumosProto libz openssl1x;
+  };
   perl = smartos-strap.perl.override {
     strap = false;
     inherit (self) illumosProto;
@@ -138,6 +162,15 @@ lib.makeScope newScope (self: {
     inherit (self) illumosProto;
   };
   libidn2 = self.callPackage ./libidn2.nix { };
+  curl = self.callPackage ./curl.nix { };
+  wget = self.callPackage ./wget.nix { inherit perl; };
+  bind = self.callPackage ./bind.nix { };
+  ipmitool = self.callPackage ./ipmitool.nix { };
+  rsyslog = self.callPackage ./rsyslog.nix { };
+  openldap = self.callPackage ./openldap.nix { };
+  openlldp = self.callPackage ./openlldp.nix { };
+  ntp = self.callPackage ./ntp.nix { };
+  openssh = self.callPackage ./openssh.nix { };
   bash = self.callPackage ./bash.nix { };
   less = self.callPackage ./less.nix { };
   gtar = self.callPackage ./gtar.nix { };

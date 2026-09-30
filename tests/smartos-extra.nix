@@ -388,6 +388,135 @@ in
     touch $out
   '';
 
+  node = compare "node" extra.node "^usr/node/";
+  # node runs with this scope's OpenSSL 1.0.2 and zlib, found through LD_LIBRARY_PATH as the platform finds them in
+  # /lib; python 2.7 was only for building it
+  node-use = pkgs.runCommand "smartos-extra-node-run" { exportReferencesGraph = [ "closure" extra.node ]; } ''
+    n=${extra.node}/usr/node/0.10/bin/node
+    export LD_LIBRARY_PATH=${extra.openssl1x}/lib:${extra.libz}/lib
+    /usr/bin/ldd $n | tee ldd
+    grep "libsunw_crypto.so.1.0.0 =>.*${extra.openssl1x}/" ldd >/dev/null
+    $n -e 'var h = require("crypto").createHash("sha256").update("abc").digest("hex").slice(0, 8);
+      console.log([process.version, process.versions.openssl, process.versions.zlib, h].join(" "));' | tee out
+    grep -x 'v0.10.26 1.0.2u 1.3.1 ba7816bf' out >/dev/null
+    echo "ok   node 0.10.26 hashes with OpenSSL 1.0.2u and has zlib 1.3.1"
+    if grep -e '-python-' closure; then echo "FAIL python is in node's closure"; exit 1; fi
+    echo "ok   python is not in node's closure"
+    touch $out
+  '';
+
+  curl = compare "curl" extra.curl "^usr/lib/libcurl\\.|^usr/bin/curl$|^usr/share/man/man1/curl\\.1$";
+  # curl with this scope's libcurl, OpenSSL 3, zlib and libidn2 (on LD_LIBRARY_PATH, as the platform finds them in
+  # /lib and /usr/lib): its version line names them, and it fetches a file: URL
+  curl-use = pkgs.runCommand "smartos-extra-curl-run" { } ''
+    export LD_LIBRARY_PATH=${extra.curl}/usr/lib:${extra.openssl3}/lib:${extra.libz}/lib:${extra.libidn2}/usr/lib
+    c=${extra.curl}/usr/bin/curl
+    /usr/bin/ldd $c | tee ldd
+    grep "libcurl.so.4 =>.*${extra.curl}/" ldd >/dev/null
+    $c --version | head -1 | tee out
+    grep "^curl 8\\.22\\.0 .* OpenSSL/3\\.5\\.8 zlib/1\\.3\\.1 libidn2/2\\.3\\.4" out >/dev/null
+    echo hello >f
+    $c -s file://$PWD/f | grep -x hello >/dev/null
+    echo "ok   curl 8.22.0 with OpenSSL 3.5.8, zlib and libidn2 fetches a file: URL"
+    touch $out
+  '';
+
+  # wget.1 is made by pod2man: theirs Pod::Man 5.01 (pkgsrc's perl), ours v6.0.2 (nixpkgs' perl), which adds a groff
+  # note and escapes hyphens
+  wget = compareExpecting "wget" extra.wget "^usr/bin/wget$|^usr/share/man/man1/wget\\.1$"
+    "^usr/share/man/man1/wget\\.1$";
+  # wget with this scope's OpenSSL and zlib: its features, and CTF in the program, as the platform's has
+  wget-use = pkgs.runCommand "smartos-extra-wget-run" { } ''
+    w=${extra.wget}/usr/bin/wget
+    export LD_LIBRARY_PATH=${extra.openssl3}/lib:${extra.libz}/lib
+    /usr/bin/ldd $w | tee ldd
+    grep "libssl-smartos.so.3 =>.*${extra.openssl3}/" ldd >/dev/null
+    $w --version | head -3 | tee out
+    grep "^GNU Wget 1\\.25\\.0 " out >/dev/null
+    grep -- "+https" out >/dev/null
+    /usr/bin/elfdump -c $w | grep "sh_name: \\.SUNW_ctf$" >/dev/null
+    echo "ok   wget 1.25.0 with https, and CTF"
+    touch $out
+  '';
+
+  bind = compare "bind" extra.bind "^usr/sbin/(dig|host|nslookup)$|^usr/share/man/man1/(dig|host|nslookup)\\.1$";
+  bind-use = pkgs.runCommand "smartos-extra-bind-run" { } ''
+    ${extra.bind}/usr/sbin/dig -v 2>&1 | tee out
+    grep -x "DiG 9\\.10\\.1-P1" out >/dev/null
+    echo "ok   dig 9.10.1-P1 runs"
+    touch $out
+  '';
+
+  ipmitool = compare "ipmitool" extra.ipmitool "^usr/sbin/ipmitool$|^usr/share/man/man1/ipmitool\\.1$";
+  # ipmitool with this scope's OpenSSL (lanplus): its version, and the libcrypto it links
+  ipmitool-use = pkgs.runCommand "smartos-extra-ipmitool-run" { } ''
+    i=${extra.ipmitool}/usr/sbin/ipmitool
+    export LD_LIBRARY_PATH=${extra.openssl3}/lib
+    /usr/bin/ldd $i | grep "libcrypto-smartos.so.3 =>.*${extra.openssl3}/" >/dev/null
+    $i -V | tee out
+    grep -x "ipmitool version 1\\.8\\.18" out >/dev/null
+    echo "ok   ipmitool 1.8.18 runs, with libcrypto"
+    touch $out
+  '';
+
+  rsyslog = compare "rsyslog" extra.rsyslog
+    "^usr/sbin/rsyslogd$|^usr/lib/rsyslog/|^etc/rsyslog\\.conf$|^usr/share/man/man[58]/rsyslog";
+  rsyslog-use = pkgs.runCommand "smartos-extra-rsyslog-run" { } ''
+    ${extra.rsyslog}/usr/sbin/rsyslogd -v | head -1 | tee out
+    grep "^rsyslogd 5\\.8\\.9" out >/dev/null
+    echo "ok   rsyslogd 5.8.9 runs"
+    touch $out
+  '';
+
+  openldap = compare "openldap" extra.openldap "^usr/openldap/|^etc/openldap/";
+  openldap-use = pkgs.runCommand "smartos-extra-openldap-run" { } ''
+    # RUNPATH /usr/openldap/lib names the build host's: this package's and OpenSSL's first
+    export LD_LIBRARY_PATH=${extra.openldap}/usr/openldap/lib:${extra.openssl3}/lib
+    ${extra.openldap}/usr/openldap/bin/ldapsearch -VV 2>&1 | tee out || true
+    grep "ldapsearch 2\\.5\\.14" out >/dev/null
+    echo "ok   ldapsearch 2.5.14 runs"
+    touch $out
+  '';
+
+  openlldp = compare "openlldp" extra.openlldp "^usr/sbin/lldp|^lib/svc/manifest/network/lldpd\\.xml$";
+  # the daemon needs datalinks; here, CTF in both programs, as the platform's have
+  openlldp-use = pkgs.runCommand "smartos-extra-openlldp-check" { } ''
+    for p in lldpd lldpneighbors; do
+      /usr/bin/elfdump -c ${extra.openlldp}/usr/sbin/$p | grep "sh_name: \\.SUNW_ctf$" >/dev/null
+    done
+    echo "ok   lldpd and lldpneighbors have CTF"
+    touch $out
+  '';
+
+  # NTP/Util.pm is listed under perl in the manifest; ntp installs it
+  ntp = compare "ntp" extra.ntp
+    "^usr/sbin/ntp|^lib/svc/(manifest/network/ntp\\.xml|method/ntp)$|^etc/security/(auth|prof)_attr\\.d/ntp$|^usr/share/man/man[18]/ntp|^usr/perl5/5\\.12/lib/NTP/";
+  ntp-use = pkgs.runCommand "smartos-extra-ntp-run" { } ''
+    export LD_LIBRARY_PATH=${extra.openssl3}/lib
+    ${extra.ntp}/usr/sbin/ntpq --help >help 2>&1 || true
+    head -1 help | tee out
+    grep "Ver\\. 4\\.2\\.8p15$" out >/dev/null
+    /usr/bin/elfdump -c ${extra.ntp}/usr/sbin/ntpd | grep "sh_name: \\.SUNW_ctf$" >/dev/null
+    echo "ok   ntpq 4.2.8p15 runs; ntpd has CTF"
+    touch $out
+  '';
+
+  # etc/ssh/sshd_config on the platform is smartos-live's own (src/etc/ssh/sshd_config, a later stage), installed over
+  # openssh's
+  openssh = compareExpecting "openssh" extra.openssh (
+    "^usr/bin/(ssh|scp|sftp)|^usr/lib/ssh/|^usr/share/man/man[158]/(ssh|scp|sftp|moduli)|^usr/lib/dtrace/sftp\\.d$"
+    + "|^etc/ssh/|^lib/svc/(method/sshd|manifest/network/ssh\\.xml)$|^usr/share/lib/ssh/moduli$"
+  ) "^etc/ssh/sshd_config$";
+  # ssh with this scope's OpenSSL and zlib: its version names both, and sshd has CTF
+  openssh-use = pkgs.runCommand "smartos-extra-openssh-run" { } ''
+    export LD_LIBRARY_PATH=${extra.openssl3}/lib:${extra.libz}/lib
+    ${extra.openssh}/usr/bin/ssh -V 2>&1 | tee out
+    grep "^OpenSSH_10\\.5p1, OpenSSL 3\\.5\\.8 " out >/dev/null
+    /usr/bin/elfdump -c ${extra.openssh}/usr/lib/ssh/sshd | grep "sh_name: \\.SUNW_ctf$" >/dev/null
+    echo "ok   ssh 10.5p1 with OpenSSL 3.5.8; sshd has CTF"
+    touch $out
+  '';
+
   # No file the platform takes from a package (the manifest's f entries) names the store. In a text file (a script,
   # configuration) such a path would be dead on the platform. In a binary it is a build location, of the kind the
   # platform's binaries carry for their build too (debug information's include directories, vim's embedded compile
