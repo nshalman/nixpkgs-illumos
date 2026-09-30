@@ -153,4 +153,21 @@ in
       return 0;
     }
   '' "3.5.8 ba7816bf";
+
+  bash = compare "bash" extra.bash "^usr/bin/bash$|^usr/share/man/man1/bash\\.1$";
+  bash-use = pkgs.runCommand "smartos-extra-bash-run" { } ''
+    ${extra.bash}/usr/bin/bash -c 'echo "$BASH_VERSION ''${BASH_VERSINFO[0]}"' | tee out
+    grep -x '4.3.30(1)-release 4' out >/dev/null
+    echo "ok   bash runs"
+    touch $out
+  '';
+
+  less = compare "less" extra.less "^usr/bin/less(echo|key)?$|^usr/share/man/man1/less(echo|key)?\\.1$";
+  less-use = pkgs.runCommand "smartos-extra-less-run" { } ''
+    ${extra.less}/usr/bin/less --version | head -1 | tee out
+    grep '^less 661 ' out >/dev/null
+    seq 1 5 | ${extra.less}/usr/bin/less -F | tail -1 | grep -x 5 >/dev/null
+    echo "ok   less runs"
+    touch $out
+  '';
 }

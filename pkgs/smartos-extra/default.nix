@@ -36,5 +36,7 @@ lib.makeScope newScope (self: {
     inherit (self) illumosProto;
   };
   libidn2 = self.callPackage ./libidn2.nix { };
+  bash = self.callPackage ./bash.nix { };
+  less = self.callPackage ./less.nix { };
   xz = self.callPackage ./xz.nix { };
 })
