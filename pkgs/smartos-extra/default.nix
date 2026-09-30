@@ -11,6 +11,9 @@
   newScope,
   smartos-strap,
   smartos-illumos,
+  # nixpkgs' perl, for the builds that run the build host's perl there; a `perl` of this scope's own (illumos-extra's
+  # perl for the platform) would shadow it in callPackage
+  perl,
 }:
 
 lib.makeScope newScope (self: {
@@ -38,5 +41,14 @@ lib.makeScope newScope (self: {
   libidn2 = self.callPackage ./libidn2.nix { };
   bash = self.callPackage ./bash.nix { };
   less = self.callPackage ./less.nix { };
+  gtar = self.callPackage ./gtar.nix { };
+  gzip = self.callPackage ./gzip.nix { };
+  coreutils = self.callPackage ./coreutils.nix { inherit perl; };
+  rsync = self.callPackage ./rsync.nix { };
+  uuid = self.callPackage ./uuid.nix { };
+  socat = self.callPackage ./socat.nix { };
+  gnupg = self.callPackage ./gnupg.nix { };
+  tun = self.callPackage ./tun.nix { };
+  screen = self.callPackage ./screen.nix { };
   xz = self.callPackage ./xz.nix { };
 })

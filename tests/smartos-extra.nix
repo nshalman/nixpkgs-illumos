@@ -170,4 +170,97 @@ in
     echo "ok   less runs"
     touch $out
   '';
+
+  gtar = compare "gtar" extra.gtar "^usr/bin/gtar$";
+  gtar-use = pkgs.runCommand "smartos-extra-gtar-run" { } ''
+    mkdir d && echo gtar >d/f
+    ${extra.gtar}/usr/bin/gtar cf t.tar d && rm -r d && ${extra.gtar}/usr/bin/gtar xf t.tar
+    grep -x gtar d/f >/dev/null
+    ${extra.gtar}/usr/bin/gtar --version | head -1 | grep -x 'tar (GNU tar) 1.23' >/dev/null
+    echo "ok   gtar round trip"
+    touch $out
+  '';
+
+  # smartos-live's man/Makefile installs .so pages for gzcat, gzcmp, gzegrep and gzfgrep (its livesrc stage)
+  gzip = compareExpecting "gzip" extra.gzip "^usr/bin/(gz|gunzip)|^usr/share/man/man1/(gz|gunzip)"
+    "^usr/share/man/man1/gz(cat|cmp|egrep|fgrep)\\.1$";
+  gzip-use = pkgs.runCommand "smartos-extra-gzip-run" { } ''
+    seq 1 20000 >in
+    ${extra.gzip}/usr/bin/gunzip -c <in >/dev/null 2>&1 && exit 1
+    # gzip and gzcat are hard links the manifest makes to gunzip, which picks its function from its name
+    ln -s ${extra.gzip}/usr/bin/gunzip gzip
+    ./gzip -c in >in.gz
+    ${extra.gzip}/usr/bin/gunzip -c in.gz | cmp - in
+    echo "ok   gzip round trip"
+    touch $out
+  '';
+
+  coreutils = compare "coreutils" extra.coreutils "^usr/bin/(readlink|seq|stat)$|^usr/share/man/man1/(readlink|seq|stat)\\.1$";
+  coreutils-use = pkgs.runCommand "smartos-extra-coreutils-run" { } ''
+    b=${extra.coreutils}/usr/bin
+    $b/seq 3 | tr '\n' ' ' | grep -x '1 2 3 ' >/dev/null
+    ln -s target l && $b/readlink l | grep -x target >/dev/null
+    $b/stat -c %s ${extra.coreutils}/usr/share/man/man1/seq.1 >/dev/null
+    $b/seq --version | head -1 | grep -x 'seq (GNU coreutils) 9.7' >/dev/null
+    echo "ok   readlink, seq and stat run"
+    touch $out
+  '';
+
+  # The platform's rsync.1 is 3.4.4's (8 Jun 2026); the pinned tarball's, installed here, is dated 13 Aug 2026, after
+  # the platform was built (23 Jul): an older illumos-extra.
+  rsync = compareExpecting "rsync" extra.rsync "^usr/bin/rsync$|^usr/share/man/man1/rsync\\.1$"
+    "^usr/share/man/man1/rsync\\.1$";
+  rsync-use = pkgs.runCommand "smartos-extra-rsync-run" { } ''
+    mkdir a && seq 1 1000 >a/f
+    ${extra.rsync}/usr/bin/rsync -a a/ b/
+    cmp a/f b/f
+    ${extra.rsync}/usr/bin/rsync --version | head -1 | grep '^rsync  version 3\.5\.0 ' >/dev/null
+    echo "ok   rsync copies"
+    touch $out
+  '';
+
+  uuid = compare "uuid" extra.uuid "^usr/bin/uuid$|^usr/share/man/man1/uuid\\.1$";
+  uuid-use = pkgs.runCommand "smartos-extra-uuid-run" { } ''
+    ${extra.uuid}/usr/bin/uuid -v4 | grep -E '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' >/dev/null
+    echo "ok   uuid makes a version 4 UUID"
+    touch $out
+  '';
+
+  socat = compare "socat" extra.socat "^usr/bin/socat$|^usr/share/man/man1/socat\\.1$";
+  socat-use = pkgs.runCommand "smartos-extra-socat-run" { } ''
+    echo socat | ${extra.socat}/usr/bin/socat - - | grep -x socat >/dev/null
+    ${extra.socat}/usr/bin/socat -V | grep '^socat version 1\.7\.4\.1 ' >/dev/null
+    echo "ok   socat copies stdin to stdout"
+    touch $out
+  '';
+
+  gnupg = compare "gnupg" extra.gnupg "^usr/bin/gpg$|^usr/share/man/man1/gpg\\.1$";
+  gnupg-use = pkgs.runCommand "smartos-extra-gnupg-run" { } ''
+    export HOME=$PWD
+    seq 1 2000 >in
+    echo secret | ${extra.gnupg}/usr/bin/gpg --batch --passphrase-fd 0 -c -o in.gpg in
+    echo secret | ${extra.gnupg}/usr/bin/gpg --batch --passphrase-fd 0 -d -o back in.gpg
+    cmp in back
+    ${extra.gnupg}/usr/bin/gpg --version | grep -x 'Compression: Uncompressed, ZIP, ZLIB, BZIP2' >/dev/null
+    echo "ok   gpg encrypts and decrypts, with ZLIB and BZIP2"
+    touch $out
+  '';
+
+  tun = compare "tun" extra.tun "^usr/kernel/drv/";
+  # the drivers are loaded only on a platform; here, that they are kernel modules
+  tun-use = pkgs.runCommand "smartos-extra-tun-check" { } ''
+    for d in tun tap; do
+      /usr/bin/elfdump -e ${extra.tun}/usr/kernel/drv/amd64/$d | grep 'e_type:.*ET_REL' >/dev/null
+      /usr/bin/nm ${extra.tun}/usr/kernel/drv/amd64/$d | grep '_init$' >/dev/null
+    done
+    echo "ok   tun and tap are relocatable kernel modules with _init"
+    touch $out
+  '';
+
+  screen = compare "screen" extra.screen "^usr/bin/screen$|^usr/share/man/man1/screen\\.1$";
+  screen-use = pkgs.runCommand "smartos-extra-screen-run" { } ''
+    ${extra.screen}/usr/bin/screen -v | grep '^Screen version 4\.09\.01 ' >/dev/null
+    echo "ok   screen runs"
+    touch $out
+  '';
 }
