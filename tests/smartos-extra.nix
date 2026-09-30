@@ -107,4 +107,16 @@ in
       return 0;
     }
   '' "xn--bcher-kva.example";
+
+  xz = compare "xz" extra.xz "^usr/bin/xz$|^usr/lib/libjoy_lzma\\.|^usr/share/man/man1/xz\\.1$";
+  xz-use = pkgs.runCommand "smartos-extra-xz-run" { } ''
+    # libjoy_lzma.so.5, which xz needs, is a link the manifest makes
+    mkdir lib && ln -s ${extra.xz}/usr/lib/libjoy_lzma.so.5.2.1 lib/libjoy_lzma.so.5
+    seq 1 20000 >in
+    LD_LIBRARY_PATH=$PWD/lib ${extra.xz}/usr/bin/xz -c in >in.xz
+    LD_LIBRARY_PATH=$PWD/lib ${extra.xz}/usr/bin/xz -dc in.xz | cmp - in
+    LD_LIBRARY_PATH=$PWD/lib /usr/bin/ldd ${extra.xz}/usr/bin/xz | grep "libjoy_lzma.so.5 =>.*$PWD/lib" >/dev/null
+    echo "ok   xz round trip, with libjoy_lzma"
+    touch $out
+  '';
 }
