@@ -16,7 +16,12 @@
 # gyp ran with (config.gypi, and process.config in the binary), as theirs records pkgsrc's; the reference to the store
 # path is removed, so python 2.7 stays a build-time input. The platform's /usr/sbin/dtrace is an input from the
 # build host, as for illumos-extra.
+#
+# With strap = false, as illumos-extra builds it for the platform (pkgs/smartos-extra): the directories in the flags
+# are followed by the proto area (illumosProto), LDFLAGS carries GENLDFLAGS (-zassert-deflib -zfatal-warnings) and
+# neither the strap RUNPATH nor the $ORIGIN one, and the build directory loses its suffix.
 {
+  lib,
   stdenv,
   strapBin,
   platformDtrace,
@@ -28,15 +33,25 @@
   openssl1x,
   python27,
   removeReferencesTo,
+  strap ? true,
+  illumosProto ? null,
 }:
 
 let
   ver = "node-v0.10.26";
+  # the build directory's suffix (Makefile.defs VER.32)
+  suffix = lib.optionalString strap "strap";
+  d = "${ver}-32${suffix}";
   strapDirs = [
     "$out"
     "${libz}"
     "${openssl1x}"
-  ];
+  ]
+  ++ lib.optional (!strap) illumosProto;
+  # after the library directories: GENLDFLAGS (non-strap), and after -lumem the strap and $ORIGIN RUNPATHs (strap)
+  genLdFlags = lib.optionalString (!strap) " -Wl,-zassert-deflib -Wl,-zfatal-warnings";
+  strapRunpath = lib.optionalString strap
+    " ${concatDirs (d: "-R${d}/usr/lib -R${d}/lib")} -R'\\$\\$'ORIGIN/../../../../usr/gcc/10/lib";
   concatDirs = f: builtins.concatStringsSep " " (map f strapDirs);
   cppflags = "${concatDirs (d: "-isystem ${d}/usr/include")} -I${openssl1x}/opt/1x";
   cxxflags = "-fpermissive -fno-delete-null-pointer-checks -Wno-cast-function-type -fno-zero-initialized-in-bss";
@@ -44,7 +59,7 @@ let
   hostCXX = "${gcc10-illumos}/bin/g++ -m32";
 in
 stdenv.mkDerivation {
-  pname = "smartos-strap-node";
+  pname = if strap then "smartos-strap-node" else "smartos-extra-node";
   version = "0.10.26";
 
   src = illumosExtraSrc [ "node.js" ];
@@ -69,16 +84,16 @@ stdenv.mkDerivation {
       echo "Applying $p"
       patch -d .unpack32/${ver} -p1 <"$p"
     done
-    mv .unpack32/${ver} ${ver}-32strap
+    mv .unpack32/${ver} ${d}
     rmdir .unpack32
-    chmod 755 ${ver}-32strap/configure
-    touch ${ver}-32strap/configure
+    chmod 755 ${d}/configure
+    touch ${d}/configure
     runHook postUnpack
   '';
 
   # AUTOCONF_ENV, as the words handed to `env` (configure) and to make (OVERRIDES)
   preConfigure = ''
-    ldflags="${concatDirs (d: "-L${d}/usr/lib -L${d}/lib")} -lumem ${concatDirs (d: "-R${d}/usr/lib -R${d}/lib")} -R'\$\$'ORIGIN/../../../../usr/gcc/10/lib"
+    ldflags="${concatDirs (d: "-L${d}/usr/lib -L${d}/lib")}${genLdFlags} -lumem${strapRunpath}"
     vars=(
       "PKG_CONFIG_LIBDIR="
       "CC=${gcc} -m32"
@@ -100,7 +115,7 @@ stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     ${hostCC} -Wall -Wextra -Werror -O2 -o wrapper wrapper.c
-    (cd ${ver}-32strap && env -i PATH="$PATH" "''${vars[@]}" ./configure --prefix=/usr --with-dtrace \
+    (cd ${d} && env -i PATH="$PATH" "''${vars[@]}" ./configure --prefix=/usr --with-dtrace \
       --without-snapshot --shared-openssl --shared-openssl-includes=${openssl1x}/opt/1x \
       --shared-openssl-libpath=${openssl1x}/lib --shared-openssl-libname=sunw1x_crypto,sunw1x_ssl --shared-zlib \
       --shared-zlib-libpath=${libz}/lib --shared-zlib-includes=${libz}/usr/include --prefix=/usr/node/0.10)
@@ -109,13 +124,13 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd ${ver}-32strap && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 "''${vars[@]}")
+    (cd ${d} && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 "''${vars[@]}")
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    (cd ${ver}-32strap && env -i PATH="$PATH" make V=1 "''${vars[@]}" DESTDIR=$out install)
+    (cd ${d} && env -i PATH="$PATH" make V=1 "''${vars[@]}" DESTDIR=$out install)
     nodeRoot=$out/usr/node/0.10
     ${hostCC} -o genversionjs -include $nodeRoot/include/node/node_version.h genversionjs.c
     mkdir -p $nodeRoot/node_modules
