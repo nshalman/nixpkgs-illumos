@@ -69,6 +69,8 @@ import nixpkgs {
       smartos-strap = final.callPackage ./pkgs/smartos-strap { };
       # illumos as SmartOS builds it (illumos-joyent), with that proto.strap.
       smartos-illumos = final.callPackage ./pkgs/smartos-illumos { };
+      # what illumos-extra adds to SmartOS's proto area after illumos, built by the same gcc 10
+      smartos-extra = final.callPackage ./pkgs/smartos-extra { };
       # a pre-built OpenJDK 11 to bootstrap OpenJDK from source
       tribblix-jdk-bin = final.callPackage ./pkgs/tribblix-jdk-bin { };
       # OpenJDK 11 built from source with the illumos port, headless; SmartOS builds illumos' Java parts with JDK 11
