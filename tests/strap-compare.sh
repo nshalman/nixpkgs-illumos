@@ -18,8 +18,14 @@
 #                   (libtool archives name them) and replacing build dates (theirs have their build's) by <date>
 #   *.chk           whether executable only (NSS's signatures of its libraries)
 #   any other file  whether executable, sha256
-# Modes are reduced to the executable bit: the store keeps no more than that.
+# Modes are reduced to the executable bit: the store keeps no more than that. With IGNORE_MODES set they are not
+# compared at all (shown as .): a platform takes its modes from its manifest, not from the proto area.
 # Directories are left out: proto.strap's are shared by every package.
+#
+# With PATH_LIST set (a file of relative paths, one per line), the files and links compared, on both sides, are the
+# ones it lists rather than all of them (PATH-REGEX still applies to the reference's): for a reference too large to
+# walk, such as a whole platform's root, and a package whose output holds more than ships (headers in a proto area
+# that the platform leaves out). A listed path one side lacks is described as missing.
 #
 # Not compared, because they cannot match: the code itself (another build of the same compiler and sources, linked
 # against another libc), the .comment section, and where RUNPATH entries point. RUNPATH is compared after naming
@@ -33,6 +39,11 @@ if [ $# -ne 3 ] && [ $# -ne 4 ]; then
   exit 2
 fi
 ref=$1 ours=$2 regex=$3 expected=${4:-}
+# a whole root is never walked: it has to come with PATH_LIST
+if [ "$(cd "$ref" && pwd -P)" = / ] && [ -z "${PATH_LIST:-}" ]; then
+  echo "$0: the reference is / and PATH_LIST is not set" >&2
+  exit 2
+fi
 oursReal=$(cd "$ours" && pwd -P)
 gccLib=${GCC_LIB:-/nonexistent}
 gccOut=${GCC_OUT:-/nonexistent}
@@ -70,6 +81,10 @@ dedup_runpath() {
 
 describe() {
   local f=$1 mode
+  if [ ! -e "$f" ] && [ ! -L "$f" ]; then
+    printf 'missing\n'
+    return
+  fi
   if [ -L "$f" ]; then
     local t
     t=$(readlink "$f")
@@ -84,6 +99,7 @@ describe() {
   fi
   # the store keeps only whether a file is executable (555 or 444)
   if [ $((8#$(stat -L -c %a "$f") & 8#111)) -ne 0 ]; then mode=x; else mode=-; fi
+  if [ -n "${IGNORE_MODES:-}" ]; then mode=.; fi
   case $f in
     *.chk)
       # NSS's shlibsign signature of the library beside it: it cannot match
@@ -118,8 +134,9 @@ describe() {
 }
 
 manifest() {
-  local dir=$1 filter=$2 p
-  (cd "$dir" && find . \( -type f -o -type l \) | sed 's#^\./##' | LC_ALL=C sort) |
+  local dir=$1 filter=$2 list=${3:-} p
+  { if [ -n "$list" ]; then cat "$list"; else (cd "$dir" && find . \( -type f -o -type l \) | sed 's#^\./##'); fi } |
+    LC_ALL=C sort |
     { if [ -n "$filter" ]; then grep -E "$filter" || true; else cat; fi } |
     while IFS= read -r p; do
       printf '%s\t%s\n' "$p" "$(describe "$dir/$p")"
@@ -128,8 +145,8 @@ manifest() {
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-manifest "$ref" "$regex" >"$tmp/reference"
-manifest "$ours" "" >"$tmp/ours"
+manifest "$ref" "$regex" "${PATH_LIST:-}" >"$tmp/reference"
+manifest "$ours" "" "${PATH_LIST:-}" >"$tmp/ours"
 
 if [ ! -s "$tmp/reference" ]; then
   echo "FAIL the reference has nothing matching $regex" >&2
