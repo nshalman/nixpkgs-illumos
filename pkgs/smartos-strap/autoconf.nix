@@ -30,11 +30,15 @@
   version,
   # the illumos-extra directory, e.g. "libexpat"
   dir,
+  # more of illumos-extra's top-level directories the build reads (tools, for make-ctf), copied beside it
+  extraDirs ? [ ],
   # the unpacked tarball's top directory (VER)
   ver,
   tarball ? "${ver}.tar.gz",
   # glob of the patches, relative to `dir`, applied in name order; null for none
   patches ? null,
+  # PATCHSTRIP
+  patchStrip ? 1,
   bits ? [ 32 ],
   deps ? [ ],
   cppflags ? "",
@@ -66,7 +70,8 @@
   # make -j (theirs: PARALLEL = -j$(MAX_JOBS)); false where the package sets PARALLEL empty
   parallel ? true,
   # more of configure's environment (AUTOCONF_ENV +=), shell words after the usual ones, so that they can replace
-  # them (as CFLAGS=); configure runs in the build directory, one below the illumos-extra directory
+  # them (as CFLAGS=); configure runs in the build directory, one below the illumos-extra directory. Or a function of
+  # the word size's flags (cc, cflags, ldflags, libs, ...), for a Makefile that puts them in the environment again
   configureEnv ? "",
   # more variables for make (OVERRIDES +=), shell words
   makeFlags ? "",
@@ -92,8 +97,16 @@ let
     libs = if b == 64 then libs64 else libs;
   };
   forBits = f: lib.concatMapStrings (b: f b (flagsFor b)) bits;
+  # one line per extra directory, nothing without any; spliced in at the start of an indented line, so that the
+  # indented string's common indentation, and so the derivation without extra directories, stay as they were
+  copyExtraDirs = lib.concatMapStrings (x: "cp -r $src/${x} ie/${x}\n") extraDirs;
   jobs = lib.optionalString parallel " -j$NIX_BUILD_CORES";
-  envWords = lib.optionalString (configureEnv != "") " ${configureEnv}";
+  envWords =
+    f:
+    let
+      e = if lib.isFunction configureEnv then configureEnv f else configureEnv;
+    in
+    lib.optionalString (e != "") " ${e}";
   makeWords = lib.optionalString (makeFlags != "") " ${makeFlags}";
 in
 stdenv.mkDerivation (
@@ -104,7 +117,7 @@ stdenv.mkDerivation (
       else
         "smartos-extra-" + lib.removePrefix "smartos-strap-" pname;
     inherit version nativeBuildInputs;
-    src = illumosExtraSrc [ dir ];
+    src = illumosExtraSrc ([ dir ] ++ extraDirs);
 
     unpackPhase = ''
       runHook preUnpack
@@ -113,7 +126,7 @@ stdenv.mkDerivation (
       mkdir -p ie
       cp $src/install.subr ie/
       cp -r $src/${dir} ie/${dir}
-      chmod -R u+w ie
+      ${copyExtraDirs}chmod -R u+w ie
       cd ie/${dir}
     ''
     + forBits (
@@ -123,7 +136,7 @@ stdenv.mkDerivation (
         ${lib.optionalString (patches != null) ''
           for p in ${patches}; do
             echo "Applying $p"
-            patch -d .unpack${toString b}/${ver} -p1 <"$p"
+            patch -d .unpack${toString b}/${ver} -p${toString patchStrip} <"$p"
           done
         ''}
         mv .unpack${toString b}/${ver} ${ver}-${toString b}${suffix}
@@ -145,7 +158,7 @@ stdenv.mkDerivation (
         (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR= \
           CC="${f.cc}${lib.optionalString cppInCC " ${cppFlags}"}" CPPFLAGS="${cppFlags}" CXX="${f.cxx}" \
           ${lib.optionalString passCflags "CFLAGS=\"${f.cflags}\""} ${lib.optionalString passLdflags "LDFLAGS=\"${f.ldflags}\""} \
-          LIBS="${f.libs}"${envWords} ./configure --prefix=${prefix} ${lib.escapeShellArgs f.configureFlags})
+          LIBS="${f.libs}"${envWords f} ./configure --prefix=${prefix} ${lib.escapeShellArgs f.configureFlags})
       ''
     )
     + ''
