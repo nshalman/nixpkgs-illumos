@@ -341,6 +341,22 @@ in
     touch $out
   '';
 
+  openssl1x = compare "openssl1x" extra.openssl1x "^lib/(amd64/)?libsunw_(crypto|ssl)\\.so\\.1\\.0\\.0$";
+  openssl1x-use = use "openssl1x" extra.openssl1x [ 32 64 ] "-I${extra.openssl1x}/opt/1x -lsunw1x_crypto" ''
+    #include <stdio.h>
+    #include <openssl/evp.h>
+    #include <openssl/crypto.h>
+    int main(void) {
+      unsigned char md[EVP_MAX_MD_SIZE];
+      unsigned int n, i;
+      if (!EVP_Digest("abc", 3, md, &n, EVP_sha256(), NULL)) return 1;
+      printf("%s ", SSLeay_version(SSLEAY_VERSION));
+      for (i = 0; i < 4; i++) printf("%02x", md[i]);
+      printf("\n");
+      return 0;
+    }
+  '' "OpenSSL 1.0.2u  20 Dec 2019 ba7816bf";
+
   # No file the platform takes from a package (the manifest's f entries) names the store. In a text file (a script,
   # configuration) such a path would be dead on the platform. In a binary it is a build location, of the kind the
   # platform's binaries carry for their build too (debug information's include directories, vim's embedded compile

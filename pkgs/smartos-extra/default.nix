@@ -109,6 +109,10 @@ lib.makeScope newScope (self: {
   # before libz in their build (SUBDIRS order), so without it, as the platform's libxml2 is
   libxml = smartos-strap.libxml.override { mkStrapAutoconf = self.mkAutoconf; };
 
+  openssl1x = smartos-strap.openssl1x.override {
+    strap = false;
+    inherit (self) illumosProto;
+  };
   openssl3 = smartos-strap.openssl3.override {
     strap = false;
     inherit (self) illumosProto;
