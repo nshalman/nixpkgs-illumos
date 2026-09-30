@@ -23,4 +23,7 @@ lib.makeScope newScope (self: {
   inherit (smartos-extra) illumosProto ctfconvert;
   # smartos-live's NATIVEDIR, the strap it builds with (gcc, g++, node, npm)
   strapProto = smartos-strap.proto;
+
+  # the src stage (0-livesrc-stamp): src and man
+  livesrc = smartos-extra.finishPackage (self.callPackage ./livesrc.nix { });
 })
