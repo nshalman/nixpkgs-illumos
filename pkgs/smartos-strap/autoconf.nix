@@ -58,6 +58,11 @@
   install ? null,
   # make -j (theirs: PARALLEL = -j$(MAX_JOBS)); false where the package sets PARALLEL empty
   parallel ? true,
+  # more of configure's environment (AUTOCONF_ENV +=), shell words after the usual ones, so that they can replace
+  # them (as CFLAGS=); configure runs in the build directory, one below the illumos-extra directory
+  configureEnv ? "",
+  # more variables for make (OVERRIDES +=), shell words
+  makeFlags ? "",
   nativeBuildInputs ? [ ],
   # other derivation attributes (preConfigure hooks, meta, ...)
   extra ? { },
@@ -79,6 +84,9 @@ let
     libs = if b == 64 then libs64 else libs;
   };
   forBits = f: lib.concatMapStrings (b: f b (flagsFor b)) bits;
+  jobs = lib.optionalString parallel " -j$NIX_BUILD_CORES";
+  envWords = lib.optionalString (configureEnv != "") " ${configureEnv}";
+  makeWords = lib.optionalString (makeFlags != "") " ${makeFlags}";
 in
 stdenv.mkDerivation (
   {
@@ -129,7 +137,7 @@ stdenv.mkDerivation (
         (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR= \
           CC="${f.cc}${lib.optionalString cppInCC " ${cppFlags}"}" CPPFLAGS="${cppFlags}" CXX="${f.cxx}" \
           ${lib.optionalString passCflags "CFLAGS=\"${f.cflags}\""} ${lib.optionalString passLdflags "LDFLAGS=\"${f.ldflags}\""} \
-          LIBS="${f.libs}" ./configure --prefix=/usr ${lib.escapeShellArgs configureFlags})
+          LIBS="${f.libs}"${envWords} ./configure --prefix=/usr ${lib.escapeShellArgs configureFlags})
       ''
     )
     + ''
@@ -141,7 +149,7 @@ stdenv.mkDerivation (
     ''
     + forBits (
       b: _: ''
-        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make${lib.optionalString parallel " -j$NIX_BUILD_CORES"} V=1)
+        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make${jobs} V=1${makeWords})
       ''
     )
     + ''
@@ -153,7 +161,7 @@ stdenv.mkDerivation (
       ${
         if install == null then
           forBits (b: _: ''
-            (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make V=1 DESTDIR=$out install)
+            (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make V=1${makeWords} DESTDIR=$out install)
           '')
         else if lib.isFunction install then
           install suffix
