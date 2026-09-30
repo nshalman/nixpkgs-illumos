@@ -13,7 +13,12 @@
 # LDFLAGS.64 and LIBS.64 in its environment. OpenSSL 1.0.2's Configure reads no environment at all (patched or not),
 # so they change nothing. The strap directory in the flags is this package's own output
 # (see ./default.nix). Configure's perl is nixpkgs' (theirs: the build host's /usr/bin/perl).
+#
+# With strap = false, as illumos-extra builds it for the platform (pkgs/smartos-extra): CPPFLAGS and LDFLAGS name the
+# proto area (illumosProto, after this package's output), LDFLAGS carries GENLDFLAGS (-zassert-deflib
+# -zfatal-warnings) instead of the strap RUNPATH, and the build directories lose their suffix.
 {
+  lib,
   stdenv,
   strapBin,
   illumosExtraSrc,
@@ -21,19 +26,34 @@
   gxx,
   libDirFlags,
   perl,
+  strap ? true,
+  illumosProto ? null,
 }:
 
 let
   ver = "openssl-1.0.2u";
-  cppflags = "-isystem $out/usr/include -DSOLARIS_OPENSSL -DNO_WINDOWS_BRAINDEATH -include openssl/sunw_prefix.h";
+  # the build directories' suffix (Makefile.defs VER.32, VER.64)
+  suffix = lib.optionalString strap "strap";
+  # their DESTDIR: this package's output, then (non-strap) the illumos proto area
+  protoDirs = [ "$out" ] ++ lib.optional (!strap) illumosProto;
+  # after the library directories: the strap RUNPATH, or GENLDFLAGS
+  ldTail = bits: if strap then libDirFlags bits "-R" protoDirs else "-Wl,-zassert-deflib -Wl,-zfatal-warnings";
+  cppflags = lib.concatStringsSep " " (
+    map (d: "-isystem ${d}/usr/include") protoDirs
+    ++ [
+      "-DSOLARIS_OPENSSL"
+      "-DNO_WINDOWS_BRAINDEATH"
+      "-include openssl/sunw_prefix.h"
+    ]
+  );
   # CFLAGS and CFLAGS.64, as the Makefile writes them: the \\" become \" in Configure's perl table
   cflags32 = ''-O3 -march=pentium -Wall -Werror -DPK11_LIB_LOCATION=\\"/usr/lib/libpkcs11.so.1\\" -Wno-stringop-truncation -Wno-stringop-overflow'';
   cflags64 = ''-O3 -Wall -Werror -DPK11_LIB_LOCATION=\\"/usr/lib/64/libpkcs11.so.1\\" -Wno-stringop-truncation -Wno-stringop-overflow'';
-  ldflags32 = "${libDirFlags 32 "-L" [ "$out" ]} ${libDirFlags 32 "-R" [ "$out" ]}";
-  ldflags64 = "${libDirFlags 64 "-L" [ "$out" ]} ${libDirFlags 64 "-R" [ "$out" ]}";
+  ldflags32 = "${libDirFlags 32 "-L" protoDirs} ${ldTail 32}";
+  ldflags64 = "${libDirFlags 64 "-L" protoDirs} ${ldTail 64}";
 in
 stdenv.mkDerivation {
-  pname = "smartos-strap-openssl1x";
+  pname = if strap then "smartos-strap-openssl1x" else "smartos-extra-openssl1x";
   version = "1.0.2u";
 
   src = illumosExtraSrc [ "openssl1x" ];
@@ -50,7 +70,7 @@ stdenv.mkDerivation {
     chmod -R u+w ie
     cd ie/openssl1x
     for bits in 32 64; do
-      d=${ver}-''${bits}strap
+      d=${ver}-''${bits}${suffix}
       mkdir .unpack$bits
       tar xzf ${ver}.tar.gz -C .unpack$bits --no-same-owner
       for p in Patches/*; do
@@ -84,9 +104,9 @@ stdenv.mkDerivation {
     runHook preConfigure
     opts="--prefix=/usr --openssldir=/etc/openssl --install_prefix=$out no-rc3 no-rc5 no-mdc2 no-idea no-hw_4758_cca no-hw_aep no-hw_atalla no-hw_chil
       no-hw_gmp no-hw_ncipher no-hw_nuron no-hw_padlock no-hw_sureware no-hw_ubsec no-hw_cswift enable-md2 threads shared"
-    (cd ${ver}-32strap && env -i PATH="$PATH" ./configure $opts smartos-x86-gcc)
+    (cd ${ver}-32${suffix} && env -i PATH="$PATH" ./configure $opts smartos-x86-gcc)
     # AUTOCONF_ENV.64
-    (cd ${ver}-64strap && env -i PATH="$PATH" PKG_CONFIG_LIBDIR="" CC="${gcc} -m64" CXX="${gxx} -m64" \
+    (cd ${ver}-64${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR="" CC="${gcc} -m64" CXX="${gxx} -m64" \
       CPPFLAGS="${cppflags}" \
       CFLAGS="-O3 -Wall -Werror -DPK11_LIB_LOCATION=\\"/usr/lib/64/libpkcs11.so.1\\" -Wno-stringop-truncation -Wno-stringop-overflow" \
       LDFLAGS="${ldflags64}" LIBS="" \
@@ -97,19 +117,19 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     for bits in 32 64; do
-      (cd ${ver}-''${bits}strap && env -i PATH="$PATH" make V=1)
+      (cd ${ver}-''${bits}${suffix} && env -i PATH="$PATH" make V=1)
     done
     bash ./tools/checksyms.bash \
-      ${ver}-32strap/libsunw_crypto.so.1.0.0 ${ver}-32strap/libsunw_ssl.so.1.0.0 \
-      ${ver}-64strap/libsunw_crypto.so.1.0.0 ${ver}-64strap/libsunw_ssl.so.1.0.0
+      ${ver}-32${suffix}/libsunw_crypto.so.1.0.0 ${ver}-32${suffix}/libsunw_ssl.so.1.0.0 \
+      ${ver}-64${suffix}/libsunw_crypto.so.1.0.0 ${ver}-64${suffix}/libsunw_ssl.so.1.0.0
     runHook postBuild
   '';
 
   # The install scripts are ksh93 scripts using an extended glob, !(fips*|...); bash needs extglob for that.
   installPhase = ''
     runHook preInstall
-    DESTDIR=$out VERDIR=${ver}-32strap LIBVER=1.0.0 bash -e -O extglob ./install-sfw
-    DESTDIR=$out VERDIR=${ver}-64strap LIBVER=1.0.0 bash -e -O extglob ./install-sfw-64
+    DESTDIR=$out VERDIR=${ver}-32${suffix} LIBVER=1.0.0 bash -e -O extglob ./install-sfw
+    DESTDIR=$out VERDIR=${ver}-64${suffix} LIBVER=1.0.0 bash -e -O extglob ./install-sfw-64
     runHook postInstall
   '';
 
