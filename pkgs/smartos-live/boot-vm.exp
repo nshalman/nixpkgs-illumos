@@ -2,13 +2,65 @@
 # $env(BOOTVM_LOG), until $env(BOOTVM_EXPECT) (a regular expression) appears on it (exit 0), $env(BOOTVM_TIMEOUT)
 # seconds pass (exit 1) or bhyve exits (exit 2). A pseudo-terminal, not a file or /dev/null: with no terminal on its
 # input, bhyve's stdio console stopped passing the guest's output on, part way through its boot messages.
+#
+# With $env(BOOTVM_COMMANDS) (a file of shell command lines, one per line), the pattern is the login prompt: logs in as
+# root with the password in $env(BOOTVM_PASSWORD_FILE) (exit 3 if it is refused) and runs each command in turn, its
+# output on ours, until one fails (exit 4, the ones after it not run). The timeout is each step's: logging in, each
+# command.
+#
+# Pattern lists are written one pattern to a line: expect takes a list on one line for a single pattern.
 set timeout $env(BOOTVM_TIMEOUT)
 # -a: log the console although log_user 0 keeps it off our output, which it does not otherwise
 log_file -a -noappend $env(BOOTVM_LOG)
 log_user 0
+# a command's output is matched whole (-d: the default, for the process spawned next)
+match_max -d 10000000
 spawn {*}$argv
+proc step {pattern} {
+  # expect sets expect_out in the scope it runs in
+  global expect_out
+  expect {
+    -re $pattern {}
+    timeout { exit 1 }
+    eof { exit 2 }
+  }
+}
+step $env(BOOTVM_EXPECT)
+if {![info exists env(BOOTVM_COMMANDS)]} {
+  exit 0
+}
+
+set f [open $env(BOOTVM_PASSWORD_FILE)]
+set password [string trim [read $f]]
+close $f
+send "root\r"
+step "assword: ?$"
+send "$password\r"
 expect {
-  -re $env(BOOTVM_EXPECT) { exit 0 }
+  "Login incorrect" {
+    puts stderr "boot-vm: root's password refused"
+    exit 3
+  }
+  -re "# $" {}
   timeout { exit 1 }
   eof { exit 2 }
 }
+# without the terminal's echo, what comes back is the commands' output alone
+send "stty -echo\r"
+step "# $"
+
+set commands [open $env(BOOTVM_COMMANDS)]
+while {[gets $commands command] >= 0} {
+  send "$command; echo BOOTVM-RC=\$?\r"
+  step "BOOTVM-RC=(\[0-9]+)\r\n"
+  set output [string range $expect_out(buffer) 0 end-[string length $expect_out(0,string)]]
+  set rc $expect_out(1,string)
+  step "# $"
+  puts -nonewline [string map {"\r\n" "\n"} $output]
+  flush stdout
+  if {$rc != 0} {
+    puts stderr "boot-vm: '$command' exited $rc"
+    exit 4
+  }
+}
+exit 0

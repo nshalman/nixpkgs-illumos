@@ -382,8 +382,9 @@ lib.makeScope newScope (self: {
 
   # What a builder-brand zone runs, as root (bhyve, lofi, ufs and pcfs mounts): bin/build-image (above), bin/build-usb
   # PLATFORM-DIR OUTPUT-DIR, a USB image of a platform with its console on ttya (./build-usb.sh), and bin/boot-vm
-  # IMAGE, which boots one in bhyve with that console on the terminal, or as a test, until a pattern appears on it
-  # (./boot-vm.sh). E.g., for a boot test:
+  # IMAGE, which boots one in bhyve with that console on the terminal, or as a test, until a pattern appears on it or
+  # running commands in it as root (./boot-vm.sh); bin/vm-net, a network of the zone's own for such a VM
+  # (./vm-net.sh). E.g., for a boot test:
   #   build-image out && build-usb -B noimport=true out/platform-* usb && boot-vm --expect 'login:' usb/*.usb.gz
   builderTools = runCommand "smartos-live-builder-tools" { } ''
     mkdir -p $out/bin
@@ -391,7 +392,8 @@ lib.makeScope newScope (self: {
     substitute ${./build-usb.sh} $out/bin/build-usb --subst-var-by workspace ${self.liveWorkspace}
     substitute ${./boot-vm.sh} $out/bin/boot-vm --subst-var-by pigz ${pigz}/bin/pigz \
       --subst-var-by expect ${expect}/bin/expect --subst-var-by bootVmExp ${./boot-vm.exp}
-    chmod +x $out/bin/build-usb $out/bin/boot-vm
+    cp ${./vm-net.sh} $out/bin/vm-net
+    chmod +x $out/bin/build-usb $out/bin/boot-vm $out/bin/vm-net
   '';
 
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`

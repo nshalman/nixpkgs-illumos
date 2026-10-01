@@ -205,7 +205,8 @@ in
     echo "ok   build-usb and boot-vm want their arguments"
     touch $out
   '';
-  # boot-vm without root or bhyve (tests/boot-vm.sh): its expect script on a stand-in for the VM's console.
+  # boot-vm without root or bhyve (tests/boot-vm.sh): its expect script on a stand-in for the VM's console, the bhyve
+  # command it makes, vm-net's boot properties.
   bootVm = pkgs.runCommand "smartos-live-boot-vm-check" { } ''
     bash ${./boot-vm.sh} ${live.builderTools}/bin ${pkgs.expect}/bin/expect ${../pkgs/smartos-live/boot-vm.exp} \
       ${./boot-vm-fake.sh}
