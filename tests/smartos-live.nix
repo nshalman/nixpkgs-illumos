@@ -37,6 +37,8 @@ let
   srcManifestSection =
     section:
     ''awk '/^# / { s = $0 } $1 == "f" && s == "# ${section}" { print $2 }' ${live.smartosLive}/src/manifest'';
+  # the f entries of local project NAME's manifest
+  localManifest = name: ''awk '$1 == "f" { print $2 }' ${live.localSrc.${name}}/manifest'';
 in
 {
   # src's manifest is what src/Makefile's manifest target writes: src/manifest and the vm and fw tests and examples,
@@ -96,6 +98,49 @@ in
       grep -x 'void foo(int)' out$bits >/dev/null
       echo "ok   $bits-bit libdemangle demangles"
     done
+    touch $out
+  '';
+
+  # The local projects, each against the f entries of its own manifest (their manifest targets copy it as it is).
+  # mdata-client: expected to differ in RUNPATH, gcc 10's here and pkgsrc's gcc 13's in theirs (pkgs/smartos-live).
+  mdata-client =
+    compareWith "IGNORE_RUNPATHS=1" "mdata-client" live.mdata-client (localManifest "mdata-client") ""
+      "";
+  # they run; the metadata socket is root's alone, so only as far as their usage messages
+  mdata-client-use = pkgs.runCommand "smartos-live-mdata-client-use" { } ''
+    for p in get put delete; do
+      rc=0; ${live.mdata-client}/usr/sbin/mdata-$p 2>err || rc=$?
+      cat err
+      [ $rc = 3 ] && grep -q "^mdata-$p: Usage: .*mdata-$p <keyname>" err
+    done
+    echo "ok   mdata-get, mdata-put and mdata-delete run"
+    touch $out
+  '';
+  kvm = compare "kvm" live.kvm (localManifest "kvm") "" "";
+  # a driver, an mdb module and a devfsadm link module, which cannot be loaded in a zone: their entry points and CTF
+  kvm-use = pkgs.runCommand "smartos-live-kvm-use" { } ''
+    k=${live.kvm}
+    for s in _init _info _fini; do
+      /usr/bin/elfdump -s $k/usr/kernel/drv/amd64/kvm | grep "FUNC GLOB .* $s$" >/dev/null
+    done
+    /usr/bin/elfdump -s $k/usr/lib/mdb/kvm/amd64/kvm.so | grep "FUNC GLOB .* _mdb_init$" >/dev/null
+    /usr/bin/elfdump -s $k/usr/lib/devfsadm/linkmod/JOY_kvm_link.so |
+      grep "OBJT GLOB .* _devfsadm_create_reg$" >/dev/null
+    for f in usr/kernel/drv/amd64/kvm usr/lib/mdb/kvm/amd64/kvm.so usr/lib/devfsadm/linkmod/JOY_kvm_link.so; do
+      /usr/bin/elfdump -c $k/$f | grep "sh_name: *.SUNW_ctf" >/dev/null
+    done
+    echo "ok   kvm, kvm.so and JOY_kvm_link.so have their entry points and CTF"
+    touch $out
+  '';
+  ur-agent = compare "ur-agent" live.ur-agent (localManifest "ur-agent") "" "";
+  # its modules load in node 0.10
+  ur-agent-use = pkgs.runCommand "smartos-live-ur-agent-use" { } ''
+    ${node} -e '
+      var m = process.argv[1];
+      console.log(typeof require(m + "/amqp").createConnection, typeof require(m + "/triton-netconfig").isNicAdmin);
+    ' ${live.ur-agent}/smartdc/node_modules | tee out
+    grep -x "function function" out >/dev/null
+    echo "ok   amqp and triton-netconfig load"
     touch $out
   '';
 
