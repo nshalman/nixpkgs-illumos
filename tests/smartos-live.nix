@@ -140,6 +140,21 @@ in
       EOF
       touch $out
     '';
+  # etc/release and etc/versions/build: from the platform's build stamp and gitstatus.json, the platform's byte for byte;
+  # ours from the illumos build's stamp and the pins
+  versionFiles =
+    let
+      theirs = live.versionFilesFor (pkgs.writeText "buildstamp" "20260903T001557Z") "${extra.platformReference}/etc/versions/build";
+    in
+    pkgs.runCommand "smartos-live-version-files-check" { } ''
+      for f in etc/release etc/versions/build; do cmp ${theirs}/$f ${extra.platformReference}/$f; done
+      echo "ok   versionFilesFor writes the platform's etc/release and etc/versions/build as they are"
+      cmp ${live.versionFiles}/etc/versions/build ${live.gitstatus}
+      head -2 ${live.versionFiles}/etc/release | tee head
+      grep -x '                     SmartOS '"$(cat ${live.illumosProto}/buildstamp)"' x86_64' head >/dev/null
+      echo "ok   ours: the illumos build's stamp and the pins' gitstatus.json"
+      touch $out
+    '';
   # build_live's tools: its checks pass on the manifest and the illumos build's proto area, as build_live runs them;
   # cryptpass hashes; builder runs (as far as wanting root: copying and owning the image's files is a root step).
   # tzcheck's check that the zoneinfo files the manifest makes hard links are hard links in the proto area cannot
