@@ -140,6 +140,33 @@ in
       EOF
       touch $out
     '';
+  # build_live's tools: its checks pass on the manifest and the illumos build's proto area, as build_live runs them;
+  # cryptpass hashes; builder runs (as far as wanting root: copying and owning the image's files is a root step).
+  # tzcheck's check that the zoneinfo files the manifest makes hard links are hard links in the proto area cannot
+  # hold in the store, which keeps no hard links: there each such pair has to be the same file's contents.
+  liveTools = pkgs.runCommand "smartos-live-tools-check" { } ''
+    t=${live.liveTools}/tools
+    p=${live.illumosProto}
+    rc=0; $t/tzcheck/tzcheck -f ${live.manifest}/manifest.gen -p $p >tz || rc=$?
+    # everything but "hardlink mismatch: NAME / manifest: TARGET / proto: check manually" and the count
+    awk '/^hardlink mismatch: / { name = $3; getline; target = $2; getline; print name, target; next }
+      /^$/ || /^time zone errors found: / { next } { print "OTHER", $0 }' tz >links
+    if grep "^OTHER" links; then exit 1; fi
+    [ $rc = 0 ] || [ $rc = 60 ]
+    while read name target; do
+      cmp $p/usr/share/lib/zoneinfo/$name $p/usr/share/lib/zoneinfo/$target
+    done <links
+    echo "ok   tzcheck: no errors but $(wc -l <links) hard links, each the same contents in the proto area"
+    $t/ucodecheck/ucodecheck -f ${live.manifest}/manifest.gen -p ${live.illumosProto}
+    echo "ok   ucodecheck"
+    $t/cryptpass secret | tee hash
+    grep '^\$.' hash >/dev/null
+    echo "ok   cryptpass"
+    rc=0; $t/builder/builder >out || rc=$?
+    [ $rc = 1 ] && grep -x "euid must be 0 to use this tool." out >/dev/null
+    echo "ok   builder runs"
+    touch $out
+  '';
   # man.cf, made from the manifest by mancf
   man-cf = compare "man-cf" live.man-cf "echo usr/share/man/man.cf" "" "";
 

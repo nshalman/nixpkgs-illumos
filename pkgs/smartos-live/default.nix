@@ -123,6 +123,34 @@ lib.makeScope newScope (self: {
     '';
   };
 
+  # The build-host tools build_live runs, at their places in the tree (tools/...), built as their Makefile does
+  # (0-tools-stamp, TOOLS_TARGETS) with NATIVE_CC, the build zone's pkgsrc gcc there and this stdenv's compiler here:
+  # builder, which copies the manifest's files into the image and owns them as it says, by the names in a proto
+  # area's etc/passwd and etc/group (users.c; the illumos build's here), and the checks tzcheck and ucodecheck, and
+  # cryptpass, which hashes the root password.
+  liveTools = stdenv.mkDerivation {
+    pname = "smartos-live-tools";
+    version = "0-unstable-2026-09-03";
+    src = self.smartosLive;
+    dontConfigure = true;
+    buildPhase = ''
+      runHook preBuild
+      ctf=CTFCONVERT=${builtins.dirOf self.ctfconvert}/ctfconvert
+      (cd tools/builder && bash ./build_users_c.sh ${self.illumosProto}/ >users.c && make builder CC=$CC)
+      (cd tools/tzcheck && make tzcheck CC=$CC $ctf)
+      (cd tools/ucodecheck && make ucodecheck CC=$CC $ctf)
+      $CC -Wall -W -O2 -o tools/cryptpass src/cryptpass.c
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      for t in builder/builder tzcheck/tzcheck ucodecheck/ucodecheck cryptpass; do
+        install -D tools/$t $out/tools/$t
+      done
+      runHook postInstall
+    '';
+  };
+
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`
   man-cf = runCommand "smartos-live-man-cf" { } ''
     mkdir -p $out/usr/share/man
