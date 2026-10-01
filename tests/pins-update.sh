@@ -11,7 +11,8 @@ set -uo pipefail
 
 top="$(cd "$(dirname "$0")/.." && pwd)"
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+# the tests run in $tmp/work: leave it first, as illumos' rm does not remove the current directory
+trap 'cd / && rm -rf "$tmp"' EXIT
 
 pass=0 fail=0
 ok()  { echo "PASS: $1"; pass=$((pass+1)); }
