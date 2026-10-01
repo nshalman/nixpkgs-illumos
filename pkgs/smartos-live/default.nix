@@ -4,6 +4,7 @@
 {
   lib,
   newScope,
+  stdenv,
   fetchFromGitHub,
   fetchurl,
   runCommand,
@@ -54,6 +55,34 @@ lib.makeScope newScope (self: {
 
   # the devpro stage (0-devpro-stamp): the C++ runtime libraries kept prebuilt in the tree
   devpro = self.callPackage ./devpro.nix { };
+
+  # the platform's manifest (manifest.gen, boot.manifest.gen), from the stages' manifests
+  manifest = self.callPackage ./manifest.nix { };
+
+  # tools/mancf, which writes man.cf from the manifest: a tool for the build host, which their Makefile builds with
+  # NATIVE_CC (the build zone's pkgsrc gcc) against the host's libraries; here with this stdenv's compiler
+  mancf = stdenv.mkDerivation {
+    pname = "smartos-live-mancf";
+    version = "0-unstable-2026-09-03";
+    src = self.smartosLive;
+    dontConfigure = true;
+    buildPhase = ''
+      runHook preBuild
+      (cd tools/mancf && make mancf CC=$CC CTFCONVERT=${builtins.dirOf self.ctfconvert}/ctfconvert)
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      install -D tools/mancf/mancf $out/bin/mancf
+      runHook postInstall
+    '';
+  };
+
+  # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`
+  man-cf = runCommand "smartos-live-man-cf" { } ''
+    mkdir -p $out/usr/share/man
+    ${self.mancf}/bin/mancf -t -f ${self.manifest}/manifest.gen >$out/usr/share/man/man.cf
+  '';
 
   # The local stage (0-local-stamp): smartos-live's projects/local, the repositories its configure-projects names, at
   # the commits release-20260903 was built from (its boot_archive.gitstatus).

@@ -101,6 +101,23 @@ in
     touch $out
   '';
 
+  # manifest.gen: every file it lists is in the platform (built from another illumos-joyent commit, so not compared
+  # line by line), and it has entries from each stage's manifest
+  manifest = pkgs.runCommand "smartos-live-manifest-check" { } ''
+    m=${live.manifest}/manifest.gen
+    awk '$1 == "f" { print $2 }' $m >files
+    n=0
+    while read f; do [ -e ${extra.platformReference}/$f ] || { echo "not in the platform: $f"; n=$((n + 1)); }; done <files
+    [ $n = 0 ]
+    for p in kernel/drv/amd64/zfs usr/bin/bash usr/vm/sbin/vmadmd usr/share/man/man8/vmadm.8 usr/lib/kbm/kbmd \
+      usr/kernel/drv/amd64/kvm smartdc/bin/qemu-system-x86_64 usr/sbin/mdata-get smartdc/ur-agent/ur-agent; do
+      grep -q "^f $p " $m || { echo "FAIL $p not in manifest.gen"; exit 1; }
+    done
+    echo "ok   all $(wc -l <files) files manifest.gen lists are in the platform; each stage's are there" | tee $out
+  '';
+  # man.cf, made from the manifest by mancf
+  man-cf = compare "man-cf" live.man-cf "echo usr/share/man/man.cf" "" "";
+
   # The local projects, each against the f entries of its own manifest (their manifest targets copy it as it is).
   # mdata-client: expected to differ in RUNPATH, gcc 10's here and pkgsrc's gcc 13's in theirs (pkgs/smartos-live).
   mdata-client =
