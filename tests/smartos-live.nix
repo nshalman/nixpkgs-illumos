@@ -174,6 +174,37 @@ in
     echo "ok   build-image"
     touch $out
   '';
+  # The USB image's parts, as far as they run without root (making and booting the image is root's, in a builder
+  # zone): proto.boot is boot.manifest.gen's files, the illumos build's, with the build stamp; format_image runs;
+  # build_boot_image takes extra loader variables and compresses with nixpkgs' pigz; build-usb and boot-vm want their
+  # arguments.
+  bootTools = pkgs.runCommand "smartos-live-boot-tools-check" { } ''
+    b=${live.bootProto}
+    n=0
+    while read -r type path rest; do
+      [ "$type" = f ] || continue
+      cmp $b/$path ${live.illumosProto}/$path
+      n=$((n + 1))
+    done <${live.manifest}/boot.manifest.gen
+    cmp $b/etc/version/boot ${live.illumosProto}/buildstamp
+    echo "ok   proto.boot: the $n files boot.manifest.gen lists, and etc/version/boot"
+    rc=0; ${live.liveTools}/tools/format_image/format_image 2>err || rc=$?
+    [ $rc != 0 ] && grep '^Usage: format_image -o image.usb' err >/dev/null
+    echo "ok   format_image runs"
+    w=${live.liveWorkspace}/tools/build_boot_image
+    grep 'print -- "$BI_LOADER_EXTRA" >>$bi_tmpdir/loader.conf' $w >/dev/null
+    grep "pfrun ${pkgs.pigz}/bin/pigz " $w >/dev/null
+    if grep /opt/local/bin/pigz $w; then exit 1; fi
+    echo "ok   build_boot_image: extra loader variables, nixpkgs' pigz"
+    t=${live.builderTools}/bin
+    bash -n $t/build-usb && bash -n $t/boot-vm
+    if $t/build-usb 2>err; then exit 1; fi
+    grep 'usage: .*build-usb .*PLATFORM-DIR OUTPUT-DIR' err >/dev/null
+    if $t/boot-vm 2>err; then exit 1; fi
+    grep 'usage: .*boot-vm .*IMAGE' err >/dev/null
+    echo "ok   build-usb and boot-vm want their arguments"
+    touch $out
+  '';
   # build_live's tools: its checks pass on the manifest and the illumos build's proto area, as build_live runs them;
   # cryptpass hashes; builder runs (as far as wanting root: copying and owning the image's files is a root step).
   # tzcheck's check that the zoneinfo files the manifest makes hard links are hard links in the proto area cannot

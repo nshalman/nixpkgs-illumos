@@ -10,6 +10,8 @@
   runCommand,
   coreutils,
   gnutar,
+  pigz,
+  expect,
   gnumake,
   writeText,
   smartos-illumos,
@@ -146,10 +148,10 @@ lib.makeScope newScope (self: {
   # The build-host tools build_live runs, at their places in the tree (tools/...), built as their Makefile does
   # (0-tools-stamp, TOOLS_TARGETS) with NATIVE_CC, the build zone's pkgsrc gcc there and this stdenv's compiler here:
   # builder, which copies the manifest's files into the image and owns them as it says, by the names in a proto
-  # area's etc/passwd and etc/group (users.c; the illumos build's here), and the checks tzcheck and ucodecheck, and
-  # cryptpass, which hashes the root password. builder is patched to run without root when BUILDER_UNOWNED is set,
-  # owning nothing (./builder-unowned.patch), for the parts of the image made without root; as root, unset, it is
-  # theirs.
+  # area's etc/passwd and etc/group (users.c; the illumos build's here), the checks tzcheck and ucodecheck, cryptpass,
+  # which hashes the root password, and format_image, which partitions a USB image (tools/build_boot_image). builder
+  # is patched to run without root when BUILDER_UNOWNED is set, owning nothing (./builder-unowned.patch), for the
+  # parts of the image made without root; as root, unset, it is theirs.
   liveTools = stdenv.mkDerivation {
     pname = "smartos-live-tools";
     version = "0-unstable-2026-09-03";
@@ -163,11 +165,16 @@ lib.makeScope newScope (self: {
       (cd tools/tzcheck && make tzcheck CC=$CC $ctf)
       (cd tools/ucodecheck && make ucodecheck CC=$CC $ctf)
       $CC -Wall -W -O2 -o tools/cryptpass src/cryptpass.c
+      # format_image links libsmbios (and through it libdladm, libpool), which this stdenv's illumos libraries do not
+      # all have: built by the strap's gcc against the illumos build's proto area, as the platform's programs are
+      (cd tools/format_image && make CC=${self.strapProto}/usr/bin/gcc ILLUMOS_SRC=${smartos-illumos.src}/usr/src \
+        CPPFLAGS="-isystem ${self.illumosProto}/usr/include" \
+        LIBS="-L${self.illumosProto}/lib -L${self.illumosProto}/usr/lib -lsmbios -luuid")
       runHook postBuild
     '';
     installPhase = ''
       runHook preInstall
-      for t in builder/builder tzcheck/tzcheck ucodecheck/ucodecheck cryptpass; do
+      for t in builder/builder tzcheck/tzcheck ucodecheck/ucodecheck cryptpass format_image/format_image; do
         install -D tools/$t $out/tools/$t
       done
       runHook postInstall
@@ -346,7 +353,18 @@ lib.makeScope newScope (self: {
         $out/usr/lib/brand/joyent-minimal/repository.db
     '';
 
-  # the tree build_live runs from, with what Nix made in place of the steps that need no root (./workspace.nix)
+  # proto.boot, the loader's files (boot.manifest.gen) from the illumos build's proto area, as smartos-live's boot
+  # target lays it out, with etc/version/boot (the build stamp); by builder without root (BUILDER_UNOWNED), as the
+  # USB image's root it goes onto is pcfs, which keeps no owners
+  bootProto = runCommand "smartos-live-proto-boot" { } ''
+    mkdir -p $out/etc/version
+    BUILDER_UNOWNED=1 ${self.liveTools}/tools/builder/builder ${self.manifest}/boot.manifest.gen $out \
+      ${self.illumosProto} >log || { grep -v ' OK' log; exit 1; }
+    cp ${self.illumosProto}/buildstamp $out/etc/version/boot
+  '';
+
+  # the tree build_live and build_boot_image run from, with what Nix made in place of the steps that need no root
+  # (./workspace.nix)
   liveWorkspace = self.callPackage ./workspace.nix { };
   # The root step: bin/build-image OUTPUT-DIR [ROOT-PASSWORD] runs build_live as `gmake live` does, with the
   # manifest, searchDirs and liveWorkspace (./build-image.sh). Needs root, lofi and UFS mounts. What their PATH has
@@ -360,6 +378,20 @@ lib.makeScope newScope (self: {
       --subst-var-by workspace ${self.liveWorkspace} \
       --subst-var-by extraPath ${coreutils}/bin:$out/libexec
     chmod +x $out/bin/build-image
+  '';
+
+  # What a builder-brand zone runs, as root (bhyve, lofi, ufs and pcfs mounts): bin/build-image (above), bin/build-usb
+  # PLATFORM-DIR OUTPUT-DIR, a USB image of a platform with its console on ttya (./build-usb.sh), and bin/boot-vm
+  # IMAGE, which boots one in bhyve with that console on the terminal, or as a test, until a pattern appears on it
+  # (./boot-vm.sh). E.g., for a boot test:
+  #   build-image out && build-usb -B noimport=true out/platform-* usb && boot-vm --expect 'login:' usb/*.usb.gz
+  builderTools = runCommand "smartos-live-builder-tools" { } ''
+    mkdir -p $out/bin
+    ln -s ${self.buildImage}/bin/build-image $out/bin/build-image
+    substitute ${./build-usb.sh} $out/bin/build-usb --subst-var-by workspace ${self.liveWorkspace}
+    substitute ${./boot-vm.sh} $out/bin/boot-vm --subst-var-by pigz ${pigz}/bin/pigz \
+      --subst-var-by expect ${expect}/bin/expect --subst-var-by bootVmExp ${./boot-vm.exp}
+    chmod +x $out/bin/build-usb $out/bin/boot-vm
   '';
 
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`

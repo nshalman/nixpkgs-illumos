@@ -1,0 +1,25 @@
+--- a/tools/build_boot_image
++++ b/tools/build_boot_image
+@@ -199,6 +199,13 @@
+ root_shadow=${shadow}
+ smartos="true"
+ EOF
++	#
++	# More loader variables, one per line, from the environment (as noimport="true",
++	# to boot without importing a pool; loader variables are boot properties).
++	#
++	if [[ -n "${BI_LOADER_EXTRA:-}" ]]; then
++		print -- "$BI_LOADER_EXTRA" >>$bi_tmpdir/loader.conf
++	fi
+ 	pfrun mv $bi_tmpdir/loader.conf $dir/boot/loader.conf
+ 	pfrun chmod 644 $dir/boot/loader.conf
+ 	print "done"
+@@ -415,7 +422,7 @@
+ 	copy_results $bi_wsroot/proto.images ${bi_proforma_prefix}gb.img ${bi_proforma_prefix}gb.
+ else
+ 	print "Compressing USB image ..."
+-	pfrun /opt/local/bin/pigz $bi_tmpdir/smartos.usb
++	pfrun @pigz@ $bi_tmpdir/smartos.usb
+ 	copy_results $bi_wsroot/output-usb $bi_usb_image_name ""
+ fi
+ 

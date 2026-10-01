@@ -19,6 +19,8 @@
   smfSeed,
   versionFiles,
   whatis,
+  bootProto,
+  pigz,
 }:
 
 runCommand "smartos-live-workspace" { } ''
@@ -33,6 +35,16 @@ runCommand "smartos-live-workspace" { } ''
   ln -s ${liveTools}/tools/cryptpass $out/tools/cryptpass
   substitute ${./tzcheck-store.sh} $out/tools/tzcheck/tzcheck --subst-var-by tzcheck ${liveTools}/tools/tzcheck/tzcheck
   chmod +x $out/tools/tzcheck/tzcheck
+
+  # what tools/build_boot_image (`gmake usb`, build-usb) takes from the tree: its script, patched to take extra
+  # loader variables and to compress with nixpkgs' pigz (./build-boot-image.patch), format_image and proto.boot
+  cp ${smartosLive}/tools/build_boot_image $out/tools/
+  chmod u+w $out/tools/build_boot_image
+  patch $out/tools/build_boot_image ${./build-boot-image.patch}
+  substituteInPlace $out/tools/build_boot_image --subst-var-by pigz ${pigz}/bin/pigz
+  mkdir -p $out/tools/format_image
+  ln -s ${liveTools}/tools/format_image/format_image $out/tools/format_image/format_image
+  ln -s ${bootProto} $out/proto.boot
 
   cat >$out/tools/smf_import <<'EOF'
   #!/bin/bash

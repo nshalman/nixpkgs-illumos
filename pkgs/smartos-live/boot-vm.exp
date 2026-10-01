@@ -1,0 +1,13 @@
+# boot-vm's test mode: the VM (argv: the bhyve command) spawned with its console on a pseudo-terminal, logged to
+# $env(BOOTVM_LOG), until $env(BOOTVM_EXPECT) (a regular expression) appears on it (exit 0), $env(BOOTVM_TIMEOUT)
+# seconds pass (exit 1) or bhyve exits (exit 2). A pseudo-terminal, not a file or /dev/null: with no terminal on its
+# input, bhyve's stdio console stopped passing the guest's output on, part way through its boot messages.
+set timeout $env(BOOTVM_TIMEOUT)
+log_file -noappend $env(BOOTVM_LOG)
+log_user 0
+spawn {*}$argv
+expect {
+  -re $env(BOOTVM_EXPECT) { exit 0 }
+  timeout { exit 1 }
+  eof { exit 2 }
+}
