@@ -11,17 +11,18 @@ let
   inherit (pkgs.smartos-strap) gcc10-illumos;
   node = "${live.strapProto}/usr/node/0.10/bin/node";
 
-  # compare NAME PKG LIST EXPECTED CHECK: PKG against the platform's files and links that LIST (shell commands
-  # writing relative paths, one per line) names, with the differences in the paths EXPECTED (a regex) matches shown
-  # and accepted (each caller says why); CHECK is more shell, run after. f entries only, as for illumos-extra
-  # (tests/smartos-extra.nix): the builder makes the links.
-  compare =
-    name: pkg: list: expected: check:
+  # compareWith ENV NAME PKG LIST EXPECTED CHECK: PKG against the platform's files and links that LIST (shell
+  # commands writing relative paths, one per line) names, with the differences in the paths EXPECTED (a regex)
+  # matches shown and accepted (each caller says why); CHECK is more shell, run after; ENV is more of
+  # strap-compare.sh's environment. f entries only, as for illumos-extra (tests/smartos-extra.nix): the builder makes
+  # the links. compare is compareWith no more environment.
+  compareWith =
+    env: name: pkg: list: expected: check:
     pkgs.runCommand "smartos-live-${name}-compare" { } ''
       {
         ${list}
       } | sort -u >list
-      IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
+      ${env} IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
         bash ${./strap-compare.sh} ${extra.platformReference} ${pkg} '.' '${expected}' >report 2>&1 ||
         { cat report; exit 1; }
       cat report
@@ -31,6 +32,7 @@ let
       ${check}
       cp report $out
     '';
+  compare = compareWith "";
   # the f entries of src/manifest's section SECTION (its "# SECTION" comment line up to the next)
   srcManifestSection =
     section:
