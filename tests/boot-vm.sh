@@ -87,6 +87,12 @@ if "$tools/boot-vm" --dry-run -n vm1 --nic vmnet0 --nic vmnet1 img.usb >dry.out 
 else
     bad "--dry-run"; show dry.out
 fi
+# and with none (an empty array is unbound to the platform's bash 4.3 under set -u)
+if "$tools/boot-vm" --dry-run -n vm1 img.usb >nonic.out 2>&1 && grep -q -- "-s 4,ahci-hd,img.usb vm1$" nonic.out; then
+    ok "--dry-run without --nic: no NIC"
+else
+    bad "--dry-run without --nic"; show nonic.out
+fi
 
 if ! "$tools/boot-vm" --run 'echo hi' img.usb 2>norun.err && grep -q 'password-file' norun.err &&
     ! "$tools/boot-vm" --expect x --run 'echo hi' --password-file password img.usb 2>both.err && grep -q 'not both' both.err; then

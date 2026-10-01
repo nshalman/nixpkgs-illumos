@@ -56,7 +56,7 @@ make_vm() {
         -l bootrom,/usr/share/bhyve/uefi-rom.bin
         -l com1,stdio
         -s 4,ahci-hd,"$disk")
-    for nic in "${nics[@]}"; do
+    for nic in ${nics[@]+"${nics[@]}"}; do
         vm+=(-s $slot,virtio-net-viona,"$nic")
         slot=$((slot + 1))
     done
