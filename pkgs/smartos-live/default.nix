@@ -127,11 +127,14 @@ lib.makeScope newScope (self: {
   # (0-tools-stamp, TOOLS_TARGETS) with NATIVE_CC, the build zone's pkgsrc gcc there and this stdenv's compiler here:
   # builder, which copies the manifest's files into the image and owns them as it says, by the names in a proto
   # area's etc/passwd and etc/group (users.c; the illumos build's here), and the checks tzcheck and ucodecheck, and
-  # cryptpass, which hashes the root password.
+  # cryptpass, which hashes the root password. builder is patched to run without root when BUILDER_UNOWNED is set,
+  # owning nothing (./builder-unowned.patch), for the parts of the image made without root; as root, unset, it is
+  # theirs.
   liveTools = stdenv.mkDerivation {
     pname = "smartos-live-tools";
     version = "0-unstable-2026-09-03";
     src = self.smartosLive;
+    patches = [ ./builder-unowned.patch ];
     dontConfigure = true;
     buildPhase = ''
       runHook preBuild

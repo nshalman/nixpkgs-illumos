@@ -164,7 +164,19 @@ in
     echo "ok   cryptpass"
     rc=0; $t/builder/builder >out || rc=$?
     [ $rc = 1 ] && grep -x "euid must be 0 to use this tool." out >/dev/null
-    echo "ok   builder runs"
+    echo "ok   builder wants root"
+    # with BUILDER_UNOWNED, without root: each file from the first search directory that has it (a symbolic link
+    # there followed), modes as the manifest says, directories' last, and the links made; nothing owned
+    mkdir -p a/usr/bin b/usr/bin img
+    echo first >a/usr/bin/x; echo second >b/usr/bin/x; echo only-b >b/usr/bin/y; ln -s $PWD/b/usr/bin/y a/usr/bin/z
+    printf '%s\n' "d usr 0755 root sys" "d usr/bin 0555 root bin" "f usr/bin/x 0555 root bin" \
+      "f usr/bin/y 0444 bin bin" "f usr/bin/z 0400 root sys" "s usr/bin/sx=x" "h usr/bin/hx=usr/bin/x" >m
+    BUILDER_UNOWNED=1 $t/builder/builder $PWD/m $PWD/img $PWD/a $PWD/b
+    [ "$(cat img/usr/bin/x img/usr/bin/y img/usr/bin/z)" = "$(printf 'first\nonly-b\nonly-b')" ]
+    [ ! -L img/usr/bin/z ] && [ "$(readlink img/usr/bin/sx)" = x ] && [ img/usr/bin/hx -ef img/usr/bin/x ]
+    [ "$(stat -c %a img/usr img/usr/bin img/usr/bin/x img/usr/bin/y img/usr/bin/z | tr '\n' ' ')" = "755 555 555 444 400 " ]
+    chmod -R u+w img
+    echo "ok   builder without root (BUILDER_UNOWNED)"
     touch $out
   '';
   # builder's search directories: every file manifest.gen lists is in one, and the two that are in two stages are

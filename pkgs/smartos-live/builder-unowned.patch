@@ -1,0 +1,51 @@
+--- a/tools/builder/builder.c
++++ b/tools/builder/builder.c
+@@ -20,6 +20,12 @@
+ 
+ static int exit_status = 0;
+ 
++/*
++ * With BUILDER_UNOWNED set, nothing is owned as the manifest says (no chown), so that the tool can run without
++ * root, and directories are made writable by their owner until the last pass sets their modes.
++ */
++static int own = 1;
++
+ /* These are from the generated users.c */
+ int uid_from_name(const char *user);
+ int gid_from_name(const char *group);
+@@ -50,13 +56,13 @@
+ 
+   m = str_to_mode(mode);
+   printf("DIR: [%s][%04o][%s/%d][%s/%d]: ", target, (unsigned int) m, user, uid_from_name(user), group, gid_from_name(group));
+-  r = mkdir(target, m);
++  r = mkdir(target, own ? m : (m | S_IRWXU));
+   if ((r) && (errno != EEXIST)) {
+     perror("mkdir()");
+     exit (1);
+   }
+ 
+-  r = chown(target, (gid_t) uid_from_name(user), (gid_t) gid_from_name(group));
++  r = own ? chown(target, (gid_t) uid_from_name(user), (gid_t) gid_from_name(group)) : 0;
+   if (r) {
+     perror("chown()");
+     exit (1);
+@@ -91,7 +97,7 @@
+   }
+ 
+   if (found) {
+-    r = chown(target, (gid_t) uid_from_name(user), (gid_t) gid_from_name(group));
++    r = own ? chown(target, (gid_t) uid_from_name(user), (gid_t) gid_from_name(group)) : 0;
+     if (r) {
+       perror("chown()");
+       exit (1);
+@@ -165,7 +171,9 @@
+   char mode[MAX_LINE_LEN], user[MAX_LINE_LEN], group[MAX_LINE_LEN];
+   char *manifest, *output;
+ 
+-  if (geteuid() != 0) {
++  if (getenv("BUILDER_UNOWNED") != NULL) {
++    own = 0;
++  } else if (geteuid() != 0) {
+     printf("euid must be 0 to use this tool.\n");
+     exit(1);
+   }
