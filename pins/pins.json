@@ -29,6 +29,18 @@
     "hash": "sha256-tLZxsW84JskhioRhZ519DORlsCKnDPSOoMy+X7j0Ehc=",
     "rev": "b5f9dc8437c2be3824bd7f86cb2ca0edc70aea4e"
   },
+  "rust-bhyve": {
+    "date": 1790777655,
+    "hash": "sha256-gXVArLI6v+8sLuSoU6sLBxNmJZwXN5mPL1H0Wl4uwjc=",
+    "rev": "705063b64802e59ab15fc42199747a56b8057b39",
+    "submodules": {
+      "third_party/libtpms": {
+        "hash": "sha256-wCipOOr3LnLq1NqDtxw6hq0VTyniDwp18vBxyET/WGM=",
+        "rev": "521c51073fe6f7c56023db78e56961fcaf7906e8",
+        "url": "https://github.com/stefanberger/libtpms.git"
+      }
+    }
+  },
   "smartos-live": {
     "date": 1788361588,
     "hash": "sha256-arryUP946sA4UMTJY8rbiQRxHi4TEaAMpk+E966Zmf0=",

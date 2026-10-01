@@ -1,0 +1,17 @@
+diff --git a/crates/vmm-tpm-sys/build.rs b/crates/vmm-tpm-sys/build.rs
+index 4d02177..57a3ecf 100644
+--- a/crates/vmm-tpm-sys/build.rs
++++ b/crates/vmm-tpm-sys/build.rs
+@@ -178,7 +178,11 @@ fn select_crypto(out_dir: &Path) -> Crypto {
+     // happens to be SmartOS says nothing about the target. Only take
+     // the platform path when we are building natively for it.
+     let native = env::var("HOST") == env::var("TARGET");
+-    if !(native && Path::new(SMARTOS_CRYPTO).is_file()) {
++    // A build whose result must not depend on the platform the build
++    // host runs (a Nix package) asks for pkg-config's OpenSSL.
++    println!("cargo:rerun-if-env-changed=VMM_TPM_SYS_PKG_CONFIG_CRYPTO");
++    let pkg_config_asked = env::var_os("VMM_TPM_SYS_PKG_CONFIG_CRYPTO").is_some();
++    if pkg_config_asked || !(native && Path::new(SMARTOS_CRYPTO).is_file()) {
+         return Crypto::PkgConfig;
+     }
+ 

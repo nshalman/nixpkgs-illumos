@@ -79,6 +79,8 @@ import nixpkgs {
       openjdk11-illumos = final.callPackage ./pkgs/openjdk11-illumos { };
       # rust-lang.org's Rust toolchain for illumos, and a rustPlatform that builds with it
       rust-illumos-bin = final.callPackage ./pkgs/rust-illumos-bin { };
+      # a bhyve VMM in Rust (rshyve, firehyve), built with it
+      rust-bhyve = final.callPackage ./pkgs/rust-bhyve { };
     })
   ];
 }
