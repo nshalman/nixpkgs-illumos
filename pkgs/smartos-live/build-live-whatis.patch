@@ -1,0 +1,49 @@
+--- a/tools/build_live
++++ b/tools/build_live
+@@ -267,30 +267,24 @@
+ 
+ function bi_gen_whatis
+ {
+-	local tools_proto="$bi_wsroot/projects/illumos/usr/src/tools/proto"
+-	local tools_man="$tools_proto/root_i386-nd/opt/onbld/bin/i386/man"
+-
+-	bi_emit_start 'Generating whatis database'
+-
+-	if [[ ! -e "$tools_man" ]]; then
+-		fail "could not find the illumos tools man at \"$tools_man\""
+-	fi
+-
+-	if ! bi_extra=$(pfexec "$tools_man" -M \
+-	    "$bi_mnt_root/usr/share/man:$bi_mnt_root/smartdc/man" -w \
+-	    2>&1); then
+-		fail "could not generate whatis database"
+-	fi
+-
+ 	#
+-	# "man -w" will, at times, output diagnostic messages that are not
+-	# fatal.
++	# The whatis databases are made without root, by Nix, from the image's
++	# manual pages (smartos-live's whatis, the illumos tools' man -w over
++	# the same files): install them, owned by root and mode 0644, as man -w
++	# run as root is believed to leave them.
+ 	#
+-	if [[ -n $bi_extra ]]; then
+-		bi_emit_newline
+-		printf "man -w output:\n"
+-		sed -e 's/^/| /' <<< "$bi_extra"
+-	fi
++	local whatis=@whatis@ d
++
++	bi_emit_start 'Installing whatis databases'
++
++	for d in usr/share/man smartdc/man; do
++		if ! pfexec /usr/bin/cp "$whatis/$d/whatis" \
++		    "$bi_mnt_root/$d/whatis" ||
++		    ! pfexec /usr/bin/chown root:root "$bi_mnt_root/$d/whatis" ||
++		    ! pfexec /usr/bin/chmod 644 "$bi_mnt_root/$d/whatis"; then
++			fail "could not install $d/whatis"
++		fi
++	done
+ 
+ 	bi_emit_done
+ }

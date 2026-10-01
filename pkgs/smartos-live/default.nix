@@ -9,6 +9,7 @@
   fetchurl,
   runCommand,
   coreutils,
+  gnutar,
   gnumake,
   writeText,
   smartos-illumos,
@@ -344,6 +345,22 @@ lib.makeScope newScope (self: {
       install -D -m 444 root/usr/lib/brand/joyent-minimal/repository.db \
         $out/usr/lib/brand/joyent-minimal/repository.db
     '';
+
+  # the tree build_live runs from, with what Nix made in place of the steps that need no root (./workspace.nix)
+  liveWorkspace = self.callPackage ./workspace.nix { };
+  # The root step: bin/build-image OUTPUT-DIR [ROOT-PASSWORD] runs build_live as `gmake live` does, with the
+  # manifest, searchDirs and liveWorkspace (./build-image.sh). Needs root, lofi and UFS mounts. What their PATH has
+  # from pkgsrc, md5sum and gtar, is nixpkgs' coreutils and GNU tar here.
+  buildImage = runCommand "smartos-live-build-image" { } ''
+    mkdir -p $out/bin $out/libexec
+    ln -s ${gnutar}/bin/tar $out/libexec/gtar
+    substitute ${./build-image.sh} $out/bin/build-image \
+      --subst-var-by manifest ${self.manifest}/manifest.gen \
+      --subst-var-by searchDirs "${toString self.searchDirs}" \
+      --subst-var-by workspace ${self.liveWorkspace} \
+      --subst-var-by extraPath ${coreutils}/bin:$out/libexec
+    chmod +x $out/bin/build-image
+  '';
 
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`
   man-cf = runCommand "smartos-live-man-cf" { } ''

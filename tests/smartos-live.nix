@@ -155,23 +155,47 @@ in
       echo "ok   ours: the illumos build's stamp and the pins' gitstatus.json"
       touch $out
     '';
+  # the workspace build_live runs from, as far as it runs without root: build_etcrelease gives what Nix made (and
+  # refuses another build stamp), build_live installs the whatis databases rather than running man -w, and
+  # build-image is a script that wants its output directory (the rest is root's, in the builder zone)
+  liveWorkspace = pkgs.runCommand "smartos-live-workspace-check" { } ''
+    w=${live.liveWorkspace}
+    $w/tools/build_etcrelease -g | cmp - ${live.versionFiles}/etc/versions/build
+    $w/tools/build_etcrelease -v "$(cat ${live.illumosProto}/buildstamp)" | cmp - ${live.versionFiles}/etc/release
+    if $w/tools/build_etcrelease -v 20000101T000000Z 2>/dev/null; then exit 1; fi
+    echo "ok   build_etcrelease"
+    grep "local whatis=${live.whatis} d" $w/tools/build_live >/dev/null
+    if grep tools_man $w/tools/build_live; then exit 1; fi
+    bash -n $w/tools/build_live
+    echo "ok   build_live installs the whatis databases"
+    bash -n ${live.buildImage}/bin/build-image
+    if ${live.buildImage}/bin/build-image 2>err; then exit 1; fi
+    grep "usage: .* OUTPUT-DIR \[ROOT-PASSWORD\]" err >/dev/null
+    echo "ok   build-image"
+    touch $out
+  '';
   # build_live's tools: its checks pass on the manifest and the illumos build's proto area, as build_live runs them;
   # cryptpass hashes; builder runs (as far as wanting root: copying and owning the image's files is a root step).
   # tzcheck's check that the zoneinfo files the manifest makes hard links are hard links in the proto area cannot
-  # hold in the store, which keeps no hard links: there each such pair has to be the same file's contents.
+  # hold in the store, which keeps no hard links: the workspace's tzcheck (pkgs/smartos-live/tzcheck-store.sh) has
+  # each such pair the same file's contents instead, and fails when a pair differs.
   liveTools = pkgs.runCommand "smartos-live-tools-check" { } ''
     t=${live.liveTools}/tools
-    p=${live.illumosProto}
-    rc=0; $t/tzcheck/tzcheck -f ${live.manifest}/manifest.gen -p $p >tz || rc=$?
-    # everything but "hardlink mismatch: NAME / manifest: TARGET / proto: check manually" and the count
-    awk '/^hardlink mismatch: / { name = $3; getline; target = $2; getline; print name, target; next }
-      /^$/ || /^time zone errors found: / { next } { print "OTHER", $0 }' tz >links
-    if grep "^OTHER" links; then exit 1; fi
-    [ $rc = 0 ] || [ $rc = 60 ]
-    while read name target; do
-      cmp $p/usr/share/lib/zoneinfo/$name $p/usr/share/lib/zoneinfo/$target
-    done <links
-    echo "ok   tzcheck: no errors but $(wc -l <links) hard links, each the same contents in the proto area"
+    tz=${live.liveWorkspace}/tools/tzcheck/tzcheck
+    $tz -f ${live.manifest}/manifest.gen -p ${live.illumosProto} | tee tz
+    grep '^tzcheck: no errors; 202 hard links' tz >/dev/null
+    printf '%s\n' "d usr 0755 root sys" "d usr/share 0755 root sys" "d usr/share/lib 0755 root sys" \
+      "d usr/share/lib/zoneinfo 0755 root bin" "f usr/share/lib/zoneinfo/A 0444 root bin" \
+      "h usr/share/lib/zoneinfo/B=usr/share/lib/zoneinfo/A" >zm
+    mkdir -p same/usr/share/lib/zoneinfo differ/usr/share/lib/zoneinfo
+    cp ${live.illumosProto}/usr/share/lib/zoneinfo/UTC same/usr/share/lib/zoneinfo/A
+    cp ${live.illumosProto}/usr/share/lib/zoneinfo/UTC same/usr/share/lib/zoneinfo/B
+    cp ${live.illumosProto}/usr/share/lib/zoneinfo/UTC differ/usr/share/lib/zoneinfo/A
+    cp ${live.illumosProto}/usr/share/lib/zoneinfo/Japan differ/usr/share/lib/zoneinfo/B
+    $tz -f zm -p same >/dev/null
+    if $tz -f zm -p differ >out; then exit 1; fi
+    grep '^tzcheck: B and A differ' out >/dev/null
+    echo "ok   tzcheck: no errors but hard links, each pair the same contents; a pair that differs fails"
     $t/ucodecheck/ucodecheck -f ${live.manifest}/manifest.gen -p ${live.illumosProto}
     echo "ok   ucodecheck"
     $t/cryptpass secret | tee hash
