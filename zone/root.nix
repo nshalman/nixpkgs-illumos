@@ -5,8 +5,8 @@
 # ./smf-seed.nix; at first boot manifest-import loads the platform's manifests from /lib/svc/manifest and ours from
 # /var/svc/manifest/site, then applies /etc/svc/profile/generic.xml and ./site.xml. Text files come from the
 # illumos-gate commit illumos-ld pins, except sshd_config: the platform's sshd is SmartOS's (illumos-extra), and its
-# configuration is smartos-live's. Every file below says why it is here; a first cut, to be checked against a zone
-# booted from it (etc-reads.d traces of lookups that fail).
+# configuration is smartos-live's; and /etc/fs's mount helpers are binaries, SmartOS's own. Every file below says
+# why it is here; a first cut, to be checked against a zone booted from it (etc-reads.d traces of lookups that fail).
 #
 # Tar entries are owned by root (0:0), with the modes set here, except admin's home and the mail directories, whose
 # owners are set where the tar is made.
@@ -278,6 +278,28 @@ pkgs.runCommand "illumos-zone-root"
     # /etc/vfstab, made as the gate's build makes it
     (cd "$r/etc" && sh "$gate/usr/src/cmd/initpkg/vfstab.sh")
     chmod 0644 "$r/etc/vfstab"
+
+    # /etc/fs: mount(8)'s helpers for ufs, hsfs and dev file systems. Opaque binaries, the only ones in this image's
+    # /etc. Why they are needed: on illumos /usr/lib/fs/{ufs,hsfs,dev}/mount are links to /etc/fs/*/mount, the
+    # binaries themselves, because the global zone needs them on its root file system: SmartOS mounts /usr itself
+    # with `/sbin/mount -F ufs` before /usr exists (fs-root), and mount(8) execs /usr/lib/fs/TYPE/mount, else
+    # /etc/fs/TYPE/mount. A zone's /usr is the global zone's but its /etc is its image's, so without these
+    # `mount -F ufs` in a zone fails ("Operation not applicable to FSType ufs"). They are not text from the gate's
+    # source, and building them would make this image depend on a whole illumos build, so they are carried as they
+    # are: SmartOS release-20260903's (./etc-fs; their md5s are the ones its boot_archive.manifest lists, and they
+    # need libc's ILLUMOS_0.37 and SUNW_1.22), as SmartOS's own images carry their build platform's. nfs's and zfs's
+    # are links the other way, as the platform makes them.
+    #
+    # How upstream could make them unnecessary: install the helpers on the root file system where zones see it too
+    # (say /lib/fs/TYPE/mount: joyent-brand zones mount the global zone's /lib), with /etc/fs/TYPE/mount and
+    # /usr/lib/fs/TYPE/mount as links to them, or have mount(8) look there as well; an image would then carry links
+    # to them, or nothing.
+    d 0755 etc/fs
+    for t in dev hsfs nfs ufs zfs; do d 0755 etc/fs/$t; done
+    for t in dev hsfs ufs; do f 0555 ${./etc-fs}/$t/mount etc/fs/$t/mount; done
+    l ../../../usr/lib/fs/nfs/mount etc/fs/nfs/mount
+    l ../../../sbin/zfs etc/fs/zfs/mount
+    l ../../../sbin/zfs etc/fs/zfs/umount
 
     # the links the gate's packages install
     l ./inet/hosts etc/hosts

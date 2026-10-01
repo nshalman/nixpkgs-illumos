@@ -31,6 +31,8 @@
 #        profile and site.xml), applies every profile, leaves the services a zone should not run off and turns on
 #        sendmail's daemon (listening on the local host only) and its client queue runner;
 #      - every symbolic link under /etc and /var resolves;
+#      - every link of the platform's /usr into /etc resolves (/usr/lib/fs/{ufs,hsfs,dev}/mount, mount(8)'s helpers,
+#        are links to /etc/fs, which the image carries);
 #      - /etc/logindevperm exists (login reads it; without it zlogin prints "error processing /etc/logindevperm");
 #      - every PKCS#11 provider /etc/crypto/pkcs11.conf names is on the platform;
 #      - `useradd -m` makes a user with a home (it needs /etc/skel and reads /etc/default/useradd);
@@ -282,6 +284,13 @@ fi
 
 broken=$(in_root /usr/bin/find /etc /var -type l ! -exec /usr/bin/test -e {} \; -print 2>/dev/null)
 if [ -z "$broken" ]; then ok "every link under /etc and /var resolves"; else bad "links that do not resolve: $broken"; fi
+
+# links from the global zone's /usr into /etc, which is the image's
+broken=$(in_root /nix/var/nix/profiles/default/bin/bash -c '
+	/usr/bin/find /usr -type l 2>/dev/null | while read -r l; do
+		case "$(/usr/bin/readlink "$l")" in *etc/*) [ -e "$l" ] || echo "$l" ;; esac
+	done')
+if [ -z "$broken" ]; then ok "every link of the platform's /usr into /etc resolves"; else bad "links of /usr into /etc that do not resolve: $broken"; fi
 
 if [ -s "$R/etc/logindevperm" ]; then ok "/etc/logindevperm exists"; else bad "no /etc/logindevperm"; fi
 
