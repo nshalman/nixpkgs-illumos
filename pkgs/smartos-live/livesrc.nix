@@ -142,6 +142,9 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     export HOME=$TMPDIR/home npm_config_registry=http://127.0.0.1:9/ npm_config_nodedir=$TMPDIR/node-v0.10.26
+    # npm's prefix as theirs has it (their node's /usr/node/0.10, not the strap's store path): npm makes
+    # $DESTDIR$prefix, which make's DESTDIR reaches it as
+    export npm_config_prefix=/usr/node/0.10
     mkdir -p $HOME
     tar xzf ${nodeSource} -C $TMPDIR
     # fs-ext's repository, which npm clones: the pinned commit, made again from its tree and commit object (shallow:
@@ -167,8 +170,10 @@ stdenv.mkDerivation {
     awk '$1 == "d" { print $2 } $1 ~ /^[fsh]$/ { sub("=.*", "", $2); if (sub("/[^/]*$", "", $2)) print $2 }' \
       src/manifest man/manifest | sort -u | (cd $out && xargs mkdir -p)
     (cd src && make ${toString makeFlags} install)
-    # as theirs, from man: its Makefile finds the tree by $(PWD)
-    (cd man && make DESTDIR=$out RONNJS="${strapProto}/usr/node/0.10/bin/node $PWD/../tools/ronnjs/bin/ronn.js" install)
+    # as theirs, from man: its Makefile finds the tree by $(PWD). ronn.js dates its pages with the month it runs in
+    # unless given one: here smartos-live's commit date, the month of theirs (built 2026-09-03)
+    (cd man && make DESTDIR=$out install \
+      RONNJS="${strapProto}/usr/node/0.10/bin/node $PWD/../tools/ronnjs/bin/ronn.js --date 2026-09-02")
     runHook postInstall
   '';
 

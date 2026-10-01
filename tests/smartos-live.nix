@@ -25,6 +25,9 @@ let
         bash ${./strap-compare.sh} ${extra.platformReference} ${pkg} '.' '${expected}' >report 2>&1 ||
         { cat report; exit 1; }
       cat report
+      # nothing installed under a store path's name ($DESTDIR followed by an absolute path)
+      if [ -e ${pkg}/nix ]; then echo "FAIL ${pkg}/nix exists:"; find ${pkg}/nix; exit 1; fi
+      echo "ok   nothing under nix/" | tee -a report
       ${check}
       cp report $out
     '';
