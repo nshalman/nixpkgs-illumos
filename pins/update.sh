@@ -2,10 +2,12 @@
 #
 # Pins each source named (all of sources.json's when none are) at the commit its branch is at now, in pins.json:
 # rev, date (the commit's time) and hash (the NAR hash of the commit's tree as `git archive` gives it, which is what
-# GitHub's archive of it unpacks to and fetchFromGitHub checks). A source whose branch has not moved is left as it is.
-# Nothing else is changed; sources.json says where each comes from and which branch it follows.
+# GitHub's archive of it unpacks to and fetchFromGitHub checks), and submodules, which archives leave out: by path,
+# the url (.gitmodules'), rev (the commit's gitlink) and hash (of that commit's tree, likewise). A source whose branch
+# has not moved is left as it is. Nothing else is changed; sources.json says where each comes from and which branch
+# it follows.
 #
-# usage: update.sh [NAME...]   (needs git, nix and python3 on PATH)
+# usage: update.sh [NAME...]   (needs git, nix, python3 and a tar that reads standard input by default on PATH)
 #
 # PINS_DIR is the directory of sources.json and pins.json (default: this script's), PINS_URL_PREFIX where the
 # repositories are (default https://github.com: PREFIX/owner/repo.git).
@@ -50,11 +52,36 @@ for name in "$@"; do
     git -C "$tmp/$name.git" archive FETCH_HEAD | tar -x -C "$tmp/$name"
     hash=$(nix --extra-experimental-features nix-command hash path --type sha256 "$tmp/$name")
 
+    # its submodules, which the archive leaves out: each at the commit its gitlink names, from the url .gitmodules
+    # gives it, with the hash of that commit's archive (lines of path, url, rev, hash)
+    : >"$tmp/$name.submodules"
+    git -C "$tmp/$name.git" ls-tree -r FETCH_HEAD | while IFS=$'\t' read -r entry path; do
+        read -r _ type subrev <<<"$entry"
+        [ "$type" = commit ] || continue
+        subname=$(git -C "$tmp/$name.git" config --blob FETCH_HEAD:.gitmodules --get-regexp '^submodule\..*\.path$' |
+            awk -v p="$path" '$2 == p { sub(/^submodule\./, "", $1); sub(/\.path$/, "", $1); print $1 }')
+        suburl=$(git -C "$tmp/$name.git" config --blob FETCH_HEAD:.gitmodules "submodule.$subname.url")
+        case $suburl in
+            ./* | ../*) echo "$name: submodule $path has a relative url ($suburl), which is not supported" >&2; exit 1 ;;
+        esac
+        sub=$tmp/$name.sub
+        rm -rf "$sub.git" "$sub"
+        git init -q --bare "$sub.git"
+        git -C "$sub.git" fetch -q --depth 1 "$suburl" "$subrev"
+        mkdir "$sub"
+        git -C "$sub.git" archive "$subrev" | tar -x -C "$sub"
+        subhash=$(nix --extra-experimental-features nix-command hash path --type sha256 "$sub")
+        printf '%s\t%s\t%s\t%s\n' "$path" "$suburl" "$subrev" "$subhash" >>"$tmp/$name.submodules"
+    done
+
     json '
 p = json.load(open(sys.argv[2]))
 p[sys.argv[3]] = {"rev": sys.argv[4], "hash": sys.argv[5], "date": int(sys.argv[6])}
+subs = [l.rstrip("\n").split("\t") for l in open(sys.argv[7])]
+if subs:
+    p[sys.argv[3]]["submodules"] = {path: {"url": url, "rev": rev, "hash": hash} for path, url, rev, hash in subs}
 with open(sys.argv[2], "w") as f:
     json.dump(p, f, indent=2, sort_keys=True)
-    f.write("\n")' "$name" "$rev" "$hash" "$date"
+    f.write("\n")' "$name" "$rev" "$hash" "$date" "$tmp/$name.submodules"
     echo "$name: $branch moved to $rev${pinned:+ (from $pinned)}"
 done

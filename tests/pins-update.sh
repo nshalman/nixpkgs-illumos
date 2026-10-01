@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # pins/update.sh against a local repository standing in for GitHub (PINS_URL_PREFIX), with its own sources.json and
-# pins.json (PINS_DIR): a new pin, an unchanged branch, a moved branch, a name sources.json does not have. The hash it
+# pins.json (PINS_DIR): a new pin, an unchanged branch, a moved branch, a name sources.json does not have, a
+# submodule. The hash it
 # writes is checked against the tree made by hand, with an executable, a symbolic link and a file .gitattributes
 # keeps out of archives (export-ignore), as GitHub's archive leaves it out.
 #
@@ -72,6 +73,25 @@ if ! run gadget >"$tmp/out4" 2>&1 && grep -q "gadget" "$tmp/out4" && cmp -s "$tm
     ok "a name sources.json does not have fails and changes nothing"
 else
     bad "an unknown name"; sed 's/^/    /' "$tmp/out4"
+fi
+
+# a submodule: acme/lib at sub/lib, which archives leave out (a gitlink), pinned with the pin at the commit the
+# gitlink names, whatever lib's branch is at
+git init -q --bare -b main "$tmp/gh/acme/lib.git"
+git init -q -b main "$tmp/lib"
+(cd "$tmp/lib" && echo lib >LIB && git add -A && git commit -q -m L && git push -q "$tmp/gh/acme/lib.git" main)
+revL=$(git -C "$tmp/lib" rev-parse HEAD)
+mkdir "$tmp/treeL" && cp "$tmp/lib/LIB" "$tmp/treeL/"
+hashL=$(nixHash "$tmp/treeL")
+git -c protocol.file.allow=always submodule -q add "file://$tmp/gh/acme/lib.git" sub/lib
+git commit -q -m C && revC=$(git rev-parse HEAD) && git push -q "$tmp/gh/acme/widget.git" main
+(cd "$tmp/lib" && echo later >>LIB && git commit -q -am L2 && git push -q "$tmp/gh/acme/lib.git" main)
+sub() { python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["widget"]["submodules"]["sub/lib"][sys.argv[2]])' "$tmp/pins/pins.json" "$1"; }
+if run widget >"$tmp/out5" 2>&1 && [ "$(pin widget rev)" = "$revC" ] && [ "$(sub url)" = "file://$tmp/gh/acme/lib.git" ] &&
+    [ "$(sub rev)" = "$revL" ] && [ "$(sub hash)" = "$hashL" ]; then
+    ok "a submodule is pinned with the pin: url, rev (the gitlink's) and hash (its archive's tree)"
+else
+    bad "a submodule"; sed 's/^/    /' "$tmp/out5"; cat "$tmp/pins/pins.json"
 fi
 
 echo "$pass passed, $fail failed"
