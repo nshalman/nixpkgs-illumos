@@ -3,7 +3,7 @@
 # boot-vm's parts that run without root and bhyve: boot-vm.exp driving tests/boot-vm-fake.sh, a stand-in for the VM's
 # console (the console logged; a pattern found, not found in time, or bhyve exiting; logging in with the password
 # file and running commands, their output on ours, a wrong password and a failing command told apart), the bhyve
-# command boot-vm makes (--dry-run), its arguments, and vm-net's boot properties.
+# command boot-vm makes (--dry-run), and the rshyve one (--vmm rshyve), its arguments, and vm-net's boot properties.
 #
 # usage: boot-vm.sh TOOLS-BIN EXPECT BOOT-VM-EXP FAKE-VM (TOOLS-BIN: builderTools' bin; EXPECT: an expect binary)
 
@@ -92,6 +92,33 @@ if "$tools/boot-vm" --dry-run -n vm1 img.usb >nonic.out 2>&1 && grep -q -- "-s 4
     ok "--dry-run without --nic: no NIC"
 else
     bad "--dry-run without --nic"; show nonic.out
+fi
+
+# rshyve (rust-bhyve) from the caller's PATH: here a stand-in, as --dry-run only names it
+mkdir rshyve-bin && printf '#!/bin/sh\nexit 1\n' >rshyve-bin/rshyve && chmod +x rshyve-bin/rshyve
+if PATH=$tmp/rshyve-bin:$PATH "$tools/boot-vm" --dry-run --vmm rshyve -n vm1 --nic vmnet0 img.usb >rdry.out 2>&1 &&
+    [ "$(cat rdry.out)" = "$tmp/rshyve-bin/rshyve -H -c 2 -m 4G -s 0,hostbridge -s 31,lpc -l bootrom,/usr/share/bhyve/uefi-rom.bin -l com1,stdio -l com2,/dev/null -s 4,nvme,img.usb -s 5,virtio-net-viona,vmnet0 vm1" ]; then
+    ok "--vmm rshyve: rshyve from PATH, the disk on NVMe, COM2 not its metadata agent, no -w"
+else
+    bad "--vmm rshyve"; show rdry.out
+fi
+if ! PATH=/usr/bin:/bin "$tools/boot-vm" --dry-run --vmm rshyve img.usb 2>nor.err && grep -q 'no rshyve on PATH' nor.err &&
+    ! "$tools/boot-vm" --dry-run --vmm qemu img.usb 2>vmm.err && grep -q 'usage: ' vmm.err &&
+    "$tools/boot-vm" --dry-run --vmm bhyve img.usb | grep -q '^bhyve -H -w .* -s 4,ahci-hd,img.usb '; then
+    ok "--vmm: rshyve must be on PATH, an unknown VMM refused, bhyve as without --vmm"
+else
+    bad "--vmm's arguments"; show nor.err vmm.err
+fi
+# rshyve leaves the terminal it is given as it finds it (bhyve makes its own raw), and a cooked one echoes what is sent
+# and turns the guest's \r\n into \r\r\n: boot-vm makes it raw. A stand-in rshyve records its terminal's modes, then
+# is the fake console.
+printf '#!/bin/sh\nstty -a >"$FAKE_STTY"\nexec bash "%s"\n' "$fake" >rshyve-bin/rshyve
+if FAKE_STTY=$tmp/rshyve.stty PATH=$tmp/rshyve-bin:$PATH "$tools/boot-vm" --vmm rshyve -n vmr --expect 'login: ' \
+    --timeout 30 img.usb >rrun.out 2>&1 && grep -q -E -- '(^| )-echo( |$)' rshyve.stty &&
+    grep -q -E -- '(^| )-opost( |$)' rshyve.stty; then
+    ok "--vmm rshyve: rshyve's terminal raw (no echo, no output processing)"
+else
+    bad "--vmm rshyve's terminal"; show rrun.out rshyve.stty
 fi
 
 if ! "$tools/boot-vm" --run 'echo hi' img.usb 2>norun.err && grep -q 'password-file' norun.err &&

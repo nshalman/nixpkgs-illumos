@@ -382,8 +382,9 @@ lib.makeScope newScope (self: {
 
   # What a builder-brand zone runs, as root (bhyve, lofi, ufs and pcfs mounts): bin/build-image (above), bin/build-usb
   # PLATFORM-DIR OUTPUT-DIR, a USB image of a platform with its console on ttya (./build-usb.sh), and bin/boot-vm
-  # IMAGE, which boots one in bhyve with that console on the terminal, or as a test, until a pattern appears on it or
-  # running commands in it as root (./boot-vm.sh); bin/vm-net, a network of the zone's own for such a VM
+  # IMAGE, which boots one in bhyve (or rshyve, rust-bhyve's, with --vmm rshyve) with that console on the terminal, or
+  # as a test, until a pattern appears on it or running commands in it as root (./boot-vm.sh); bin/vm-net, a network
+  # of the zone's own for such a VM
   # (./vm-net.sh). E.g., for a boot test:
   #   build-image out && build-usb -B noimport=true out/platform-* usb && boot-vm --expect 'login:' usb/*.usb.gz
   builderTools = runCommand "smartos-live-builder-tools" { } ''
