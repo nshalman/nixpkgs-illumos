@@ -198,6 +198,32 @@ in
     echo "ok   all $(wc -l <files) files in the search directories; sshd_config from livesrc, zcat from gzip"
     touch $out
   '';
+  # the SMF repositories: not reproducible byte for byte (sqlite 2), so what they configure, `svccfg archive`,
+  # flattened to sorted lines (./smf-flatten.py: the order the repository lists things in is not the platform's),
+  # against the platform's. Its manifest hashes are two MD5s, of a file's owner, size and time and of its contents:
+  # here only the second is compared, as the import ran without root on the store's files (the platform's on the
+  # image's); at boot a hash whose contents half matches is reconciled, not imported again.
+  smf =
+    let
+      svccfg = "${pkgs.smartos-illumos.tools}/opt/onbld/bin/i386/svccfg";
+    in
+    pkgs.runCommand "smartos-live-smf-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+      archive() {
+        cp $1 repo.db && chmod u+w repo.db
+        SVCCFG_REPOSITORY=$PWD/repo.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd ${svccfg} archive >archive.xml
+        rm repo.db
+        grep -c '<service ' archive.xml >$2.services
+        python3 ${./smf-flatten.py} archive.xml | sed -E 's/(propval=md5sum type=opaque value=)[0-9a-f]{32}/\1/' >$2
+      }
+      for r in etc/svc/repository.db:${live.smfRepository} usr/lib/brand/joyent-minimal/repository.db:${live.smfSeed}; do
+        f=''${r%%:*} p=''${r#*:}
+        archive ${extra.platformReference}/$f theirs
+        archive $p/$f ours
+        diff theirs ours
+        echo "ok   $f configures what the platform's does ($(cat ours.services) services)"
+      done
+      touch $out
+    '';
   # the whatis databases, made from the image's manual pages
   whatis =
     compare "whatis" live.whatis "printf '%s\\n' usr/share/man/whatis smartdc/man/whatis" ""

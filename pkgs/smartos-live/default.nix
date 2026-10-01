@@ -278,6 +278,54 @@ lib.makeScope newScope (self: {
       done
     '';
 
+  # The SMF repositories build_live makes in the mounted image, made here without root by their own scripts from a part
+  # of the image, in a tree laid out as theirs (tools/, and the illumos tools' svccfg and svc.configd at
+  # projects/illumos/usr/src/tools/proto/root_i386-nd): smfRepository, the global zone's etc/svc/repository.db
+  # (tools/smf_import: every manifest under lib/svc/manifest imported, the generic and platform profiles applied, a
+  # few properties set; svc.configd is the build host's, as theirs is); smfSeed, joyent-minimal's seed repository
+  # (tools/build_seeds, with the onbld svc.configd, and the build host's nawk, from /usr/bin on their PATH), whose last
+  # step, owning it as root, is the root step's here.
+  smfTree = runCommand "smartos-live-smf-tree" { } ''
+    mkdir -p $out/tools $out/projects/illumos/usr/src/tools/proto
+    cp ${self.smartosLive}/tools/smf_import ${self.smartosLive}/tools/build_seeds $out/tools/
+    chmod u+w $out/tools/build_seeds
+    substituteInPlace $out/tools/build_seeds \
+      --replace-fail 'chown root:root $ROOT/usr/lib/brand/joyent-minimal/repository.db' \
+        ': chown root:root $ROOT/usr/lib/brand/joyent-minimal/repository.db'
+    ln -s ${smartos-illumos.tools} $out/projects/illumos/usr/src/tools/proto/root_i386-nd
+    mkdir $out/bin
+    ln -s /usr/bin/nawk $out/bin/nawk
+  '';
+  smfRepository =
+    let
+      part = self.imagePart "smf" [
+        "lib/svc/manifest"
+        "etc/svc/profile"
+        "usr/share/lib/xml/dtd"
+      ];
+    in
+    runCommand "smartos-live-smf-repository" { } ''
+      cp -r ${part} root
+      chmod -R u+w root
+      mkdir -p root/etc/svc
+      bash ${self.smfTree}/tools/smf_import $PWD/root
+      install -D -m 444 root/etc/svc/repository.db $out/etc/svc/repository.db
+    '';
+  smfSeed =
+    let
+      part = self.imagePart "smf-seed" [
+        "lib/svc/manifest"
+        "usr/lib/brand/joyent-minimal/manifests"
+      ];
+    in
+    runCommand "smartos-live-smf-seed" { } ''
+      cp -r ${part} root
+      chmod -R u+w root
+      PATH=${self.smfTree}/bin:$PATH bash ${self.smfTree}/tools/build_seeds $PWD/root
+      install -D -m 444 root/usr/lib/brand/joyent-minimal/repository.db \
+        $out/usr/lib/brand/joyent-minimal/repository.db
+    '';
+
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`
   man-cf = runCommand "smartos-live-man-cf" { } ''
     mkdir -p $out/usr/share/man
