@@ -5,6 +5,7 @@
   lib,
   newScope,
   fetchFromGitHub,
+  writeText,
   smartos-illumos,
   smartos-strap,
   smartos-extra,
@@ -19,6 +20,17 @@ lib.makeScope newScope (self: {
     rev = "148c3689faede56d529a44469fdb989d24b29aa1";
     sha256 = "1zcrk6pgg12glq6a048k5qg72149vg567jf4a0wc1skqzx8g5fka";
   };
+
+  # the build.env configure writes, with its defaults, which the stages read
+  buildEnv = writeText "build.env" ''
+    FORCE_STRAP_REBUILD=no
+    ILLUMOS_CLOBBER=no
+    ILLUMOS_ENABLE_DEBUG=no
+    PRIMARY_COMPILER=gcc10
+    PRIMARY_COMPILER_VER=10
+    SHADOW_COMPILERS=
+    ENABLE_SMATCH=yes
+  '';
 
   inherit (smartos-extra) illumosProto ctfconvert;
   # smartos-live's NATIVEDIR, the strap it builds with (gcc, g++, node, npm)

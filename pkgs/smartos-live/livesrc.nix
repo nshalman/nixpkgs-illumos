@@ -37,6 +37,7 @@
   gitMinimal,
   python27,
   smartosLive,
+  buildEnv,
   illumosProto,
   strapProto,
   ctfconvert,
@@ -122,16 +123,8 @@ stdenv.mkDerivation {
       --replace-fail 'NODE_LIBDIR =	-L$(PREFIX_NODE)/lib' 'NODE_LIBDIR =	-L$(NODE_PROTO)/lib'
     substituteInPlace src/Makefile --replace-fail 'PYTHON="/opt/local/bin/python2.7"' 'PYTHON="${pythonForNodeGyp}/bin/python2.7"'
 
-    # configure's build.env, with its defaults
-    cat >build.env <<EOF
-    FORCE_STRAP_REBUILD=no
-    ILLUMOS_CLOBBER=no
-    ILLUMOS_ENABLE_DEBUG=no
-    PRIMARY_COMPILER=gcc10
-    PRIMARY_COMPILER_VER=10
-    SHADOW_COMPILERS=
-    ENABLE_SMATCH=yes
-    EOF
+    # configure's build.env
+    cp ${buildEnv} build.env
     # the nightly's build stamp, which src reads from proto/buildstamp (CTF labels)
     mkdir -p proto
     cp ${illumosProto}/buildstamp proto/buildstamp
