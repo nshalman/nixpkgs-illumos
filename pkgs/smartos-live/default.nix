@@ -39,9 +39,9 @@ lib.makeScope newScope (self: {
   smartosLive = self.fetchPin "smartos-live";
 
   # gitstatus.json, which build_live writes into the platform (etc/versions/build, the boot archive's .gitstatus) as
-  # tools/build_etcrelease -g gives it: each repository's branch, commit time, commit and URL, in the order smartos-live,
-  # illumos-joyent, illumos-extra, the local projects; here from the pins, not from checkouts. gitstatusText writes
-  # entries (repo, branch, commit_date, rev, url) as build_etcrelease does (json -o json-4).
+  # tools/build_etcrelease -g gives it: each repository's branch, commit time, commit and URL, in the order
+  # smartos-live, illumos-joyent, illumos-extra, the local projects; here from the pins, not from checkouts.
+  # gitstatusText writes entries (repo, branch, commit_date, rev, url) as build_etcrelease does (json -o json-4).
   gitstatusText =
     entries:
     let
