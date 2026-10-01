@@ -205,6 +205,12 @@ in
     echo "ok   build-usb and boot-vm want their arguments"
     touch $out
   '';
+  # boot-vm without root or bhyve (tests/boot-vm.sh): its expect script on a stand-in for the VM's console.
+  bootVm = pkgs.runCommand "smartos-live-boot-vm-check" { } ''
+    bash ${./boot-vm.sh} ${live.builderTools}/bin ${pkgs.expect}/bin/expect ${../pkgs/smartos-live/boot-vm.exp} \
+      ${./boot-vm-fake.sh}
+    touch $out
+  '';
   # build_live's tools: its checks pass on the manifest and the illumos build's proto area, as build_live runs them;
   # cryptpass hashes; builder runs (as far as wanting root: copying and owning the image's files is a root step).
   # tzcheck's check that the zoneinfo files the manifest makes hard links are hard links in the proto area cannot

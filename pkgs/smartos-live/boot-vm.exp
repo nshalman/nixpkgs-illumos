@@ -3,7 +3,8 @@
 # seconds pass (exit 1) or bhyve exits (exit 2). A pseudo-terminal, not a file or /dev/null: with no terminal on its
 # input, bhyve's stdio console stopped passing the guest's output on, part way through its boot messages.
 set timeout $env(BOOTVM_TIMEOUT)
-log_file -noappend $env(BOOTVM_LOG)
+# -a: log the console although log_user 0 keeps it off our output, which it does not otherwise
+log_file -a -noappend $env(BOOTVM_LOG)
 log_user 0
 spawn {*}$argv
 expect {
