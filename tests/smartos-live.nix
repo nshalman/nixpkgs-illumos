@@ -132,6 +132,22 @@ in
     echo "ok   kvm, kvm.so and JOY_kvm_link.so have their entry points and CTF"
     touch $out
   '';
+  kvm-cmd = compare "kvm-cmd" live.kvm-cmd (localManifest "kvm-cmd") "" "";
+  # QEMU 0.14.1: qemu-img makes, reads and converts an image; qemu-system-x86_64 runs as far as its version (KVM
+  # itself is not in a zone); the mdb module has its entry point
+  kvm-cmd-use = pkgs.runCommand "smartos-live-kvm-cmd-use" { } ''
+    b=${live.kvm-cmd}/smartdc/bin
+    $b/qemu-system-x86_64 -version | tee out
+    grep "^QEMU emulator version 0.14.1 (qemu-kvm-devel)" out >/dev/null
+    $b/qemu-img create -f qcow2 disk.qcow2 64M
+    $b/qemu-img info disk.qcow2 | tee info
+    grep -x "file format: qcow2" info >/dev/null && grep "^virtual size: 64M " info >/dev/null
+    $b/qemu-img convert -O raw disk.qcow2 disk.raw
+    [ $(wc -c <disk.raw) = 67108864 ]
+    /usr/bin/elfdump -s ${live.kvm-cmd}/usr/lib/mdb/proc/amd64/qemu.so | grep "FUNC GLOB .* _mdb_init$" >/dev/null
+    echo "ok   qemu-img round trip, qemu-system-x86_64 runs, qemu.so has _mdb_init"
+    touch $out
+  '';
   ur-agent = compare "ur-agent" live.ur-agent (localManifest "ur-agent") "" "";
   # its modules load in node 0.10
   ur-agent-use = pkgs.runCommand "smartos-live-ur-agent-use" { } ''

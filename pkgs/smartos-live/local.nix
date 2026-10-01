@@ -11,6 +11,7 @@
   lib,
   stdenv,
   buildEnv,
+  manifestDirs,
   illumosProto,
   strapProto,
   ctfconvert,
@@ -62,6 +63,7 @@ stdenv.mkDerivation (
 
     installPhase = ''
       runHook preInstall
+      ${manifestDirs [ "manifest" ]}
       f=Makefile
       [ ! -f Makefile.joyent ] || f=Makefile.joyent
       make -f $f CTFMERGE=${ctfBin}/ctfmerge CTFCONVERT=${ctfBin}/ctfconvert MAX_JOBS=$NIX_BUILD_CORES \

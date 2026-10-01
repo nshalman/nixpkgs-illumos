@@ -5,6 +5,10 @@
   lib,
   newScope,
   fetchFromGitHub,
+  fetchurl,
+  runCommand,
+  coreutils,
+  gnumake,
   writeText,
   smartos-illumos,
   smartos-strap,
@@ -107,6 +111,60 @@ lib.makeScope newScope (self: {
       makeFlags = [ "LD=$(${self.strapProto}/usr/bin/gcc -print-prog-name=ld)" ];
     }
   );
+
+  # illumos-kvm-cmd: QEMU 0.14.1 for KVM, and its mdb module. Its build.sh, which configure runs, downloads libpng
+  # 1.5.4 from Manta unless it is there already, and builds it; it is a pinned input here (Nahum approved the
+  # download), unpacked where build.sh looks. build.sh compiles and links against $DESTDIR, their proto area; what it
+  # reads there, the illumos build's headers and libraries and illumos-extra's libz, is given for reading, and DESTDIR
+  # is this package's output. QEMU's kernel directory is ../kvm, illumos-kvm's source. Its trace backend is dtrace,
+  # which the build runs (dtrace -h, -G): the build host's, as for perl and node.
+  kvm-cmd =
+    let
+      libpng = fetchurl {
+        url = "https://us-central.manta.mnx.io/Joyent_Dev/public/releng/kvm-cmd/libpng-1.5.4.tar.gz";
+        sha256 = "1azaiz451p2kgx4pz6m1yg1px6clrgmimansj058vd3j1jvxpk55";
+      };
+      readProto = [
+        self.illumosProto
+        "${smartos-extra.libz}"
+      ];
+      includes = toString (map (d: "-isystem ${d}/usr/include") readProto);
+      libDirs = toString (map (d: "-L${d}/usr/lib/amd64 -L${d}/lib/amd64") readProto);
+      # what the build takes from their PATH: gmake, which Makefile.joyent runs, and ginstall, which QEMU's configure
+      # asks for on SunOS (theirs pkgsrc's; here nixpkgs' make and coreutils), and isainfo (the host's). configure
+      # also names gld, for a config-host.ld nothing reads; not given.
+      pathTools = runCommand "kvm-cmd-path-tools" { } ''
+        mkdir -p $out/bin
+        ln -s ${gnumake}/bin/make $out/bin/gmake
+        ln -s ${coreutils}/bin/install $out/bin/ginstall
+        ln -s /usr/bin/isainfo $out/bin/isainfo
+      '';
+    in
+    smartos-extra.finishPackage (
+      self.mkLocal {
+        name = "kvm-cmd";
+        version = "0-unstable-2025-08-28";
+        src = self.localSrc.kvm-cmd;
+        withLocal = [ "kvm" ];
+        nativeBuildInputs = [
+          smartos-strap.platformDtrace
+          pathTools
+        ];
+        postPatch = ''
+          tar xzf ${libpng}
+          substituteInPlace build.sh \
+            --replace-fail '-isystem ''${DESTDIR}/usr/include' '${includes}' \
+            --replace-fail '-L''${DESTDIR}/usr/lib/amd64 -L''${DESTDIR}/lib/amd64' '${libDirs}'
+        '';
+        # build.sh runs libpng's and QEMU's configure as ./configure, under /bin/sh (ksh93). stdenv exports
+        # CONFIG_SHELL (bash), which their config.status then runs under: libpng's libtool 2.4 chose `print -r --`
+        # for echo under ksh93, and bash has no print, so the libtool it wrote was broken. Their build has no
+        # CONFIG_SHELL.
+        preInstall = ''
+          unset CONFIG_SHELL
+        '';
+      }
+    );
 
   # sdc-ur-agent: node programs and modules committed in the repository. Its world target is `git submodule update`,
   # for jsstyle, javascriptlint and restdown, which only `make check` uses; it is taken as done (-o).
