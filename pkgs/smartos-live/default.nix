@@ -35,6 +35,42 @@ lib.makeScope newScope (self: {
   # smartos-extra.platformReference is, so that what is built here can be compared with it
   smartosLive = self.fetchPin "smartos-live";
 
+  # gitstatus.json, which build_live writes into the platform (etc/versions/build, the boot archive's .gitstatus) as
+  # tools/build_etcrelease -g gives it: each repository's branch, commit time, commit and URL, in the order smartos-live,
+  # illumos-joyent, illumos-extra, the local projects; here from the pins, not from checkouts. gitstatusText writes
+  # entries (repo, branch, commit_date, rev, url) as build_etcrelease does (json -o json-4).
+  gitstatusText =
+    entries:
+    let
+      entry = e: ''
+        {
+                "repo": "${e.repo}",
+                "branch": "${e.branch}",
+                "commit_date": "${e.commit_date}",
+                "rev": "${e.rev}",
+                "url": "${e.url}"
+            }'';
+    in
+    "[\n    " + lib.concatMapStringsSep ",\n    " entry entries + "\n]\n";
+  gitstatus = writeText "gitstatus.json" (
+    self.gitstatusText (
+      map
+        (name: {
+          repo = name;
+          inherit (self.pins.${name}) branch rev url;
+          commit_date = toString self.pins.${name}.date;
+        })
+        (
+          [
+            "smartos-live"
+            "illumos-joyent"
+            "illumos-extra"
+          ]
+          ++ lib.attrNames self.localSrc
+        )
+    )
+  );
+
   # the build.env configure writes, with its defaults, which the stages read
   buildEnv = writeText "build.env" ''
     FORCE_STRAP_REBUILD=no

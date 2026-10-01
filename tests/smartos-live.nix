@@ -115,6 +115,31 @@ in
     done
     echo "ok   all $(wc -l <files) files manifest.gen lists are in the platform; each stage's are there" | tee $out
   '';
+  # gitstatus.json: written as build_etcrelease writes it (the platform's own entries give its etc/versions/build
+  # byte for byte), and from the pins the same as the platform's but for illumos-joyent (pinned at a master commit,
+  # not the release's) and the URLs' case (theirs are their clones' remotes)
+  gitstatus =
+    let
+      platformJSON = "${extra.platformReference}/etc/versions/build";
+      again = pkgs.writeText "gitstatus-again" (
+        live.gitstatusText (builtins.fromJSON (builtins.readFile platformJSON))
+      );
+    in
+    pkgs.runCommand "smartos-live-gitstatus-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+      cmp ${again} ${platformJSON}
+      echo "ok   gitstatusText writes the platform's gitstatus.json as it is"
+      python3 - ${live.gitstatus} ${platformJSON} <<'EOF'
+      import json, sys
+      ours, theirs = (json.load(open(f)) for f in sys.argv[1:3])
+      assert [e["repo"] for e in ours] == [e["repo"] for e in theirs], (ours, theirs)
+      for o, t in zip(ours, theirs):
+          o["url"], t["url"] = o["url"].lower(), t["url"].lower()
+          if o["repo"] != "illumos-joyent":
+              assert o == t, (o, t)
+      print("ok   gitstatus.json from the pins: the platform's but for illumos-joyent and the URLs' case")
+      EOF
+      touch $out
+    '';
   # man.cf, made from the manifest by mancf
   man-cf = compare "man-cf" live.man-cf "echo usr/share/man/man.cf" "" "";
 
