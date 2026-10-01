@@ -112,6 +112,44 @@ lib.makeScope newScope (self: {
     }
   );
 
+  # kbmd, the key backup and management daemon, with pivy's pivy-tool and pivy-box. pivy is a git submodule, which
+  # its Makefile checks out with `git submodule update`; here the commit kbmd records (Nahum approved the download)
+  # is put in place and that command left out. Its Makefile compiles and links against $DESTDIR, their proto area,
+  # and passes it to pivy's: what it reads there, the illumos build's headers and libraries, illumos-extra's libz,
+  # and illumos-extra's OpenSSL 1.x (opt/1x and its static libcrypto in .build), is given for reading, and DESTDIR is
+  # this package's output.
+  kbmd =
+    let
+      pivy = fetchFromGitHub {
+        owner = "arekinath";
+        repo = "pivy";
+        rev = "deebdab681be3d37dd207da2c30b16d0db3baf44";
+        hash = "sha256-b5ivtmXYbfSO24Pxyjj6ibGQ+WQrw6rSBDIgdhKIiig=";
+      };
+      inherit (smartos-extra) libz openssl1x;
+    in
+    smartos-extra.finishPackage (
+      self.mkLocal {
+        name = "kbmd";
+        version = "0-unstable-2025-04-22";
+        src = self.localSrc.kbmd;
+        postPatch = ''
+          cp -r ${pivy}/. pivy/
+          chmod -R u+w pivy
+          substituteInPlace Makefile \
+            --replace-fail 'git submodule update --init' ': git submodule update --init' \
+            --replace-fail '$(DESTDIR)/.build/' '${openssl1x}/.build/' \
+            --replace-fail '$(DESTDIR)/opt/1x' '${openssl1x}/opt/1x' \
+            --replace-fail '-I''${DESTDIR}/opt/1x' '-I${openssl1x}/opt/1x' \
+            --replace-fail '$(DESTDIR)/usr/include' '${self.illumosProto}/usr/include -I${libz}/usr/include' \
+            --replace-fail '-L$(DESTDIR)/lib/amd64' '-L${self.illumosProto}/lib/amd64 -L${libz}/lib/amd64' \
+            --replace-fail '-L$(DESTDIR)/usr/lib/amd64' '-L${self.illumosProto}/usr/lib/amd64 -L${libz}/usr/lib/amd64' \
+            --replace-fail 'PROTO_AREA="$(DESTDIR)"' \
+              'PROTO_AREA="${self.illumosProto}" ZLIB_CFLAGS="-isystem ${libz}/usr/include"'
+        '';
+      }
+    );
+
   # illumos-kvm-cmd: QEMU 0.14.1 for KVM, and its mdb module. Its build.sh, which configure runs, downloads libpng
   # 1.5.4 from Manta unless it is there already, and builds it; it is a pinned input here (Nahum approved the
   # download), unpacked where build.sh looks. build.sh compiles and links against $DESTDIR, their proto area; what it

@@ -132,6 +132,22 @@ in
     echo "ok   kvm, kvm.so and JOY_kvm_link.so have their entry points and CTF"
     touch $out
   '';
+  kbmd = compare "kbmd" live.kbmd (localManifest "kbmd") "" "";
+  # pivy-tool, pivy-box, reset-piv and kbmadm run as far as their arguments (they need a PIV token or kbmd; kbmd
+  # itself, run, starts)
+  kbmd-use = pkgs.runCommand "smartos-live-kbmd-use" { } ''
+    s=${live.kbmd}/usr/sbin
+    $s/pivy-tool 2>&1 | tee out || true
+    grep -x "pivy-tool: operation required" out >/dev/null
+    $s/pivy-box 2>&1 | tee out || true
+    grep -x "pivy-box: type and operation required" out >/dev/null
+    $s/reset-piv -h 2>&1 | tee out || true
+    grep -x "reset-piv: failed to parse guid '-h'" out >/dev/null
+    $s/kbmadm -h 2>&1 | tee out || true
+    grep "kbmadm: illegal option -- h$" out >/dev/null
+    echo "ok   pivy-tool, pivy-box, reset-piv and kbmadm run"
+    touch $out
+  '';
   kvm-cmd = compare "kvm-cmd" live.kvm-cmd (localManifest "kvm-cmd") "" "";
   # QEMU 0.14.1: qemu-img makes, reads and converts an image; qemu-system-x86_64 runs as far as its version (KVM
   # itself is not in a zone); the mdb module has its entry point
