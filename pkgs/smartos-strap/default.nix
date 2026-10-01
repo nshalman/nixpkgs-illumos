@@ -30,11 +30,15 @@
 lib.makeScope newScope (self: {
   # illumos-extra: the package sources (tarballs are committed in the repository, except gcc's), patches and
   # install scripts. smartos-live's strap cache is keyed by this commit. Fetched during evaluation (the GitHub
-  # archive, the same tree fetchFromGitHub makes), so that illumosExtraSrc can take parts of it.
-  illumosExtra = builtins.fetchTarball {
-    url = "https://github.com/TritonDataCenter/illumos-extra/archive/5850d8e9f17443bbe42eb24739c8f3c2f268ae60.tar.gz";
-    sha256 = "0i1kdwz7rqv2s22fry1nl6yc6inmkfslv3p275fvs0bi4i1zjyrc";
-  };
+  # archive, the same tree fetchFromGitHub makes), so that illumosExtraSrc can take parts of it. Pinned in ../../pins.
+  illumosExtra =
+    let
+      pin = (import ../../pins)."illumos-extra";
+    in
+    builtins.fetchTarball {
+      url = pin.archive;
+      sha256 = pin.hash;
+    };
 
   # The part of illumos-extra a package's build reads: install.subr and the package's own directories (DIRS). A copy
   # in the store named by its contents, so that a package is rebuilt when those change and not whenever the pinned
@@ -48,7 +52,8 @@ lib.makeScope newScope (self: {
     builtins.path {
       path = self.illumosExtra;
       name = "illumos-extra-${lib.concatStringsSep "-" dirs}";
-      filter = p: _: rel p == "install.subr" || lib.any (d: rel p == d || lib.hasPrefix "${d}/" (rel p)) dirs;
+      filter =
+        p: _: rel p == "install.subr" || lib.any (d: rel p == d || lib.hasPrefix "${d}/" (rel p)) dirs;
     };
 
   # The compilers as illumos-extra's Makefile.defs names them in a strap build (GCCBIN, GXXBIN): the strap gcc
@@ -77,7 +82,10 @@ lib.makeScope newScope (self: {
   libDirFlags =
     bits: flag: dirs:
     lib.concatMapStringsSep " " (
-      d: "${flag}${d}/usr/lib${lib.optionalString (bits == 64) "/64"} ${flag}${d}/lib${lib.optionalString (bits == 64) "/64"}"
+      d:
+      "${flag}${d}/usr/lib${lib.optionalString (bits == 64) "/64"} ${flag}${d}/lib${
+        lib.optionalString (bits == 64) "/64"
+      }"
     ) dirs;
 
   # SmartOS's own proto.strap for the same illumos-extra commit, from smartos-live's strap cache

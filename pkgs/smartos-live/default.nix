@@ -17,14 +17,23 @@
 }:
 
 lib.makeScope newScope (self: {
+  # the sources pinned by data (../../pins), by name
+  pins = import ../../pins;
+  # a pinned GitHub source
+  fetchPin =
+    name:
+    fetchFromGitHub {
+      inherit (self.pins.${name})
+        owner
+        repo
+        rev
+        hash
+        ;
+    };
+
   # smartos-live at the commit SmartOS release-20260903 was built from (its gitstatus.json), the release
   # smartos-extra.platformReference is, so that what is built here can be compared with it
-  smartosLive = fetchFromGitHub {
-    owner = "TritonDataCenter";
-    repo = "smartos-live";
-    rev = "148c3689faede56d529a44469fdb989d24b29aa1";
-    sha256 = "1zcrk6pgg12glq6a048k5qg72149vg567jf4a0wc1skqzx8g5fka";
-  };
+  smartosLive = self.fetchPin "smartos-live";
 
   # the build.env configure writes, with its defaults, which the stages read
   buildEnv = writeText "build.env" ''
@@ -85,33 +94,14 @@ lib.makeScope newScope (self: {
   '';
 
   # The local stage (0-local-stamp): smartos-live's projects/local, the repositories its configure-projects names, at
-  # the commits release-20260903 was built from (its boot_archive.gitstatus).
-  localSrc =
-    let
-      f =
-        repo: rev: hash:
-        fetchFromGitHub {
-          owner = "TritonDataCenter";
-          inherit repo rev hash;
-        };
-    in
-    {
-      kbmd =
-        f "kbmd" "726dfaa6f72e7b8ce6b0cce88ff26b93feb0f574"
-          "sha256-MTVoxI5cIDw57AP1L1b5G0RSE4yqnYklV16ukgTUETg=";
-      kvm =
-        f "illumos-kvm" "a7f088a6252631a8fd3d86f413fe0c7809ac50c3"
-          "sha256-DFIJSRCI/9+nU+36JeQwZOWRnemN5dkxSS2QsqRciG4=";
-      kvm-cmd =
-        f "illumos-kvm-cmd" "1c9b441da90fe179451abab9aa8a4b926912d518"
-          "sha256-L5fxkfI5rqR4U0FTxL0o0a3Af6QiwaGHluM9HimA18k=";
-      mdata-client =
-        f "mdata-client" "b5f9dc8437c2be3824bd7f86cb2ca0edc70aea4e"
-          "sha256-tLZxsW84JskhioRhZ519DORlsCKnDPSOoMy+X7j0Ehc=";
-      ur-agent =
-        f "sdc-ur-agent" "cc3cc3bfca21c77cf3b4541fcafde7c0fa3d30f1"
-          "sha256-v8M+bGepmKKtrplEG+1842eKPzUt2pKd0o9XnAi1VIM=";
-    };
+  # the commits release-20260903 was built from (its boot_archive.gitstatus), pinned in ../../pins.
+  localSrc = lib.genAttrs [
+    "kbmd"
+    "kvm"
+    "kvm-cmd"
+    "mdata-client"
+    "ur-agent"
+  ] self.fetchPin;
   # a local project, as 0-subdir-NAME-stamp builds it
   mkLocal = self.callPackage ./local.nix { };
 

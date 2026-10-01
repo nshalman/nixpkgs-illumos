@@ -1,0 +1,10 @@
+{
+  "illumos-extra": { "owner": "TritonDataCenter", "repo": "illumos-extra", "branch": "release-20260903" },
+  "illumos-joyent": { "owner": "TritonDataCenter", "repo": "illumos-joyent", "branch": "master" },
+  "kbmd": { "owner": "TritonDataCenter", "repo": "kbmd", "branch": "release-20260903" },
+  "kvm": { "owner": "TritonDataCenter", "repo": "illumos-kvm", "branch": "release-20260903" },
+  "kvm-cmd": { "owner": "TritonDataCenter", "repo": "illumos-kvm-cmd", "branch": "release-20260903" },
+  "mdata-client": { "owner": "TritonDataCenter", "repo": "mdata-client", "branch": "release-20260903" },
+  "smartos-live": { "owner": "TritonDataCenter", "repo": "smartos-live", "branch": "release-20260903" },
+  "ur-agent": { "owner": "TritonDataCenter", "repo": "sdc-ur-agent", "branch": "release-20260903" }
+}
