@@ -198,6 +198,10 @@ in
     echo "ok   all $(wc -l <files) files in the search directories; sshd_config from livesrc, zcat from gzip"
     touch $out
   '';
+  # the whatis databases, made from the image's manual pages
+  whatis =
+    compare "whatis" live.whatis "printf '%s\\n' usr/share/man/whatis smartdc/man/whatis" ""
+      "";
   # man.cf, made from the manifest by mancf
   man-cf = compare "man-cf" live.man-cf "echo usr/share/man/man.cf" "" "";
 

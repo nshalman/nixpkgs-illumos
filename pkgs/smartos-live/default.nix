@@ -235,6 +235,49 @@ lib.makeScope newScope (self: {
     self.illumosProto
   ];
 
+  # The image's entries under PREFIXES (and the directories down to them), laid out by builder from searchDirs as
+  # build_live lays out the whole image, but without root (BUILDER_UNOWNED, owning nothing): for what build_live
+  # makes in the mounted image from its files that needs no root, made here instead.
+  imagePart =
+    name: prefixes:
+    runCommand "smartos-live-image-${name}" { } ''
+      awk -v prefixes='${toString prefixes}' '
+        BEGIN { n = split(prefixes, p, " ") }
+        {
+          path = $2
+          sub("=.*", "", path)
+          for (i = 1; i <= n; i++)
+            if (path == p[i] || index(path, p[i] "/") == 1 || ($1 == "d" && index(p[i], path "/") == 1)) {
+              print
+              next
+            }
+        }' ${self.manifest}/manifest.gen >manifest
+      mkdir $out
+      BUILDER_UNOWNED=1 ${self.liveTools}/tools/builder/builder $PWD/manifest $out ${toString self.searchDirs} >log ||
+        { grep -v ' OK' log; exit 1; }
+    '';
+
+  # The whatis databases of the image's manual pages, as build_live makes them (bi_gen_whatis): the illumos tools'
+  # man -w over usr/share/man and smartdc/man, with the directories some of their pages are links into (usr/has/man,
+  # usr/node/0.10/man).
+  whatis =
+    let
+      part = self.imagePart "man" [
+        "usr/share/man"
+        "smartdc/man"
+        "usr/has/man"
+        "usr/node/0.10/man"
+      ];
+    in
+    runCommand "smartos-live-whatis" { } ''
+      cp -r ${part} root
+      chmod -R u+w root
+      ${smartos-illumos.tools}/opt/onbld/bin/i386/man -M $PWD/root/usr/share/man:$PWD/root/smartdc/man -w
+      for d in usr/share/man smartdc/man; do
+        install -D -m 444 root/$d/whatis $out/$d/whatis
+      done
+    '';
+
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`
   man-cf = runCommand "smartos-live-man-cf" { } ''
     mkdir -p $out/usr/share/man
