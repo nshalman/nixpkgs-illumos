@@ -38,6 +38,7 @@
   python27,
   smartosLive,
   buildEnv,
+  manifestDirs,
   illumosProto,
   strapProto,
   ctfconvert,
@@ -164,11 +165,10 @@ stdenv.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    # their installs copy into directories their proto area already has (illumos' among them): the directories
-    # src's and man's manifests list, and those their files are in
-    mkdir -p $out
-    awk '$1 == "d" { print $2 } $1 ~ /^[fsh]$/ { sub("=.*", "", $2); if (sub("/[^/]*$", "", $2)) print $2 }' \
-      src/manifest man/manifest | sort -u | (cd $out && xargs mkdir -p)
+    ${manifestDirs [
+      "src/manifest"
+      "man/manifest"
+    ]}
     (cd src && make ${toString makeFlags} install)
     # as theirs, from man: its Makefile finds the tree by $(PWD). ronn.js dates its pages with the month it runs in
     # unless given one: here smartos-live's commit date, the month of theirs (built 2026-09-03)

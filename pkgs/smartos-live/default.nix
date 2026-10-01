@@ -32,6 +32,15 @@ lib.makeScope newScope (self: {
     ENABLE_SMATCH=yes
   '';
 
+  # Shell for an installPhase: their installs copy into directories their proto area already has (illumos' among
+  # them); this makes in $out the directories MANIFESTS (paths from the build directory) list, and those their files
+  # are in.
+  manifestDirs = manifests: ''
+    mkdir -p $out
+    awk '$1 == "d" { print $2 } $1 ~ /^[fsh]$/ { sub("=.*", "", $2); if (sub("/[^/]*$", "", $2)) print $2 }' \
+      ${toString manifests} | sort -u | (cd $out && xargs mkdir -p)
+  '';
+
   inherit (smartos-extra) illumosProto ctfconvert;
   # smartos-live's NATIVEDIR, the strap it builds with (gcc, g++, node, npm)
   strapProto = smartos-strap.proto;
