@@ -26,4 +26,7 @@ lib.makeScope newScope (self: {
 
   # the src stage (0-livesrc-stamp): src and man
   livesrc = smartos-extra.finishPackage (self.callPackage ./livesrc.nix { });
+
+  # the devpro stage (0-devpro-stamp): the C++ runtime libraries kept prebuilt in the tree
+  devpro = self.callPackage ./devpro.nix { };
 })

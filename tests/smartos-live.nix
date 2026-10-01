@@ -28,6 +28,10 @@ let
       ${check}
       cp report $out
     '';
+  # the f entries of src/manifest's section SECTION (its "# SECTION" comment line up to the next)
+  srcManifestSection =
+    section:
+    ''awk '/^# / { s = $0 } $1 == "f" && s == "# ${section}" { print $2 }' ${live.smartosLive}/src/manifest'';
 in
 {
   # src's manifest is what src/Makefile's manifest target writes: src/manifest and the vm and fw tests and examples,
@@ -63,6 +67,32 @@ in
           <(grep -v '"shasum": ' ${live.livesrc}/${fsExtJson})
         echo "ok   ${fsExtJson} but for dist.shasum" | tee -a report
       '';
+
+  # src/manifest's 0-devpro-stamp section
+  devpro = compare "devpro" live.devpro (srcManifestSection "0-devpro-stamp") "" "";
+  # a program built by the strap gcc against libdemangle, for each word size, run: it demangles a Sun C++ name
+  devpro-use = pkgs.runCommand "smartos-live-devpro-use" { } ''
+    cat >t.c <<'C'
+    #include <stdio.h>
+    #include <demangle.h>
+    int main(void) {
+      char out[128];
+      if (cplus_demangle("__1cDfoo6Fi_v_", out, sizeof out) != 0) return 1;
+      printf("%s\n", out);
+      return 0;
+    }
+    C
+    for bits in 32 64; do
+      if [ $bits = 32 ]; then l=${live.devpro}/usr/lib; else l=${live.devpro}/usr/lib/amd64; fi
+      ${pkgs.smartos-strap.gcc} -m$bits -I${live.devpro}/usr/include -isystem ${live.illumosProto}/usr/include t.c \
+        -o t$bits $l/libdemangle.so.1 -R$l
+      /usr/bin/ldd t$bits | grep "libdemangle.so.1 =>[[:space:]]*$l/" >/dev/null
+      ./t$bits | tee out$bits
+      grep -x 'void foo(int)' out$bits >/dev/null
+      echo "ok   $bits-bit libdemangle demangles"
+    done
+    touch $out
+  '';
 
   # the node add-ons, loaded by a node 0.10 (the strap's; the platform's is the same 0.10.26) and used: those built
   # with nan (dtrace-provider, fs-ext, zonename) and the others; their libraries resolve as on the platform, on the
