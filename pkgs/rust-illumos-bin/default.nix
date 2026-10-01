@@ -16,6 +16,7 @@
 # dash, which does not build on illumos yet (it uses struct dirent's d_type and BSD getopt's optreset).
 {
   stdenv,
+  stdenvAdapters,
   path,
   callPackage,
   fetchurl,
@@ -67,8 +68,17 @@ let
       inherit sha256;
     };
   };
+  # rustc keeps a crate's metadata in a .rustc section nothing refers to, which it reads back from proc-macros (shared
+  # objects) when it uses them; it links with -z ignore (the illumos link-editor discards unreferenced sections of the
+  # objects after it) after its own objects, so that section stays. The ld wrapper puts -z ignore before everything,
+  # which discards it ("no .rustc section"). The packages rustPlatform builds turn it back off, -z record (the
+  # link-editor's default), after the wrapper's -z ignore and before the objects.
+  stdenvRust = stdenvAdapters.addAttrsToDerivation { NIX_LDFLAGS_BEFORE = "-z record"; } stdenv;
 in
 toolchain
 // {
-  rustPlatform = makeRustPlatform { inherit (toolchain) rustc cargo; };
+  rustPlatform = makeRustPlatform {
+    inherit (toolchain) rustc cargo;
+    stdenv = stdenvRust;
+  };
 }

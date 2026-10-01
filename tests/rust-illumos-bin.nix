@@ -5,7 +5,8 @@
 #     gcc-illumos's lib output, not the running system's /usr/lib, and the system's (liblgrp, which the sysroot does
 #     not have) on the running system;
 #   - a program built by rustc (linked through the stdenv's cc) runs, and so does one cargo builds offline from a
-#     package with a build script, through rust-illumos-bin.rustPlatform as packages build with it.
+#     package with a build script and a proc-macro crate, through rust-illumos-bin.rustPlatform as packages build
+#     with it.
 #   nix-build tests/rust-illumos-bin.nix --arg pkgs 'import /work/dev-pkgs.nix'
 { pkgs }:
 
@@ -13,14 +14,18 @@ let
   rust = pkgs.rust-illumos-bin;
   gccLib = pkgs.stdenv.cc.cc.lib;
 
-  # a package with a build script that sets an environment variable the program prints
+  # a package with a build script that sets an environment variable the program prints, and a proc-macro crate whose
+  # macro gives a number it prints (proc-macros are shared objects rustc loads, and reads their metadata from)
   hello = pkgs.runCommand "hello-rs-src" { } ''
-    mkdir -p $out/src
+    mkdir -p $out/src $out/pm/src
     cat >$out/Cargo.toml <<'EOF'
     [package]
     name = "hello"
     version = "0.1.0"
     edition = "2021"
+
+    [dependencies]
+    pm = { path = "pm" }
     EOF
     cat >$out/Cargo.lock <<'EOF'
     version = 4
@@ -28,12 +33,33 @@ let
     [[package]]
     name = "hello"
     version = "0.1.0"
+    dependencies = [
+     "pm",
+    ]
+
+    [[package]]
+    name = "pm"
+    version = "0.1.0"
     EOF
     cat >$out/build.rs <<'EOF'
     fn main() { println!("cargo:rustc-env=HELLO_FROM=build script"); }
     EOF
     cat >$out/src/main.rs <<'EOF'
-    fn main() { println!("hello from cargo and the {}", env!("HELLO_FROM")); }
+    fn main() { println!("hello from cargo, the {} and a proc-macro ({})", env!("HELLO_FROM"), pm::answer!()); }
+    EOF
+    cat >$out/pm/Cargo.toml <<'EOF'
+    [package]
+    name = "pm"
+    version = "0.1.0"
+    edition = "2021"
+
+    [lib]
+    proc-macro = true
+    EOF
+    cat >$out/pm/src/lib.rs <<'EOF'
+    use proc_macro::TokenStream;
+    #[proc_macro]
+    pub fn answer(_: TokenStream) -> TokenStream { "42".parse().unwrap() }
     EOF
   '';
   helloCargo = rust.rustPlatform.buildRustPackage {
@@ -66,8 +92,8 @@ pkgs.runCommand "rust-illumos-bin-test" { nativeBuildInputs = [ pkgs.stdenv.cc ]
   printf 'fn main() { println!("hello from rustc"); }\n' >hello.rs
   check "rustc builds a program" '${rust.rustc}/bin/rustc -O hello.rs -o hello'
   check "which runs" './hello | grep -x "hello from rustc" >/dev/null'
-  check "a package cargo builds with a build script runs" \
-    '${helloCargo}/bin/hello | grep -x "hello from cargo and the build script" >/dev/null'
+  check "a package cargo builds with a build script and a proc-macro runs" \
+    '${helloCargo}/bin/hello | grep -x "hello from cargo, the build script and a proc-macro (42)" >/dev/null'
 
   [ $fail -eq 0 ] && touch $out
 ''
