@@ -199,7 +199,7 @@ in
     t=${live.builderTools}/bin
     bash -n $t/build-usb && bash -n $t/boot-vm
     if $t/build-usb 2>err; then exit 1; fi
-    grep 'usage: .*build-usb .*PLATFORM-DIR OUTPUT-DIR' err >/dev/null
+    grep 'usage: .*build-usb .*\[-f FILE=PATH ...\] PLATFORM-DIR OUTPUT-DIR' err >/dev/null
     if $t/boot-vm 2>err; then exit 1; fi
     grep 'usage: .*boot-vm .*IMAGE' err >/dev/null
     echo "ok   build-usb and boot-vm want their arguments"

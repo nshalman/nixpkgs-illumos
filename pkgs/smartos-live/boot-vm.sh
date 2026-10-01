@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-# boot-vm [--vmm bhyve|rshyve] [-n NAME] [-m MEMORY] [-c CPUS] [--nic LINK ...]
+# boot-vm [--vmm bhyve|rshyve] [-n NAME] [-m MEMORY] [-c CPUS] [--nic LINK ...] [--disk FILE ...]
 #         [--expect PATTERN | --run COMMAND ... --password-file FILE] [--timeout SECONDS] [--dry-run] IMAGE:
 # boots IMAGE (a USB image from build-usb, gzipped or not) in a bhyve VM with UEFI firmware (the platform's), its first
 # serial port (ttya) on this terminal: the console of an image made with build-usb's default -c ttya. Each --nic is a
-# virtio NIC on LINK (a VNIC of this zone, e.g. vm-net's vmnet0). Needs root and bhyve (a builder- or bhyve-brand
+# virtio NIC on LINK (a VNIC of this zone, e.g. vm-net's vmnet0); each --disk a virtio disk on FILE (e.g. one from
+# `mkfile -n 20g`, for a zones pool), kept as the VM leaves it. Needs root and bhyve (a builder- or bhyve-brand
 # zone, or the global zone). The VM is destroyed when bhyve exits, or when this script does. --dry-run prints the bhyve
 # command instead.
 #
 # --vmm rshyve runs it under rshyve (rust-bhyve, the overlay's rust-bhyve package), found on the caller's PATH, in
-# place of the platform's bhyve: its disk on NVMe and its COM2 on nothing (see make_vm).
+# place of the platform's bhyve: its disks on NVMe and its COM2 on nothing (see make_vm).
 #
 # With --expect, the VM runs under expect, its console logged (NAME.console, in the current directory) instead,
 # until PATTERN (a regular expression) appears on it (exit 0), SECONDS pass (default 600; exit 1) or bhyve exits
@@ -25,9 +26,9 @@ callerPath=$PATH
 export PATH=/usr/bin:/usr/sbin:/sbin
 
 name=boot-vm-$$ memory=4G cpus=2 expect= timeout=600 password= dry= vmm=bhyve
-nics=() commands=()
+nics=() disks=() commands=()
 usage() {
-    echo "usage: $0 [--vmm bhyve|rshyve] [-n NAME] [-m MEMORY] [-c CPUS] [--nic LINK ...]" \
+    echo "usage: $0 [--vmm bhyve|rshyve] [-n NAME] [-m MEMORY] [-c CPUS] [--nic LINK ...] [--disk FILE ...]" \
         "[--expect PATTERN | --run COMMAND ... --password-file FILE] [--timeout SECONDS] [--dry-run] IMAGE" >&2
     exit 2
 }
@@ -38,6 +39,7 @@ while [ $# -gt 1 ]; do
         -m) memory=$2; shift 2 ;;
         -c) cpus=$2; shift 2 ;;
         --nic) nics+=("$2"); shift 2 ;;
+        --disk) disks+=("$2"); shift 2 ;;
         --expect) expect=$2; shift 2 ;;
         --run) commands+=("$2"); shift 2 ;;
         --password-file) password=$2; shift 2 ;;
@@ -55,6 +57,9 @@ case $vmm in
             { echo "$0: --vmm rshyve: no rshyve on PATH ($callerPath)" >&2; exit 2; } ;;
     *) usage ;;
 esac
+for d in ${disks[@]+"${disks[@]}"}; do
+    [ -f "$d" ] || { echo "$0: --disk $d: no such file" >&2; exit 2; }
+done
 if [ ${#commands[@]} -gt 0 ]; then
     [ -z "$expect" ] || { echo "$0: --expect or --run, not both" >&2; exit 2; }
     [ -f "$password" ] || { echo "$0: --run wants --password-file FILE, root's password" >&2; exit 2; }
@@ -62,7 +67,7 @@ fi
 
 # make_vm DISK: the bhyve (or rshyve) command, in vm
 make_vm() {
-    local disk=$1 slot=5 nic
+    local disk=$1 slot=5 nic d dev=virtio-blk
     case $vmm in
         bhyve) vm=(bhyve -H -w) ;;
         rshyve) vm=("$rshyve" -H) ;;
@@ -75,10 +80,16 @@ make_vm() {
         bhyve) vm+=(-s 4,ahci-hd,"$disk") ;;
         # rshyve has no AHCI disk, and its COM2 is a metadata agent unless one is named: the image's loader writes its
         # console to COM2 too (ttyb), and would take the agent's answers ("invalid command") for keys
-        rshyve) vm+=(-l com2,/dev/null -s 4,nvme,"$disk") ;;
+        rshyve) vm+=(-l com2,/dev/null -s 4,nvme,"$disk"); dev=nvme ;;
     esac
     for nic in ${nics[@]+"${nics[@]}"}; do
         vm+=(-s $slot,virtio-net-viona,"$nic")
+        slot=$((slot + 1))
+    done
+    # the --disk disks from slot 10, after the NICs
+    slot=10
+    for d in ${disks[@]+"${disks[@]}"}; do
+        vm+=(-s $slot,$dev,"$d")
         slot=$((slot + 1))
     done
     vm+=("$name")

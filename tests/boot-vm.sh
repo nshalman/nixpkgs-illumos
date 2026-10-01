@@ -93,12 +93,20 @@ if "$tools/boot-vm" --dry-run -n vm1 img.usb >nonic.out 2>&1 && grep -q -- "-s 4
 else
     bad "--dry-run without --nic"; show nonic.out
 fi
+touch zones.img data.img
+if "$tools/boot-vm" --dry-run -n vm1 --nic vmnet0 --disk zones.img --disk data.img img.usb >disk.out 2>&1 &&
+    grep -q -- "-s 5,virtio-net-viona,vmnet0 -s 10,virtio-blk,zones.img -s 11,virtio-blk,data.img vm1$" disk.out &&
+    ! "$tools/boot-vm" --dry-run --disk missing.img img.usb 2>nodisk.err && grep -q 'missing.img' nodisk.err; then
+    ok "--disk: a virtio disk on each file, from slot 10; a missing file refused"
+else
+    bad "--disk"; show disk.out nodisk.err
+fi
 
 # rshyve (rust-bhyve) from the caller's PATH: here a stand-in, as --dry-run only names it
 mkdir rshyve-bin && printf '#!/bin/sh\nexit 1\n' >rshyve-bin/rshyve && chmod +x rshyve-bin/rshyve
-if PATH=$tmp/rshyve-bin:$PATH "$tools/boot-vm" --dry-run --vmm rshyve -n vm1 --nic vmnet0 img.usb >rdry.out 2>&1 &&
-    [ "$(cat rdry.out)" = "$tmp/rshyve-bin/rshyve -H -c 2 -m 4G -s 0,hostbridge -s 31,lpc -l bootrom,/usr/share/bhyve/uefi-rom.bin -l com1,stdio -l com2,/dev/null -s 4,nvme,img.usb -s 5,virtio-net-viona,vmnet0 vm1" ]; then
-    ok "--vmm rshyve: rshyve from PATH, the disk on NVMe, COM2 not its metadata agent, no -w"
+if PATH=$tmp/rshyve-bin:$PATH "$tools/boot-vm" --dry-run --vmm rshyve -n vm1 --nic vmnet0 --disk zones.img img.usb >rdry.out 2>&1 &&
+    [ "$(cat rdry.out)" = "$tmp/rshyve-bin/rshyve -H -c 2 -m 4G -s 0,hostbridge -s 31,lpc -l bootrom,/usr/share/bhyve/uefi-rom.bin -l com1,stdio -l com2,/dev/null -s 4,nvme,img.usb -s 5,virtio-net-viona,vmnet0 -s 10,nvme,zones.img vm1" ]; then
+    ok "--vmm rshyve: rshyve from PATH, the disks on NVMe, COM2 not its metadata agent, no -w"
 else
     bad "--vmm rshyve"; show rdry.out
 fi
