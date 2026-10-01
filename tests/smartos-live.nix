@@ -167,6 +167,25 @@ in
     echo "ok   builder runs"
     touch $out
   '';
+  # builder's search directories: every file manifest.gen lists is in one, and the two that are in two stages are
+  # taken from the stage the platform has them from (livesrc's sshd_config, illumos-extra's gzip's zcat)
+  searchDirs = pkgs.runCommand "smartos-live-search-dirs-check" { } ''
+    awk '$1 == "f" { print $2 }' ${live.manifest}/manifest.gen >files
+    while read -r f; do
+      found=
+      for d in ${toString live.searchDirs}; do
+        if [ -e "$d/$f" ]; then found=$d; break; fi
+      done
+      [ -n "$found" ] || { echo "FAIL $f is in none of them"; exit 1; }
+      echo "$f $found"
+    done <files >found
+    grep -x "etc/ssh/sshd_config ${live.livesrc}" found
+    cmp ${live.livesrc}/etc/ssh/sshd_config ${extra.platformReference}/etc/ssh/sshd_config
+    grep -x "usr/bin/zcat ${live.extraJoin}" found
+    readlink ${live.extraJoin}/usr/bin/zcat | grep "^${extra.gzip}/" >/dev/null
+    echo "ok   all $(wc -l <files) files in the search directories; sshd_config from livesrc, zcat from gzip"
+    touch $out
+  '';
   # man.cf, made from the manifest by mancf
   man-cf = compare "man-cf" live.man-cf "echo usr/share/man/man.cf" "" "";
 

@@ -151,6 +151,87 @@ lib.makeScope newScope (self: {
     '';
   };
 
+  # The directories builder takes the platform's files from (build_live's input directories), first match first.
+  # Theirs is the one proto area every stage installed into, a later stage's file over an earlier one's; here the
+  # stages' outputs, later stages first: of the files the manifest lists, livesrc's sshd_config is also openssh's
+  # (illumos-extra), and illumos-extra's zcat (gzip) also illumos'; no others are in two. Stages with none in
+  # common are joined into one directory of links to the files of theirs the manifest lists (what builder reads; it
+  # copies the files linked to), which fails if two of them have the same one. livesrc, the joined local stages, the
+  # joined illumos-extra, illumos.
+  join =
+    name: paths:
+    runCommand name { } ''
+      mkdir $out
+      awk '$1 == "f" { print $2 }' ${self.manifest}/manifest.gen >files
+      for p in ${toString paths}; do
+        while read -r f; do
+          [ -e "$p/$f" ] || continue
+          if [ -e "$out/$f" ] || [ -L "$out/$f" ]; then
+            echo "$f is in more than one of ${toString paths}" >&2
+            exit 1
+          fi
+          mkdir -p "$out/$(dirname "$f")"
+          ln -s "$p/$f" "$out/$f"
+        done <files
+      done
+    '';
+  localJoin = self.join "smartos-live-local-join" (
+    [
+      self.devpro
+      self.man-cf
+    ]
+    ++ map (n: self.${n}) (lib.attrNames self.localSrc)
+  );
+  # what illumos-extra installs into the platform's proto area: its 38 packages and gcc 10's runtime libraries
+  extraPackages = map (n: smartos-extra.${n}) [
+    "bash"
+    "bind"
+    "bzip2"
+    "coreutils"
+    "cpp"
+    "curl"
+    "dialog"
+    "gcc10"
+    "gnupg"
+    "gtar"
+    "gzip"
+    "ipmitool"
+    "less"
+    "libexpat"
+    "libidn"
+    "libidn2"
+    "libxml"
+    "libz"
+    "mdb_v8"
+    "ncurses"
+    "node"
+    "nss-nspr"
+    "ntp"
+    "openldap"
+    "openlldp"
+    "openssh"
+    "openssl1x"
+    "openssl3"
+    "pbzip2"
+    "perl"
+    "rsync"
+    "rsyslog"
+    "screen"
+    "socat"
+    "tun"
+    "uuid"
+    "vim"
+    "wget"
+    "xz"
+  ];
+  extraJoin = self.join "smartos-extra-join" self.extraPackages;
+  searchDirs = [
+    self.livesrc
+    self.localJoin
+    self.extraJoin
+    self.illumosProto
+  ];
+
   # usr/share/man/man.cf, the man page sections the platform's pages are in: `mancf -t -f manifest.gen`
   man-cf = runCommand "smartos-live-man-cf" { } ''
     mkdir -p $out/usr/share/man
