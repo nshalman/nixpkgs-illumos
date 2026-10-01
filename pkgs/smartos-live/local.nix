@@ -8,11 +8,13 @@
 # is the scope's, proto the illumos build's proto area (read only: DESTDIR, which they install into, is this
 # package's output), proto.strap the strap, projects/illumos the nightly's illumos-joyent source.
 {
+  lib,
   stdenv,
   buildEnv,
   illumosProto,
   strapProto,
   ctfconvert,
+  localSrc,
   smartos-illumos,
 }:
 
@@ -22,6 +24,8 @@
   version,
   # more make variables, on the command line
   makeFlags ? [ ],
+  # other local projects whose sources it reads, beside it in projects/local
+  withLocal ? [ ],
   ...
 }@args:
 
@@ -32,6 +36,7 @@ stdenv.mkDerivation (
   removeAttrs args [
     "name"
     "makeFlags"
+    "withLocal"
   ]
   // {
     pname = "smartos-live-local-${name}";
@@ -45,7 +50,9 @@ stdenv.mkDerivation (
       cp ${buildEnv} live/build.env
       ln -s ${illumosProto} live/proto
       ln -s ${strapProto} live/proto.strap
-      ln -s ${smartos-illumos.src} live/projects/illumos
+      ln -s ${smartos-illumos.src} live/projects/illumos${
+        lib.concatMapStrings (n: "\nln -s ${localSrc.${n}} live/projects/local/${n}") withLocal
+      }
       cd live/projects/local/${name}
       runHook postUnpack
     '';
