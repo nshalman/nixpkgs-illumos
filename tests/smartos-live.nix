@@ -18,9 +18,11 @@ in
   # 0-devpro-stamp section (projects/devpro installs those), and of man's, man.cf (made from the whole manifest by
   # tools/mancf) and, of src's, var/log/syslog (made empty in the image by tools/build_live).
   #
-  # Expected to differ: the dist.shasum npm writes into fs-ext's package.json, the sha1 of the tarball npm packs from
-  # the git archive it makes (npm 1.4.3's addRemoteGit and addTmpTarball), which depends on the tools that pack it;
-  # the rest of it, _resolved and _from (what was installed) among it, is compared apart.
+  # Expected to differ: the dist.shasum npm writes into fs-ext's package.json, a sha1 of the tarball npm makes from
+  # the git archive of the pinned commit (npm 1.4.3's addRemoteGit, then addTmpTarball). Why theirs differs is not
+  # known: ours is the same from one build to the next, and is not the sha1 of that git archive gzipped by the strap
+  # node's zlib as addRemoteGit does, so the tarball hashed is another; their git's archive may differ from nixpkgs'.
+  # The rest of the file, _resolved and _from (what was installed) among it, is compared apart.
   livesrc =
     pkgs.runCommand "smartos-live-src-compare" { } ''
       src=${live.smartosLive}/src
