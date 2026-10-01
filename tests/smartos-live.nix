@@ -10,12 +10,29 @@ let
   extra = pkgs.smartos-extra;
   inherit (pkgs.smartos-strap) gcc10-illumos;
   node = "${live.strapProto}/usr/node/0.10/bin/node";
+
+  # compare NAME PKG LIST EXPECTED CHECK: PKG against the platform's files and links that LIST (shell commands
+  # writing relative paths, one per line) names, with the differences in the paths EXPECTED (a regex) matches shown
+  # and accepted (each caller says why); CHECK is more shell, run after. f entries only, as for illumos-extra
+  # (tests/smartos-extra.nix): the builder makes the links.
+  compare =
+    name: pkg: list: expected: check:
+    pkgs.runCommand "smartos-live-${name}-compare" { } ''
+      {
+        ${list}
+      } | sort -u >list
+      IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
+        bash ${./strap-compare.sh} ${extra.platformReference} ${pkg} '.' '${expected}' >report 2>&1 ||
+        { cat report; exit 1; }
+      cat report
+      ${check}
+      cp report $out
+    '';
 in
 {
-  # f entries only, as for illumos-extra (tests/smartos-extra.nix): the builder makes the links. src's manifest is
-  # what src/Makefile's manifest target writes: src/manifest and the vm and fw tests and examples, which it lists with
-  # git ls-files (here with find, the source having no .git). Not this stage's, so left out: src/manifest's
-  # 0-devpro-stamp section (projects/devpro installs those), and of man's, man.cf (made from the whole manifest by
+  # src's manifest is what src/Makefile's manifest target writes: src/manifest and the vm and fw tests and examples,
+  # which it lists with git ls-files (here with find, the source having no .git). Not this stage's, so left out:
+  # src/manifest's 0-devpro-stamp section (devpro, below), and of man's, man.cf (made from the whole manifest by
   # tools/mancf) and, of src's, var/log/syslog (made empty in the image by tools/build_live).
   #
   # Expected to differ: the dist.shasum npm writes into fs-ext's package.json, a sha1 of the tarball npm makes from
@@ -24,28 +41,28 @@ in
   # node's zlib as addRemoteGit does, so the tarball hashed is another; their git's archive may differ from nixpkgs'.
   # The rest of the file, _resolved and _from (what was installed) among it, is compared apart.
   livesrc =
-    pkgs.runCommand "smartos-live-src-compare" { } ''
-      src=${live.smartosLive}/src
-      fsExtJson=usr/node/0.10/node_modules/fs-ext/package.json
-      {
-        awk '/^# / { section = $0 } $1 == "f" && section != "# 0-devpro-stamp" { print $2 }' $src/manifest |
+    let
+      src = "${live.smartosLive}/src";
+      fsExtJson = "usr/node/0.10/node_modules/fs-ext/package.json";
+    in
+    compare "src" live.livesrc
+      ''
+        awk '/^# / { s = $0 } $1 == "f" && s != "# 0-devpro-stamp" { print $2 }' ${src}/manifest |
           grep -vx var/log/syslog
         awk '$1 == "f" { print $2 }' ${live.smartosLive}/man/manifest | grep -vx usr/share/man/man.cf
         # and the pages man installs over illumos-extra's, which illumos-extra's manifest lists
         awk '/^MAN_FILES =/ { on = 1; next } on && NF == 0 { on = 0 } on { print $1 }' ${live.smartosLive}/man/Makefile
-        (cd $src/vm && find tests \( -type f -o -type l \) -print) | grep -v /testdata/ | sed 's|^|usr/vm/test/|'
-        (cd $src/vm/tests && find testdata \( -type f -o -type l \) -print) | sed 's|^|usr/vm/test/|'
-        (cd $src/fw/test && find integration \( -type f -o -type l \) -print) | sed 's|^|usr/fw/test/|'
-        (cd $src/fw/etc && find examples \( -type f -o -type l \) -print) | sed 's|^|usr/fw/etc/|'
-      } | sort -u >list
-      IGNORE_MODES=1 PATH_LIST=$PWD/list GCC_LIB=${gcc10-illumos.lib} GCC_OUT=${gcc10-illumos} \
-        bash ${./strap-compare.sh} ${extra.platformReference} ${live.livesrc} '.' "^$fsExtJson$" >report 2>&1 ||
-        { cat report; exit 1; }
-      cat report
-      diff <(grep -v '"shasum": ' ${extra.platformReference}/$fsExtJson) <(grep -v '"shasum": ' ${live.livesrc}/$fsExtJson)
-      echo "ok   $fsExtJson but for dist.shasum" | tee -a report
-      cp report $out
-    '';
+        (cd ${src}/vm && find tests \( -type f -o -type l \) -print) | grep -v /testdata/ | sed 's|^|usr/vm/test/|'
+        (cd ${src}/vm/tests && find testdata \( -type f -o -type l \) -print) | sed 's|^|usr/vm/test/|'
+        (cd ${src}/fw/test && find integration \( -type f -o -type l \) -print) | sed 's|^|usr/fw/test/|'
+        (cd ${src}/fw/etc && find examples \( -type f -o -type l \) -print) | sed 's|^|usr/fw/etc/|'
+      ''
+      "^${fsExtJson}$"
+      ''
+        diff <(grep -v '"shasum": ' ${extra.platformReference}/${fsExtJson}) \
+          <(grep -v '"shasum": ' ${live.livesrc}/${fsExtJson})
+        echo "ok   ${fsExtJson} but for dist.shasum" | tee -a report
+      '';
 
   # the node add-ons, loaded by a node 0.10 (the strap's; the platform's is the same 0.10.26) and used: those built
   # with nan (dtrace-provider, fs-ext, zonename) and the others; their libraries resolve as on the platform, on the
