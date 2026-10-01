@@ -67,7 +67,9 @@ fi
 
 # make_vm DISK: the bhyve (or rshyve) command, in vm
 make_vm() {
-    local disk=$1 slot=5 nic d dev=virtio-blk
+    # bhyve gives a disk on a file the file system's block size (st_blksize; ZFS's recordsize, 128K) for its physical
+    # sector size, too big for a pool's ashift ("one or more vdevs require an invalid ashift"): 4K, as a disk's
+    local disk=$1 slot=5 nic d dev=virtio-blk opts=,sectorsize=512/4096
     case $vmm in
         bhyve) vm=(bhyve -H -w) ;;
         rshyve) vm=("$rshyve" -H) ;;
@@ -80,7 +82,7 @@ make_vm() {
         bhyve) vm+=(-s 4,ahci-hd,"$disk") ;;
         # rshyve has no AHCI disk, and its COM2 is a metadata agent unless one is named: the image's loader writes its
         # console to COM2 too (ttyb), and would take the agent's answers ("invalid command") for keys
-        rshyve) vm+=(-l com2,/dev/null -s 4,nvme,"$disk"); dev=nvme ;;
+        rshyve) vm+=(-l com2,/dev/null -s 4,nvme,"$disk"); dev=nvme opts= ;;
     esac
     for nic in ${nics[@]+"${nics[@]}"}; do
         vm+=(-s $slot,virtio-net-viona,"$nic")
@@ -89,7 +91,7 @@ make_vm() {
     # the --disk disks from slot 10, after the NICs
     slot=10
     for d in ${disks[@]+"${disks[@]}"}; do
-        vm+=(-s $slot,$dev,"$d")
+        vm+=(-s $slot,$dev,"$d$opts")
         slot=$((slot + 1))
     done
     vm+=("$name")

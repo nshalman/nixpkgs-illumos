@@ -95,9 +95,9 @@ else
 fi
 touch zones.img data.img
 if "$tools/boot-vm" --dry-run -n vm1 --nic vmnet0 --disk zones.img --disk data.img img.usb >disk.out 2>&1 &&
-    grep -q -- "-s 5,virtio-net-viona,vmnet0 -s 10,virtio-blk,zones.img -s 11,virtio-blk,data.img vm1$" disk.out &&
+    grep -q -- "-s 5,virtio-net-viona,vmnet0 -s 10,virtio-blk,zones.img,sectorsize=512/4096 -s 11,virtio-blk,data.img,sectorsize=512/4096 vm1$" disk.out &&
     ! "$tools/boot-vm" --dry-run --disk missing.img img.usb 2>nodisk.err && grep -q 'missing.img' nodisk.err; then
-    ok "--disk: a virtio disk on each file, from slot 10; a missing file refused"
+    ok "--disk: a virtio disk on each file, from slot 10, 4K physical sectors; a missing file refused"
 else
     bad "--disk"; show disk.out nodisk.err
 fi
