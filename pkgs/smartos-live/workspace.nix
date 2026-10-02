@@ -5,9 +5,10 @@
 # What build_live makes in the mounted image without needing root is made by Nix here, and installed by the tools it
 # runs for it, in place of theirs: tools/smf_import and tools/build_seeds install the SMF repository and the
 # joyent-minimal seed (smfRepository, smfSeed: owned as their scripts leave them), tools/build_etcrelease prints
-# gitstatus.json (-g) and etc/release (-v; versionFiles), which build_live writes in. Its whatis step, which runs the
-# illumos tools' man -w itself, installs the whatis databases instead (./build-live-whatis.patch). tools/tzcheck is
-# ./tzcheck-store.sh around theirs: the proto area is in the store, which keeps no hard links.
+# the platform's gitstatus.json (-g; platformGitstatus) and etc/release for the image's build stamp (-v), which
+# build_live writes in. Its whatis step, which runs the illumos tools' man -w itself, installs the whatis databases
+# instead (./build-live-whatis.patch). tools/tzcheck is ./tzcheck-store.sh around theirs: the proto area is in the
+# store, which keeps no hard links.
 #
 # build_live writes its log in the tree (log/), so it is run from a writable directory of links to this one.
 {
@@ -17,7 +18,7 @@
   liveTools,
   smfRepository,
   smfSeed,
-  versionFiles,
+  platformGitstatus,
   whatis,
   bootProto,
   pigz,
@@ -65,12 +66,14 @@ runCommand "smartos-live-workspace" { } ''
   EOF
   cat >$out/tools/build_etcrelease <<'EOF'
   #!/bin/bash
-  # build_etcrelease -g | -v BUILDSTAMP: gitstatus.json and etc/release, made by Nix (smartos-live versionFiles)
+  # build_etcrelease -g | -v BUILDSTAMP: the platform's gitstatus.json, made by Nix (smartos-live platformGitstatus:
+  # the pins' entries and the overlay's, not checkouts'), and etc/release for BUILDSTAMP, the stamp the image step
+  # chose (smartos-live etc-release.sh)
   set -euo pipefail
-  case "$*" in
-    -g) cat ${versionFiles}/etc/versions/build ;;
-    "-v $(head -1 ${versionFiles}/etc/release | awk '{ print $2 }')") cat ${versionFiles}/etc/release ;;
-    *) echo "build_etcrelease: $* is not what was made (${versionFiles})" >&2; exit 1 ;;
+  case "''${1:-}" in
+    -g) cat ${platformGitstatus} ;;
+    -v) bash ${./etc-release.sh} "''${2:?usage: build_etcrelease -v BUILDSTAMP}" ${platformGitstatus} ;;
+    *) echo "usage: build_etcrelease -g | -v BUILDSTAMP" >&2; exit 2 ;;
   esac
   EOF
   chmod +x $out/tools/smf_import $out/tools/build_seeds $out/tools/build_etcrelease

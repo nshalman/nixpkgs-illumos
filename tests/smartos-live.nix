@@ -155,15 +155,20 @@ in
       echo "ok   ours: the illumos build's stamp and the pins' gitstatus.json"
       touch $out
     '';
-  # the workspace build_live runs from, as far as it runs without root: build_etcrelease gives what Nix made (and
-  # refuses another build stamp), build_live installs the whatis databases rather than running man -w, and
-  # build-image is a script that wants its output directory (the rest is root's, in the builder zone)
+  # the workspace build_live runs from, as far as it runs without root: build_etcrelease gives the platform's
+  # gitstatus.json and etc/release for whatever build stamp the image step chose, build_live installs the whatis
+  # databases rather than running man -w, and build-image is a script that wants its output directory (the rest is
+  # root's, in the builder zone)
   liveWorkspace = pkgs.runCommand "smartos-live-workspace-check" { } ''
     w=${live.liveWorkspace}
-    $w/tools/build_etcrelease -g | cmp - ${live.versionFiles}/etc/versions/build
-    $w/tools/build_etcrelease -v "$(cat ${live.illumosProto}/buildstamp)" | cmp - ${live.versionFiles}/etc/release
-    if $w/tools/build_etcrelease -v 20000101T000000Z 2>/dev/null; then exit 1; fi
-    echo "ok   build_etcrelease"
+    $w/tools/build_etcrelease -g | cmp - ${live.platformGitstatus}
+    $w/tools/build_etcrelease -v 20000101T000007Z >release
+    sed -n 1,2p release >head
+    printf '%s\n' '                     SmartOS 20000101T000007Z x86_64' \
+      '                    Copyright 2000 Edgecast Cloud LLC.' | cmp - head
+    tail -n +6 release | cmp - ${live.platformGitstatus}
+    if $w/tools/build_etcrelease -x 2>/dev/null; then exit 1; fi
+    echo "ok   build_etcrelease: the platform's gitstatus.json, and etc/release for any build stamp"
     grep "local whatis=${live.whatis} d" $w/tools/build_live >/dev/null
     if grep tools_man $w/tools/build_live; then exit 1; fi
     bash -n $w/tools/build_live
@@ -198,6 +203,54 @@ in
     if $t ls joyent_x 2>err; then exit 1; fi
     grep 'no utsname' err >/dev/null && cmp ls ${live.illumosProto}/usr/bin/ls
     echo "ok   a version too long, a file without utsname: refused, unchanged"
+    touch $out
+  '';
+  # stage-image, the image step's build stamp, for each kind of identity: a clean tree's stamp (its commit's) or, for
+  # a dirty one, the time now with its last digit 7; that stamp in the proto area build_live reads (the illumos
+  # build's otherwise, by links), the kernel's uname -v, and etc/motd and etc/issue (the illumos build's, its stamp
+  # replaced); an identity of no known kind refused.
+  stageImage = pkgs.runCommand "smartos-live-stage-image-check" { } ''
+    t=${live.buildImage}/libexec/stage-image
+    p=${live.illumosProto}
+    old=$(cat $p/buildstamp)
+    bare() { /usr/bin/strings -a "$1" | grep -x 'joyent_[0-9A-Za-z]*' || true; }
+    printf 'kind=clean\nrev=abc\nstamp=20231114T221327Z\n' >clean
+    [ "$($t clean c)" = 20231114T221327Z ]
+    [ "$(cat c/proto/buildstamp)" = 20231114T221327Z ]
+    [ "$(ls $p | wc -l)" = "$(ls c/proto | wc -l)" ] && [ "$(readlink c/proto/usr)" = $p/usr ]
+    [ "$(bare c/stamped/platform/i86pc/kernel/amd64/unix)" = joyent_20231114T221327Z ]
+    [ "$(cat c/stamped/etc/motd)" = "SmartOS (build: 20231114T221327Z)" ]
+    grep -q 20231114T221327Z c/stamped/etc/issue
+    sed "s/20231114T221327Z/$old/g" c/stamped/etc/issue | cmp - $p/etc/issue
+    echo "ok   a clean tree: its stamp in proto/buildstamp, the kernel, motd and issue"
+    printf 'kind=dirty\nrev=abc-dirty\nstamp=\n' >dirty
+    before=$(TZ=UTC date +%Y%m%d)
+    s=$($t dirty d)
+    after=$(TZ=UTC date +%Y%m%d)
+    [[ $s =~ ^[0-9]{8}T[0-9]{5}7Z$ ]] && { [ "''${s:0:8}" = "$before" ] || [ "''${s:0:8}" = "$after" ]; }
+    [ "$(cat d/proto/buildstamp)" = "$s" ] && [ "$(bare d/stamped/platform/i86pc/kernel/amd64/unix)" = "joyent_$s" ]
+    echo "ok   a dirty tree: the time now (UTC), last digit 7"
+    printf 'kind=bogus\n' >bad
+    if $t bad b 2>err; then exit 1; fi
+    grep -q 'bogus' err
+    echo "ok   an identity of no known kind: refused"
+    touch $out
+  '';
+  # the platform's gitstatus.json: the pins', then the overlay's own entry (its commit, or <commit>-dirty, and commit
+  # time; ./identity.nix), unless its identity is unknown
+  platformGitstatus = pkgs.runCommand "smartos-live-platform-gitstatus-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''
+    python3 - ${live.gitstatus} ${live.platformGitstatus} <<'EOF'
+    import json, sys
+    pins, plat = (json.load(open(f)) for f in sys.argv[1:3])
+    kind, rev, date = "${live.identity.kind}", "${toString live.identity.rev}", "${toString live.identity.date}"
+    if kind == "unknown":
+        assert plat == pins, plat
+    else:
+        assert plat[:-1] == pins, plat
+        own = plat[-1]
+        assert (own["repo"], own["rev"], own["commit_date"]) == ("nixpkgs-illumos", rev, date), own
+    print("ok   the pins' entries, then the overlay's (" + kind + " " + rev + ")")
+    EOF
     touch $out
   '';
   # The USB image's parts, as far as they run without root (making and booting the image is root's, in a builder

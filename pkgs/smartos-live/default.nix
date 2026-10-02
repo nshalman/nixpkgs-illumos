@@ -72,6 +72,29 @@ lib.makeScope newScope (self: {
       );
   gitstatus = writeText "gitstatus.json" (self.gitstatusText self.gitstatusEntries);
 
+  # The overlay's identity (./identity.nix), from this checkout, and as the image step reads it (identityFile,
+  # ./stage-image.sh): kind, rev and stamp, one KEY=VALUE a line, stamp empty when there is none
+  identity = import ./identity.nix { src = ../..; };
+  identityFile = writeText "identity" ''
+    kind=${self.identity.kind}
+    rev=${toString self.identity.rev}
+    stamp=${toString self.identity.stamp}
+  '';
+  # gitstatus.json for the platform: the pins' entries, then the overlay's own (its commit, or <commit>-dirty, and the
+  # commit's time; branch HEAD, what was checked out), unless its identity is unknown
+  platformGitstatus = writeText "gitstatus.json" (
+    self.gitstatusText (
+      self.gitstatusEntries
+      ++ lib.optional (self.identity.kind != "unknown") {
+        repo = "nixpkgs-illumos";
+        branch = "HEAD";
+        commit_date = toString self.identity.date;
+        inherit (self.identity) rev;
+        url = "https://github.com/nshalman/nixpkgs-illumos.git";
+      }
+    )
+  );
+
   # etc/release and etc/versions/build, as build_live writes them (bi_gen_version_files): gitstatus.json, and
   # tools/build_etcrelease -v's template (./etc-release.sh). versionFilesFor BUILDSTAMP GITSTATUS, from those files;
   # versionFiles from the illumos build's stamp (proto/buildstamp, which build_live reads) and the pins'
@@ -359,18 +382,20 @@ lib.makeScope newScope (self: {
   # (./workspace.nix)
   liveWorkspace = self.callPackage ./workspace.nix { };
   # The root step: bin/build-image OUTPUT-DIR [ROOT-PASSWORD] runs build_live as `gmake live` does, with the
-  # manifest, searchDirs and liveWorkspace (./build-image.sh), and the illumos build's kernel with the platform's
-  # version (libexec/uname-version, ./uname-version.sh) ahead of them. Needs root, lofi and UFS mounts. What their PATH
-  # has from pkgsrc, md5sum and gtar, is nixpkgs' coreutils and GNU tar here.
+  # manifest, searchDirs and liveWorkspace (./build-image.sh), and the platform's build stamp from the overlay's
+  # identity (libexec/stage-image, ./stage-image.sh: in the proto area build_live reads, the kernel's uname -v by
+  # libexec/uname-version, motd and issue, ahead of the search directories). Needs root, lofi and UFS mounts. What their
+  # PATH has from pkgsrc, md5sum and gtar, is nixpkgs' coreutils and GNU tar here.
   buildImage = runCommand "smartos-live-build-image" { } ''
     mkdir -p $out/bin $out/libexec
     ln -s ${gnutar}/bin/tar $out/libexec/gtar
     cp ${./uname-version.sh} $out/libexec/uname-version
-    chmod +x $out/libexec/uname-version
+    substitute ${./stage-image.sh} $out/libexec/stage-image --subst-var-by illumosProto ${self.illumosProto}
+    chmod +x $out/libexec/uname-version $out/libexec/stage-image
     substitute ${./build-image.sh} $out/bin/build-image \
       --subst-var-by manifest ${self.manifest}/manifest.gen \
       --subst-var-by searchDirs "${toString self.searchDirs}" \
-      --subst-var-by unix ${self.illumosProto}/platform/i86pc/kernel/amd64/unix \
+      --subst-var-by identity ${self.identityFile} \
       --subst-var-by workspace ${self.liveWorkspace} \
       --subst-var-by extraPath ${coreutils}/bin:$out/libexec
     chmod +x $out/bin/build-image

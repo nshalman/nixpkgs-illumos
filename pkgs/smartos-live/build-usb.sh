@@ -47,6 +47,12 @@ ln -s "$platform" "$ws/output/platform-latest"
 rm "$ws/proto.boot"
 cp -r @workspace@/proto.boot/ "$ws/proto.boot"
 find "$ws/proto.boot" -type d -exec chmod u+w {} +
+# the boot files' version, etc/version/boot, is the platform's build stamp (build_live's etc/version/platform), as
+# theirs, which have one stamp a build; the illumos build's in proto.boot otherwise
+if [ -f "$platform/etc/version/platform" ]; then
+    rm -f "$ws/proto.boot/etc/version/boot"
+    cp "$platform/etc/version/platform" "$ws/proto.boot/etc/version/boot"
+fi
 # the -f files: build_boot_image copies proto.boot onto the root file system
 for f in ${files[@]+"${files[@]}"}; do
     mkdir -p "$(dirname "$ws/proto.boot/${f#*=}")"

@@ -5,6 +5,9 @@
 # directories (@searchDirs@) and the workspace build_live runs from (@workspace@). Needs root, lofi and UFS mounts:
 # a zone with the builder brand (its lofi devices) and fs_allowed including ufs, or the global zone.
 #
+# The build stamp follows the overlay's checkout (./identity.nix, ./stage-image.sh): a clean tree's is its commit's,
+# a dirty one's the time the image is made.
+#
 # The root password is ROOT-PASSWORD, or one made here (theirs by pkgsrc's pwgen -B -c -n 16); build_live writes it
 # beside the image (root.password). PATH is theirs (/usr/bin, /usr/sbin, /sbin, then what they take from pkgsrc:
 # md5sum and gtar, here nixpkgs' coreutils and GNU tar).
@@ -27,18 +30,16 @@ fi
 ws=$(mktemp -d)
 trap 'rm -rf "$ws"' EXIT
 for f in @workspace@/*; do
-    ln -s "$f" "$ws/"
+    [ "${f##*/}" = proto ] || ln -s "$f" "$ws/"
 done
 mkdir -p "$out/log"
 ln -s "$(cd "$out" && pwd)/log" "$ws/log"
 
-# The kernel, its uname -v the platform's version, joyent_ and the build stamp build_live gives the image (as
-# smartos-live's build_illumos makes it), rather than the illumos build's (./uname-version.sh): in a search directory
-# of its own, ahead of the others, as builder takes each file from the first that has it
-stamped=$ws/stamped/platform/i86pc/kernel/amd64
-mkdir -p "$stamped"
-cp @unix@ "$stamped/unix"
-chmod u+w "$stamped/unix"
-uname-version "$stamped/unix" "joyent_$(cat @workspace@/proto/buildstamp)"
+# The platform's build stamp, from the overlay's identity (@identity@; ./stage-image.sh): the proto area build_live
+# reads it from, and the files with it in (the kernel's uname -v, motd, issue) in a search directory of their own,
+# ahead of the others, as builder takes each file from the first that has it
+stamp=$(stage-image @identity@ "$ws/stage")
+echo "build-image: build stamp $stamp"
+ln -s "$ws/stage/proto" "$ws/proto"
 
-"$ws/tools/build_live" -m @manifest@ -o "$out" -p "$password" "$ws/stamped" @searchDirs@
+"$ws/tools/build_live" -m @manifest@ -o "$out" -p "$password" "$ws/stage/stamped" @searchDirs@
