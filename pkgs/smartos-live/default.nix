@@ -75,21 +75,15 @@ lib.makeScope newScope (self: {
   );
 
   # etc/release and etc/versions/build, as build_live writes them (bi_gen_version_files): gitstatus.json, and
-  # tools/build_etcrelease -v's template, with the build stamp and a year (theirs the year it runs in, here the build
-  # stamp's), followed by gitstatus.json. versionFilesFor BUILDSTAMP GITSTATUS, from those files; versionFiles from the
-  # illumos build's stamp (proto/buildstamp, which build_live reads) and the pins' gitstatus.json.
+  # tools/build_etcrelease -v's template (./etc-release.sh). versionFilesFor BUILDSTAMP GITSTATUS, from those files;
+  # versionFiles from the illumos build's stamp (proto/buildstamp, which build_live reads) and the pins'
+  # gitstatus.json.
   versionFilesFor =
     buildstamp: gitstatus:
     runCommand "smartos-live-version-files" { } ''
-      stamp=$(cat ${buildstamp})
       mkdir -p $out/etc/versions
       cp ${gitstatus} $out/etc/versions/build
-      {
-        printf '                     SmartOS %s x86_64\n' "$stamp"
-        printf '                    Copyright %s Edgecast Cloud LLC.\n' "''${stamp:0:4}"
-        printf '\n  Built with the following components:\n\n'
-        cat ${gitstatus}
-      } >$out/etc/release
+      bash ${./etc-release.sh} "$(cat ${buildstamp})" ${gitstatus} >$out/etc/release
     '';
   versionFiles = self.versionFilesFor "${self.illumosProto}/buildstamp" self.gitstatus;
 
