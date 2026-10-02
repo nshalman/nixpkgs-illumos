@@ -55,24 +55,22 @@ lib.makeScope newScope (self: {
             }'';
     in
     "[\n    " + lib.concatMapStringsSep ",\n    " entry entries + "\n]\n";
-  gitstatus = writeText "gitstatus.json" (
-    self.gitstatusText (
-      map
-        (name: {
-          repo = name;
-          inherit (self.pins.${name}) branch rev url;
-          commit_date = toString self.pins.${name}.date;
-        })
-        (
-          [
-            "smartos-live"
-            "illumos-joyent"
-            "illumos-extra"
-          ]
-          ++ lib.attrNames self.localSrc
-        )
-    )
-  );
+  gitstatusEntries =
+    map
+      (name: {
+        repo = name;
+        inherit (self.pins.${name}) branch rev url;
+        commit_date = toString self.pins.${name}.date;
+      })
+      (
+        [
+          "smartos-live"
+          "illumos-joyent"
+          "illumos-extra"
+        ]
+        ++ lib.attrNames self.localSrc
+      );
+  gitstatus = writeText "gitstatus.json" (self.gitstatusText self.gitstatusEntries);
 
   # etc/release and etc/versions/build, as build_live writes them (bi_gen_version_files): gitstatus.json, and
   # tools/build_etcrelease -v's template (./etc-release.sh). versionFilesFor BUILDSTAMP GITSTATUS, from those files;
