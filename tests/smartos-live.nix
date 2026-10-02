@@ -231,6 +231,9 @@ in
     echo "ok   a clean tree: its stamp, last digit 7, in proto/buildstamp, the kernel, motd and issue"
     [ "$($t clean c8 8)" = 20231114T221328Z ] && [ "$(cat c8/stamped/etc/motd)" = "SmartOS (build: 20231114T221328Z)" ] || exit 1
     echo "ok   another flavor's digit: 8"
+    printf 'kind=release\nrev=abc\nstamp=20231115T000000Z\npassword=pw\nhash=$6$s$h\n' >release
+    [ "$($t release r 7)" = 20231115T000007Z ] && [ "$(cat r/proto/buildstamp)" = 20231115T000007Z ] || exit 1
+    echo "ok   a release: its stamp, the flavor's digit"
     printf 'kind=dirty\nrev=abc-dirty\nstamp=\n' >dirty
     before=$(TZ=UTC date +%Y%m%d)
     s=$($t dirty d 9)

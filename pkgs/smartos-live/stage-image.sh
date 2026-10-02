@@ -8,9 +8,10 @@
 # its stamp replaced.
 #
 # IDENTITY is the overlay's (smartos-live identityFile, ./identity.nix: kind, rev, stamp, one KEY=VALUE a line): a
-# clean tree has its commit's time, the same on every build of it; a dirty or unknown tree's is the time now (UTC), so
-# each build of it is newer than the last. DIGIT, the flavor's, is the stamp's last, as smartos-live's Jenkins builds
-# stamp theirs (tools/build_jenkins: 7 the default build, 8 debug, 9 gcc14), so that flavors of one build differ.
+# clean tree or a release has its commit's time (a release's, the stamp it was cut at), the same on every build of
+# it; a dirty or unknown tree's is the time now (UTC), so each build of it is newer than the last. DIGIT, the
+# flavor's, is the stamp's last, as smartos-live's Jenkins builds stamp theirs (tools/build_jenkins: 7 the default
+# build, 8 debug, 9 gcc14), so that flavors of one build differ.
 
 set -euo pipefail
 export PATH=/usr/bin:/usr/sbin:/sbin
@@ -31,8 +32,8 @@ while IFS='=' read -r key value; do
     esac
 done <"$identity"
 case $kind in
-    clean | dirty | unknown) ;;
-    *) echo "$0: $identity: kind '$kind' is not clean, dirty or unknown" >&2; exit 1 ;;
+    clean | release | dirty | unknown) ;;
+    *) echo "$0: $identity: kind '$kind' is not clean, release, dirty or unknown" >&2; exit 1 ;;
 esac
 if [ -z "$stamp" ]; then
     stamp=$(TZ=UTC date +%Y%m%dT%H%M%SZ)
