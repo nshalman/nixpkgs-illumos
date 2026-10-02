@@ -1,0 +1,18 @@
+--- a/tools/build_live
++++ b/tools/build_live
+@@ -341,9 +341,13 @@
+ 	bi_emit_info 'Password' "$cp_password"
+ 
+ 	#
+-	# Hash the password for use in /etc/shadow.
++	# Hash the password for use in /etc/shadow, or take the hash given for it
++	# in BI_ROOT_HASH (a release's, made once when it was cut, so that every
++	# image of the release has the same /etc/shadow).
+ 	#
+-	if ! cp_hash=$("$cryptpass" "$cp_password") ||
++	if [[ -n "${BI_ROOT_HASH:-}" ]]; then
++		cp_hash="$BI_ROOT_HASH"
++	elif ! cp_hash=$("$cryptpass" "$cp_password") ||
+ 	    [[ -z $cp_hash ]]; then
+ 		fail 'unable to generate root password hash.'
+ 	fi

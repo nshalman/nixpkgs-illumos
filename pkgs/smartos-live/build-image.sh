@@ -8,9 +8,11 @@
 # The build stamp follows the overlay's checkout (./identity.nix, ./stage-image.sh): a clean tree's is its commit's
 # time, a dirty one's the time the image is made, its last digit the flavor's (@flavorDigit@).
 #
-# The root password is ROOT-PASSWORD, or one made here (theirs by pkgsrc's pwgen -B -c -n 16); build_live writes it
-# beside the image (root.password). PATH is theirs (/usr/bin, /usr/sbin, /sbin, then what they take from pkgsrc:
-# md5sum and gtar, here nixpkgs' coreutils and GNU tar).
+# The root password is ROOT-PASSWORD; or, for a clean tree, the last release's, with its hash
+# (release/release.json, made once when the release was cut: every image of the commit has the same /etc/shadow);
+# or one made here (theirs by pkgsrc's pwgen -B -c -n 16). build_live writes it beside the image (root.password).
+# PATH is theirs (/usr/bin, /usr/sbin, /sbin, then what they take from pkgsrc: md5sum and gtar, here nixpkgs'
+# coreutils and GNU tar).
 
 set -euo pipefail
 
@@ -18,7 +20,18 @@ export PATH=/usr/bin:/usr/sbin:/sbin:@extraPath@
 
 out=${1:?usage: $0 OUTPUT-DIR [ROOT-PASSWORD]}
 password=${2:-}
-if [ -z "$password" ]; then
+release_password= release_hash=
+while IFS='=' read -r key value; do
+    case $key in
+        password) release_password=$value ;;
+        hash) release_hash=$value ;;
+    esac
+done <@identity@
+if [ -z "$password" ] && [ -n "$release_hash" ]; then
+    password=$release_password
+    export BI_ROOT_HASH=$release_hash
+    echo "build-image: the release's root password and hash"
+elif [ -z "$password" ]; then
     # 16 letters and digits, none easily mistaken for another
     password=$(head -c 4096 /dev/urandom | LC_ALL=C tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789')
     password=${password:0:16}

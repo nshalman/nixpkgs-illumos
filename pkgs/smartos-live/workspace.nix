@@ -7,8 +7,9 @@
 # joyent-minimal seed (smfRepository, smfSeed: owned as their scripts leave them), tools/build_etcrelease prints
 # the platform's gitstatus.json (-g; platformGitstatus) and etc/release for the image's build stamp (-v), which
 # build_live writes in. Its whatis step, which runs the illumos tools' man -w itself, installs the whatis databases
-# instead (./build-live-whatis.patch). tools/tzcheck is ./tzcheck-store.sh around theirs: the proto area is in the
-# store, which keeps no hard links.
+# instead (./build-live-whatis.patch). Its root password's hash may be given (BI_ROOT_HASH, a release's;
+# ./build-live-hash.patch) rather than made with a salt of its own. tools/tzcheck is ./tzcheck-store.sh around
+# theirs: the proto area is in the store, which keeps no hard links.
 #
 # build_live writes its log in the tree (log/), so it is run from a writable directory of links to this one.
 {
@@ -29,6 +30,7 @@ runCommand "smartos-live-workspace" { } ''
   cp ${smartosLive}/tools/build_live $out/tools/
   chmod u+w $out/tools/build_live
   patch $out/tools/build_live ${./build-live-whatis.patch}
+  patch $out/tools/build_live ${./build-live-hash.patch}
   substituteInPlace $out/tools/build_live --subst-var-by whatis ${whatis}
   cp ${smartosLive}/tools/lib/build_common.sh $out/tools/lib/
   ln -s ${liveTools}/tools/builder/builder $out/tools/builder/builder

@@ -173,6 +173,12 @@ in
     if grep tools_man $w/tools/build_live; then exit 1; fi
     bash -n $w/tools/build_live
     echo "ok   build_live installs the whatis databases"
+    grep -x '		cp_hash="$BI_ROOT_HASH"' $w/tools/build_live >/dev/null
+    echo "ok   build_live takes the root password's hash given (BI_ROOT_HASH)"
+    i=${live.identityFile}
+    [ "$(grep -c '^\(kind\|rev\|stamp\|password\|hash\)=' $i)" = 5 ]
+    grep -x 'hash=${if live.identity.release == null then "" else live.identity.release.hash}' $i >/dev/null
+    echo "ok   identityFile: kind, rev, stamp, and the release's password and hash (${live.identity.kind})"
     bash -n ${live.buildImage}/bin/build-image
     if ${live.buildImage}/bin/build-image 2>err; then exit 1; fi
     grep "usage: .* OUTPUT-DIR \[ROOT-PASSWORD\]" err >/dev/null

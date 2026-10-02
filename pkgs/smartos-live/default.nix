@@ -86,13 +86,20 @@ lib.makeScope newScope (self: {
   gitstatus = writeText "gitstatus.json" (self.gitstatusText self.gitstatusEntries);
 
   # The overlay's identity (./identity.nix), from this checkout, and as the image step reads it (identityFile,
-  # ./stage-image.sh): kind, rev and stamp, one KEY=VALUE a line, stamp empty when there is none
+  # ./stage-image.sh, ./build-image.sh): kind, rev, stamp, and the last release's root password and hash (a clean
+  # tree's: ../../release/release.json), one KEY=VALUE a line, each empty when there is none
   identity = import ./identity.nix { src = ../..; };
-  identityFile = writeText "identity" ''
-    kind=${self.identity.kind}
-    rev=${toString self.identity.rev}
-    stamp=${toString self.identity.stamp}
-  '';
+  identityFile =
+    let
+      release = field: if self.identity.release == null then "" else self.identity.release.${field};
+    in
+    writeText "identity" ''
+      kind=${self.identity.kind}
+      rev=${toString self.identity.rev}
+      stamp=${toString self.identity.stamp}
+      password=${release "password"}
+      hash=${release "hash"}
+    '';
   # gitstatus.json for the platform: the pins' entries, then the overlay's own (its commit, or <commit>-dirty, and the
   # commit's time; branch HEAD, what was checked out), unless its identity is unknown
   platformGitstatus = writeText "gitstatus.json" (
