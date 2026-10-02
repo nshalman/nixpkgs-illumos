@@ -17,9 +17,22 @@
   smartos-illumos,
   smartos-strap,
   smartos-extra,
+  # which of smartos-live's Jenkins builds this is (its Jenkinsfile): "default", "debug" (smartos-illumos and
+  # smartos-extra built on a DEBUG nightly) or "gcc14"
+  flavor ? "default",
 }:
 
 lib.makeScope newScope (self: {
+  inherit flavor;
+  # the flavor's last digit of the build stamp, as tools/build_jenkins stamps theirs (./stage-image.sh)
+  flavorDigit =
+    {
+      default = "7";
+      debug = "8";
+      gcc14 = "9";
+    }
+    .${flavor};
+
   # the sources pinned by data (../../pins), by name
   pins = import ../../pins;
   # a pinned GitHub source
@@ -396,6 +409,7 @@ lib.makeScope newScope (self: {
       --subst-var-by manifest ${self.manifest}/manifest.gen \
       --subst-var-by searchDirs "${toString self.searchDirs}" \
       --subst-var-by identity ${self.identityFile} \
+      --subst-var-by flavorDigit ${self.flavorDigit} \
       --subst-var-by workspace ${self.liveWorkspace} \
       --subst-var-by extraPath ${coreutils}/bin:$out/libexec
     chmod +x $out/bin/build-image

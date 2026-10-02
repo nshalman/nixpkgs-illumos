@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # pkgs/smartos-live/identity.nix on a throwaway git repository standing in for the overlay's checkout: a clean tree
-# (its commit, the commit time as a build stamp with the last digit 7), an untracked file (still clean: fetchGit
+# (its commit, and the commit time as a build stamp), an untracked file (still clean: fetchGit
 # leaves untracked files out), a changed tracked file (dirty: <commit>-dirty, no stamp), and a directory that is not a
 # git checkout (unknown).
 #
@@ -35,14 +35,14 @@ rev=$(git rev-parse HEAD)
 
 if [ "$(identity "$tmp/repo" kind)" = '"clean"' ] && [ "$(identity "$tmp/repo" rev)" = "\"$rev\"" ] &&
     [ "$(identity "$tmp/repo" shortRev)" = "\"${rev:0:7}\"" ] && [ "$(identity "$tmp/repo" date)" = 1700000000 ] &&
-    [ "$(identity "$tmp/repo" stamp)" = '"20231114T221327Z"' ]; then
-    ok "a clean tree: its commit, and the commit time as a build stamp, last digit 7"
+    [ "$(identity "$tmp/repo" stamp)" = '"20231114T221320Z"' ]; then
+    ok "a clean tree: its commit, and the commit time as a build stamp"
 else
     bad "a clean tree"; identity "$tmp/repo" ""
 fi
 
 echo b >untracked
-if [ "$(identity "$tmp/repo" kind)" = '"clean"' ] && [ "$(identity "$tmp/repo" stamp)" = '"20231114T221327Z"' ]; then
+if [ "$(identity "$tmp/repo" kind)" = '"clean"' ] && [ "$(identity "$tmp/repo" stamp)" = '"20231114T221320Z"' ]; then
     ok "an untracked file: still clean (fetchGit leaves it out)"
 else
     bad "an untracked file: $(identity "$tmp/repo" kind)"

@@ -205,35 +205,39 @@ in
     echo "ok   a version too long, a file without utsname: refused, unchanged"
     touch $out
   '';
-  # stage-image, the image step's build stamp, for each kind of identity: a clean tree's stamp (its commit's) or, for
-  # a dirty one, the time now with its last digit 7; that stamp in the proto area build_live reads (the illumos
-  # build's otherwise, by links), the kernel's uname -v, and etc/motd and etc/issue (the illumos build's, its stamp
-  # replaced); an identity of no known kind refused.
+  # stage-image, the image step's build stamp, for each kind of identity and a flavor's last digit: a clean tree's
+  # stamp (its commit's time) or, for a dirty one, the time now, with the digit as its last; that stamp in the proto
+  # area build_live reads (the illumos build's otherwise, by links), the kernel's uname -v, and etc/motd and etc/issue
+  # (the illumos build's, its stamp replaced); an identity of no known kind, and a digit that is not one, refused.
   stageImage = pkgs.runCommand "smartos-live-stage-image-check" { } ''
     t=${live.buildImage}/libexec/stage-image
     p=${live.illumosProto}
     old=$(cat $p/buildstamp)
     bare() { /usr/bin/strings -a "$1" | grep -x 'joyent_[0-9A-Za-z]*' || true; }
-    printf 'kind=clean\nrev=abc\nstamp=20231114T221327Z\n' >clean
-    [ "$($t clean c)" = 20231114T221327Z ]
+    printf 'kind=clean\nrev=abc\nstamp=20231114T221320Z\n' >clean
+    [ "$($t clean c 7)" = 20231114T221327Z ]
     [ "$(cat c/proto/buildstamp)" = 20231114T221327Z ]
     [ "$(ls $p | wc -l)" = "$(ls c/proto | wc -l)" ] && [ "$(readlink c/proto/usr)" = $p/usr ]
     [ "$(bare c/stamped/platform/i86pc/kernel/amd64/unix)" = joyent_20231114T221327Z ]
     [ "$(cat c/stamped/etc/motd)" = "SmartOS (build: 20231114T221327Z)" ]
     grep -q 20231114T221327Z c/stamped/etc/issue
     sed "s/20231114T221327Z/$old/g" c/stamped/etc/issue | cmp - $p/etc/issue
-    echo "ok   a clean tree: its stamp in proto/buildstamp, the kernel, motd and issue"
+    echo "ok   a clean tree: its stamp, last digit 7, in proto/buildstamp, the kernel, motd and issue"
+    [ "$($t clean c8 8)" = 20231114T221328Z ] && [ "$(cat c8/stamped/etc/motd)" = "SmartOS (build: 20231114T221328Z)" ]
+    echo "ok   another flavor's digit: 8"
     printf 'kind=dirty\nrev=abc-dirty\nstamp=\n' >dirty
     before=$(TZ=UTC date +%Y%m%d)
-    s=$($t dirty d)
+    s=$($t dirty d 9)
     after=$(TZ=UTC date +%Y%m%d)
-    [[ $s =~ ^[0-9]{8}T[0-9]{5}7Z$ ]] && { [ "''${s:0:8}" = "$before" ] || [ "''${s:0:8}" = "$after" ]; }
+    [[ $s =~ ^[0-9]{8}T[0-9]{5}9Z$ ]] && { [ "''${s:0:8}" = "$before" ] || [ "''${s:0:8}" = "$after" ]; }
     [ "$(cat d/proto/buildstamp)" = "$s" ] && [ "$(bare d/stamped/platform/i86pc/kernel/amd64/unix)" = "joyent_$s" ]
-    echo "ok   a dirty tree: the time now (UTC), last digit 7"
+    echo "ok   a dirty tree: the time now (UTC), last digit the flavor's (9)"
     printf 'kind=bogus\n' >bad
-    if $t bad b 2>err; then exit 1; fi
+    if $t bad b 7 2>err; then exit 1; fi
     grep -q 'bogus' err
-    echo "ok   an identity of no known kind: refused"
+    if $t clean x 77 2>err; then exit 1; fi
+    if $t clean y 2>err; then exit 1; fi
+    echo "ok   an identity of no known kind, a digit that is not one, none: refused"
     touch $out
   '';
   # the platform's gitstatus.json: the pins', then the overlay's own entry (its commit, or <commit>-dirty, and commit
