@@ -16,16 +16,20 @@
 # illumos-joyent commit's time (UTC), so the build does not depend on when it runs. build_illumos also makes GATE
 # joyent_$BUILDSTAMP; GATE here is joyent_<commit> (./bldenv.nix).
 {
+  lib,
   mkBldenvStep,
   setup,
   msgcc,
   openjdk11-illumos,
   buildstamp ? "20260911T185107Z",
+  # a DEBUG build only, as smartos-live's configure -d (ILLUMOS_ENABLE_DEBUG=exclusive) makes it: NIGHTLY_OPTIONS
+  # with D (DEBUG) and F (no non-DEBUG build); the proto area is the same one (MULTI_PROTO no)
+  debug ? false,
 }:
 
 mkBldenvStep {
-  pname = "smartos-illumos-nightly";
-  description = "illumos-joyent's proto area from a SmartOS nightly build";
+  pname = "smartos-illumos-nightly" + lib.optionalString debug "-debug";
+  description = "illumos-joyent's proto area from a SmartOS nightly build" + lib.optionalString debug " (DEBUG)";
   dir = "usr/src";
   inherit (setup) command;
 
@@ -35,6 +39,9 @@ mkBldenvStep {
     MAKE="\$SRC/tools/proto/root_i386-nd/opt/onbld/bin/i386/dmake";	export MAKE
     fi
     ASTBINDIR=${msgcc}/usr/ast/bin;		export ASTBINDIR
+  ''
+  + lib.optionalString debug ''
+    NIGHTLY_OPTIONS="-CiLmMNntDF";			export NIGHTLY_OPTIONS
   '';
 
   afterBldenv = "BANNER_YEAR=2026 ./usr/src/tools/scripts/nightly illumos.sh";

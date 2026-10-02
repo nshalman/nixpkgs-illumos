@@ -240,6 +240,25 @@ in
     echo "ok   an identity of no known kind, a digit that is not one, none: refused"
     touch $out
   '';
+  # the flavors, as smartos-live's Jenkins builds them (its Jenkinsfile, tools/build_jenkins): default, debug (the
+  # illumos nightly with -DF, a DEBUG build only) and gcc14 (to come). Each smartos-live scope's last digit of the
+  # build stamp (7, 8), and debug's chain of scopes on its own nightly. Evaluated only; nothing is built here.
+  flavors =
+    let
+      inherit (pkgs.lib) hasInfix;
+      debugNightly = pkgs.smartos-illumos-debug.nightly;
+    in
+    assert live.flavorDigit == "7";
+    assert pkgs.smartos-live-debug.flavorDigit == "8";
+    assert hasInfix ''NIGHTLY_OPTIONS="-CiLmMNntDF"'' debugNightly.buildPhase;
+    assert !hasInfix "DF" pkgs.smartos-illumos.nightly.buildPhase;
+    assert pkgs.smartos-extra-debug.illumosProto == "${debugNightly}/proto";
+    assert pkgs.smartos-live-debug.illumosProto == "${debugNightly}/proto";
+    assert pkgs.smartos-live-debug.strapProto == live.strapProto;
+    pkgs.runCommand "smartos-live-flavors-check" { } ''
+      echo "ok   default 7, debug 8 on the -DF nightly (${debugNightly.name})"
+      touch $out
+    '';
   # the platform's gitstatus.json: the pins', then the overlay's own entry (its commit, or <commit>-dirty, and commit
   # time; ./identity.nix), unless its identity is unknown
   platformGitstatus = pkgs.runCommand "smartos-live-platform-gitstatus-check" { nativeBuildInputs = [ pkgs.python3 ]; } ''

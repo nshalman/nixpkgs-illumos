@@ -73,6 +73,16 @@ import nixpkgs {
       smartos-extra = final.callPackage ./pkgs/smartos-extra { };
       # smartos-live's own stages (src, man, ...), built against those
       smartos-live = final.callPackage ./pkgs/smartos-live { };
+      # smartos-live's Jenkins "debug" build: the same, on a DEBUG nightly (stamp's last digit 8)
+      smartos-illumos-debug = final.smartos-illumos.overrideScope (
+        _: prev: { nightly = prev.nightly.override { debug = true; }; }
+      );
+      smartos-extra-debug = final.smartos-extra.override { smartos-illumos = final.smartos-illumos-debug; };
+      smartos-live-debug = final.smartos-live.override {
+        smartos-illumos = final.smartos-illumos-debug;
+        smartos-extra = final.smartos-extra-debug;
+        flavor = "debug";
+      };
       # a pre-built OpenJDK 11 to bootstrap OpenJDK from source
       tribblix-jdk-bin = final.callPackage ./pkgs/tribblix-jdk-bin { };
       # OpenJDK 11 built from source with the illumos port, headless; SmartOS builds illumos' Java parts with JDK 11
