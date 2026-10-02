@@ -367,8 +367,9 @@ lib.makeScope newScope (self: {
   # (./workspace.nix)
   liveWorkspace = self.callPackage ./workspace.nix { };
   # The root step: bin/build-image OUTPUT-DIR [ROOT-PASSWORD] runs build_live as `gmake live` does, with the
-  # manifest, searchDirs and liveWorkspace (./build-image.sh). Needs root, lofi and UFS mounts. What their PATH has
-  # from pkgsrc, md5sum and gtar, is nixpkgs' coreutils and GNU tar here.
+  # manifest, searchDirs and liveWorkspace (./build-image.sh), and the illumos build's kernel with the platform's
+  # version (libexec/uname-version, ./uname-version.sh) ahead of them. Needs root, lofi and UFS mounts. What their PATH
+  # has from pkgsrc, md5sum and gtar, is nixpkgs' coreutils and GNU tar here.
   buildImage = runCommand "smartos-live-build-image" { } ''
     mkdir -p $out/bin $out/libexec
     ln -s ${gnutar}/bin/tar $out/libexec/gtar
@@ -377,6 +378,7 @@ lib.makeScope newScope (self: {
     substitute ${./build-image.sh} $out/bin/build-image \
       --subst-var-by manifest ${self.manifest}/manifest.gen \
       --subst-var-by searchDirs "${toString self.searchDirs}" \
+      --subst-var-by unix ${self.illumosProto}/platform/i86pc/kernel/amd64/unix \
       --subst-var-by workspace ${self.liveWorkspace} \
       --subst-var-by extraPath ${coreutils}/bin:$out/libexec
     chmod +x $out/bin/build-image

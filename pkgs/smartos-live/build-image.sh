@@ -32,4 +32,13 @@ done
 mkdir -p "$out/log"
 ln -s "$(cd "$out" && pwd)/log" "$ws/log"
 
-"$ws/tools/build_live" -m @manifest@ -o "$out" -p "$password" @searchDirs@
+# The kernel, its uname -v the platform's version, joyent_ and the build stamp build_live gives the image (as
+# smartos-live's build_illumos makes it), rather than the illumos build's (./uname-version.sh): in a search directory
+# of its own, ahead of the others, as builder takes each file from the first that has it
+stamped=$ws/stamped/platform/i86pc/kernel/amd64
+mkdir -p "$stamped"
+cp @unix@ "$stamped/unix"
+chmod u+w "$stamped/unix"
+uname-version "$stamped/unix" "joyent_$(cat @workspace@/proto/buildstamp)"
+
+"$ws/tools/build_live" -m @manifest@ -o "$out" -p "$password" "$ws/stamped" @searchDirs@
