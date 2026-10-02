@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
 # pkgs/smartos-live/identity.nix on a throwaway git repository standing in for the overlay's checkout: a clean tree
-# (its commit, and the commit time as a build stamp), an untracked file (still clean: fetchGit
-# leaves untracked files out), a changed tracked file (dirty: <commit>-dirty, no stamp), and a directory that is not a
-# git checkout (unknown).
+# (its commit, and the commit time as a build stamp), an untracked file (still clean: fetchGit leaves untracked files
+# out), a changed tracked file (dirty: <commit>-dirty, no stamp), a release commit (release/release.json committed at
+# its stamp's time: release, with its password and hash), a commit after it (clean, the release's password and hash
+# still), dirty after it (none), and a directory that is not a git checkout (unknown).
 #
 # usage: identity.sh (needs git and nix on PATH)
 
@@ -55,6 +56,32 @@ if [ "$(identity "$tmp/repo" kind)" = '"dirty"' ] && [ "$(identity "$tmp/repo" r
     ok "a changed tracked file: dirty, <commit>-dirty, no stamp"
 else
     bad "a changed tracked file: $(identity "$tmp/repo" kind) $(identity "$tmp/repo" rev) $(identity "$tmp/repo" stamp)"
+fi
+
+git checkout -q file
+# a release: release/release.json, committed at its stamp's time (as release/cut.sh commits it), then a commit after
+mkdir release
+printf '{ "stamp": "20231115T000000Z", "password": "pw", "hash": "$6$salt$h" }\n' >release/release.json
+git add release
+GIT_COMMITTER_DATE=@1700006400 git commit -q -m release
+if [ "$(identity "$tmp/repo" kind)" = '"release"' ] && [ "$(identity "$tmp/repo" stamp)" = '"20231115T000000Z"' ] &&
+    [ "$(identity "$tmp/repo" release.password)" = '"pw"' ] && [ "$(identity "$tmp/repo" release.hash)" = '"$6$salt$h"' ]; then
+    ok "a release commit: release, its stamp, release.json's password and hash"
+else
+    bad "a release commit: $(identity "$tmp/repo" kind) $(identity "$tmp/repo" stamp)"
+fi
+echo d >>file && git add file && GIT_COMMITTER_DATE=@1700010000 git commit -q -m after
+if [ "$(identity "$tmp/repo" kind)" = '"clean"' ] && [ "$(identity "$tmp/repo" stamp)" = '"20231115T010000Z"' ] &&
+    [ "$(identity "$tmp/repo" release.hash)" = '"$6$salt$h"' ]; then
+    ok "a commit after it: clean, its own time, the release's password and hash still"
+else
+    bad "a commit after a release: $(identity "$tmp/repo" kind) $(identity "$tmp/repo" stamp)"
+fi
+echo e >>file
+if [ "$(identity "$tmp/repo" kind)" = '"dirty"' ] && [ "$(identity "$tmp/repo" release)" = null ]; then
+    ok "dirty after a release: no release password (each image makes its own)"
+else
+    bad "dirty after a release: $(identity "$tmp/repo" release)"
 fi
 
 mkdir "$tmp/plain" && echo a >"$tmp/plain/file"
