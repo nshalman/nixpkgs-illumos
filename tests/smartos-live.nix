@@ -204,10 +204,10 @@ in
     echo "ok   a shorter version leaves nothing behind"
     cp unix before
     if $t unix "joyent_$(printf '%0250d' 0)" 2>err; then exit 1; fi
-    grep 'VERSION must be' err >/dev/null && cmp before unix
+    grep 'VERSION must be' err >/dev/null && cmp before unix || exit 1
     cp ${live.illumosProto}/usr/bin/ls ls && chmod u+w ls
     if $t ls joyent_x 2>err; then exit 1; fi
-    grep 'no utsname' err >/dev/null && cmp ls ${live.illumosProto}/usr/bin/ls
+    grep 'no utsname' err >/dev/null && cmp ls ${live.illumosProto}/usr/bin/ls || exit 1
     echo "ok   a version too long, a file without utsname: refused, unchanged"
     touch $out
   '';
@@ -223,20 +223,20 @@ in
     printf 'kind=clean\nrev=abc\nstamp=20231114T221320Z\n' >clean
     [ "$($t clean c 7)" = 20231114T221327Z ]
     [ "$(cat c/proto/buildstamp)" = 20231114T221327Z ]
-    [ "$(ls $p | wc -l)" = "$(ls c/proto | wc -l)" ] && [ "$(readlink c/proto/usr)" = $p/usr ]
+    [ "$(ls $p | wc -l)" = "$(ls c/proto | wc -l)" ] && [ "$(readlink c/proto/usr)" = $p/usr ] || exit 1
     [ "$(bare c/stamped/platform/i86pc/kernel/amd64/unix)" = joyent_20231114T221327Z ]
     [ "$(cat c/stamped/etc/motd)" = "SmartOS (build: 20231114T221327Z)" ]
     grep -q 20231114T221327Z c/stamped/etc/issue
     sed "s/20231114T221327Z/$old/g" c/stamped/etc/issue | cmp - $p/etc/issue
     echo "ok   a clean tree: its stamp, last digit 7, in proto/buildstamp, the kernel, motd and issue"
-    [ "$($t clean c8 8)" = 20231114T221328Z ] && [ "$(cat c8/stamped/etc/motd)" = "SmartOS (build: 20231114T221328Z)" ]
+    [ "$($t clean c8 8)" = 20231114T221328Z ] && [ "$(cat c8/stamped/etc/motd)" = "SmartOS (build: 20231114T221328Z)" ] || exit 1
     echo "ok   another flavor's digit: 8"
     printf 'kind=dirty\nrev=abc-dirty\nstamp=\n' >dirty
     before=$(TZ=UTC date +%Y%m%d)
     s=$($t dirty d 9)
     after=$(TZ=UTC date +%Y%m%d)
-    [[ $s =~ ^[0-9]{8}T[0-9]{5}9Z$ ]] && { [ "''${s:0:8}" = "$before" ] || [ "''${s:0:8}" = "$after" ]; }
-    [ "$(cat d/proto/buildstamp)" = "$s" ] && [ "$(bare d/stamped/platform/i86pc/kernel/amd64/unix)" = "joyent_$s" ]
+    [[ $s =~ ^[0-9]{8}T[0-9]{5}9Z$ ]] && { [ "''${s:0:8}" = "$before" ] || [ "''${s:0:8}" = "$after" ]; } || exit 1
+    [ "$(cat d/proto/buildstamp)" = "$s" ] && [ "$(bare d/stamped/platform/i86pc/kernel/amd64/unix)" = "joyent_$s" ] || exit 1
     echo "ok   a dirty tree: the time now (UTC), last digit the flavor's (9)"
     printf 'kind=bogus\n' >bad
     if $t bad b 7 2>err; then exit 1; fi
@@ -297,7 +297,7 @@ in
     cmp $b/etc/version/boot ${live.illumosProto}/buildstamp
     echo "ok   proto.boot: the $n files boot.manifest.gen lists, and etc/version/boot"
     rc=0; ${live.liveTools}/tools/format_image/format_image 2>err || rc=$?
-    [ $rc != 0 ] && grep '^Usage: format_image -o image.usb' err >/dev/null
+    [ $rc != 0 ] && grep '^Usage: format_image -o image.usb' err >/dev/null || exit 1
     echo "ok   format_image runs"
     w=${live.liveWorkspace}/tools/build_boot_image
     grep 'print -- "$BI_LOADER_EXTRA" >>$bi_tmpdir/loader.conf' $w >/dev/null
@@ -348,7 +348,7 @@ in
     grep '^\$.' hash >/dev/null
     echo "ok   cryptpass"
     rc=0; $t/builder/builder >out || rc=$?
-    [ $rc = 1 ] && grep -x "euid must be 0 to use this tool." out >/dev/null
+    [ $rc = 1 ] && grep -x "euid must be 0 to use this tool." out >/dev/null || exit 1
     echo "ok   builder wants root"
     # with BUILDER_UNOWNED, without root: each file from the first search directory that has it (a symbolic link
     # there followed), modes as the manifest says, directories' last, and the links made; nothing owned
@@ -358,7 +358,7 @@ in
       "f usr/bin/y 0444 bin bin" "f usr/bin/z 0400 root sys" "s usr/bin/sx=x" "h usr/bin/hx=usr/bin/x" >m
     BUILDER_UNOWNED=1 $t/builder/builder $PWD/m $PWD/img $PWD/a $PWD/b
     [ "$(cat img/usr/bin/x img/usr/bin/y img/usr/bin/z)" = "$(printf 'first\nonly-b\nonly-b')" ]
-    [ ! -L img/usr/bin/z ] && [ "$(readlink img/usr/bin/sx)" = x ] && [ img/usr/bin/hx -ef img/usr/bin/x ]
+    [ ! -L img/usr/bin/z ] && [ "$(readlink img/usr/bin/sx)" = x ] && [ img/usr/bin/hx -ef img/usr/bin/x ] || exit 1
     [ "$(stat -c %a img/usr img/usr/bin img/usr/bin/x img/usr/bin/y img/usr/bin/z | tr '\n' ' ')" = "755 555 555 444 400 " ]
     chmod -R u+w img
     echo "ok   builder without root (BUILDER_UNOWNED)"
@@ -426,7 +426,7 @@ in
     for p in get put delete; do
       rc=0; ${live.mdata-client}/usr/sbin/mdata-$p 2>err || rc=$?
       cat err
-      [ $rc = 3 ] && grep -q "^mdata-$p: Usage: .*mdata-$p <keyname>" err
+      [ $rc = 3 ] && grep -q "^mdata-$p: Usage: .*mdata-$p <keyname>" err || exit 1
     done
     echo "ok   mdata-get, mdata-put and mdata-delete run"
     touch $out
@@ -472,7 +472,7 @@ in
     grep "^QEMU emulator version 0.14.1 (qemu-kvm-devel)" out >/dev/null
     $b/qemu-img create -f qcow2 disk.qcow2 64M
     $b/qemu-img info disk.qcow2 | tee info
-    grep -x "file format: qcow2" info >/dev/null && grep "^virtual size: 64M " info >/dev/null
+    grep -x "file format: qcow2" info >/dev/null && grep "^virtual size: 64M " info >/dev/null || exit 1
     $b/qemu-img convert -O raw disk.qcow2 disk.raw
     [ $(wc -c <disk.raw) = 67108864 ]
     /usr/bin/elfdump -s ${live.kvm-cmd}/usr/lib/mdb/proc/amd64/qemu.so | grep "FUNC GLOB .* _mdb_init$" >/dev/null
