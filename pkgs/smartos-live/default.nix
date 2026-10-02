@@ -372,6 +372,8 @@ lib.makeScope newScope (self: {
   buildImage = runCommand "smartos-live-build-image" { } ''
     mkdir -p $out/bin $out/libexec
     ln -s ${gnutar}/bin/tar $out/libexec/gtar
+    cp ${./uname-version.sh} $out/libexec/uname-version
+    chmod +x $out/libexec/uname-version
     substitute ${./build-image.sh} $out/bin/build-image \
       --subst-var-by manifest ${self.manifest}/manifest.gen \
       --subst-var-by searchDirs "${toString self.searchDirs}" \

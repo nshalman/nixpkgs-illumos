@@ -174,6 +174,32 @@ in
     echo "ok   build-image"
     touch $out
   '';
+  # uname-version on a copy of the illumos build's kernel: the version uname -v reports (bare in the kernel, besides
+  # the @(#) idents) is the new one and the old one is gone, only the 257 bytes of utsname's version field change, a
+  # shorter version leaves nothing of a longer one behind; a version too long and a file without utsname (ls) are
+  # refused, the file unchanged.
+  unameVersion = pkgs.runCommand "smartos-live-uname-version-check" { } ''
+    t=${live.buildImage}/libexec/uname-version
+    bare() { /usr/bin/strings -a "$1" | grep -x 'joyent_[0-9A-Za-z]*' || true; }
+    cp ${live.illumosProto}/platform/i86pc/kernel/amd64/unix orig
+    [ "$(bare orig | wc -l)" = 1 ]
+    cp orig unix && chmod u+w unix
+    $t unix joyent_20261002T000001Z
+    [ "$(bare unix)" = joyent_20261002T000001Z ]
+    cmp -l orig unix | awk 'NR == 1 { lo = $1 } { hi = $1 } END { exit !(NR > 0 && hi - lo < 257) }'
+    echo "ok   the version field, and nothing else, is the new version"
+    $t unix joyent_x
+    [ "$(bare unix)" = joyent_x ]
+    echo "ok   a shorter version leaves nothing behind"
+    cp unix before
+    if $t unix "joyent_$(printf '%0250d' 0)" 2>err; then exit 1; fi
+    grep 'VERSION must be' err >/dev/null && cmp before unix
+    cp ${live.illumosProto}/usr/bin/ls ls && chmod u+w ls
+    if $t ls joyent_x 2>err; then exit 1; fi
+    grep 'no utsname' err >/dev/null && cmp ls ${live.illumosProto}/usr/bin/ls
+    echo "ok   a version too long, a file without utsname: refused, unchanged"
+    touch $out
+  '';
   # The USB image's parts, as far as they run without root (making and booting the image is root's, in a builder
   # zone): proto.boot is boot.manifest.gen's files, the illumos build's, with the build stamp; format_image runs;
   # build_boot_image takes extra loader variables and compresses with nixpkgs' pigz; build-usb and boot-vm want their
