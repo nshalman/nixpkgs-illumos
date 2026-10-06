@@ -94,10 +94,17 @@ lib.makeScope newScope (self: {
   '';
 
   # The platform's dtrace, which perl and node run at build time (dtrace -h, -G) as they do in illumos-extra: an
-  # input from the build host, outside the store.
+  # input from the build host, outside the store. It runs with ./dtrace-shim.c preloaded, so that the objects
+  # dtrace -G writes name neither the build host nor its platform (the DOF's utsname: nodename "illumos", version
+  # $DTRACE_SHIM_VERSION or "joyent") and do not depend on inode numbers (the $dtrace<key> aliases).
   platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
-    mkdir -p $out/bin
-    ln -s /usr/sbin/dtrace $out/bin/dtrace
+    mkdir -p $out/bin $out/lib
+    ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c}
+    cat >$out/bin/dtrace <<EOF
+    #!/bin/sh
+    LD_PRELOAD_64=$out/lib/dtrace-shim.so exec /usr/sbin/dtrace "\$@"
+    EOF
+    chmod +x $out/bin/dtrace
   '';
 
   # -L and -R for the strap libraries a package links against (Makefile.defs' SYSLIBDIRS, /usr/lib and /lib, under
