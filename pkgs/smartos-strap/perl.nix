@@ -103,6 +103,8 @@ stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     ${xform} <config.over.in >${d}/config.over
+    # cf_time, when Configure ran, which it takes from the clock (perlbug's config_tag), as SOURCE_DATE_EPOCH gives it
+    echo "cf_time='$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH")'" >>${d}/config.over
     (cd ${d} && ${strapEnv} ./Configure -des -Dcc="${cc}" -Duse64bitint)
     (cd ${d} && /usr/sbin/dtrace -h -s perldtrace.d -o perldtrace.h)
     runHook postConfigure
