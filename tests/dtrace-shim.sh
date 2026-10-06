@@ -183,11 +183,23 @@ if "$zero" t.c && "$zero" prov.d; then
 else
     bad "dof-zero-uarg fails on what is not an ELF object with DOF"
 fi
-if ! "$dtraceDir/bin/dtrace" -G -64 -s prov.d obj.o 2>noout.err && grep -q -- '-o' noout.err; then
-    ok "platformDtrace: dtrace -G without -o is refused (the object it would write is not zeroed)"
+# without -o, dtrace -G names the object after the script (h.d: h.o, in the current directory, as the illumos build's
+# isns has it); that one is zeroed too
+rm -f h.o && /usr/sbin/dtrace -32 -C -G -s ./h.d && cp h.o plain.o && "$zero" h.o
+p=$(cmp -s h.o plain.o && echo same || echo changed)
+rm -f h.o && "$dtraceDir/bin/dtrace" -32 -C -G -s ./h.d && cp h.o shim.o && "$zero" h.o
+s=$(cmp -s h.o shim.o && echo same || echo changed)
+if [ "$p" = changed ] && [ "$s" = same ]; then
+    ok "platformDtrace: without -o, the object named after the script is zeroed"
 else
-    bad "platformDtrace: dtrace -G without -o is not refused"
+    bad "platformDtrace without -o: dof-zero-uarg on the platform's object: $p, on platformDtrace's: $s"
 fi
+if ! "$dtraceDir/bin/dtrace" -32 -G -n 'dtrace:helper:ustack: { "@x" }' 2>noout.err && grep -q 'cannot be zeroed' noout.err; then
+    ok "platformDtrace: dtrace -G on a program not from a script is refused (its object, d.out, is not zeroed)"
+else
+    bad "platformDtrace: dtrace -G on a program not from a script is not refused"
+fi
+rm -f d.out
 
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
