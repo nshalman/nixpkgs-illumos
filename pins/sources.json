@@ -7,6 +7,7 @@
   "mdata-client": { "owner": "TritonDataCenter", "repo": "mdata-client", "branch": "release-20260903" },
   "nix-src": { "owner": "nshalman", "repo": "nix-src", "branch": "illumos-support-2.35" },
   "nixpkgs": { "owner": "nshalman", "repo": "nixpkgs", "branch": "illumos-26.05" },
+  "nixpkgs-illumos": { "owner": "nshalman", "repo": "nixpkgs-illumos", "branch": "main" },
   "rust-bhyve": { "owner": "TritonDataCenter", "repo": "rust-bhyve", "branch": "wip/virtio-gpu" },
   "smartos-live": { "owner": "TritonDataCenter", "repo": "smartos-live", "branch": "release-20260903" },
   "ur-agent": { "owner": "TritonDataCenter", "repo": "sdc-ur-agent", "branch": "release-20260903" }

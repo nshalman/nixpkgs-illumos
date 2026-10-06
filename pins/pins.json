@@ -39,6 +39,11 @@
     "hash": "sha256-p55mTucE4TRKZA2tRLhLfqgbaUyQ+zD9RuaL6tF3Rcc=",
     "rev": "4eee97ee70a159d8d78a47df7b1a8500c38e2652"
   },
+  "nixpkgs-illumos": {
+    "date": 1790360263,
+    "hash": "sha256-IpHwwucYcYAkY4nMSerUQKn+A+qwabJdigLKUFOadxE=",
+    "rev": "b6a6a75babac37ebae9b4dc52c28f8c42f0b2bd6"
+  },
   "rust-bhyve": {
     "date": 1790777655,
     "hash": "sha256-gXVArLI6v+8sLuSoU6sLBxNmJZwXN5mPL1H0Wl4uwjc=",

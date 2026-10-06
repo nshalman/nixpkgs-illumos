@@ -162,6 +162,27 @@ let
   '';
 
   # The nixpkgs-illumos binary cache, off until a zone turns it on
+  # /etc/nixos/nixpkgs-illumos.nix of a zone from this image: this repo's pin (../pins, nixpkgs-illumos) written
+  # out on its own, as ./example/nixpkgs-illumos.nix reads it, since a zone's /etc/nixos has no pins to read
+  nixosPin =
+    let
+      pin = (import ../pins)."nixpkgs-illumos";
+    in
+    pkgs.writeText "nixpkgs-illumos.nix" ''
+      # /etc/nixos/nixpkgs-illumos.nix of zone nixpkgs-native: the published commit of this repo the zone is built from.
+      # ./pkgs.nix and ./system.nix both take it from here; moving the zone to another commit means changing url and
+      # sha256 (`nix-prefetch-url --unpack URL`), then `illumos-rebuild switch`.
+      builtins.fetchTarball {
+        url = "${pin.archive}";
+        sha256 = "${
+          builtins.convertHash {
+            inherit (pin) hash;
+            toHashFormat = "nix32";
+          }
+        }";
+      }
+    '';
+
   cacheUrl = "https://www.shalman.org/files/cache/?trusted=true";
   nixLocalConfExample = pkgs.writeText "nix.local.conf.example" ''
     # Local additions to /etc/nix/nix.conf, which includes /etc/nix/nix.local.conf last (and skips it if it is
@@ -197,7 +218,7 @@ let
 in
 pkgs.runCommand "illumos-zone-root"
   {
-    inherit gate gateFileList sshdConfig nixosSystem zoneinitJson nixLocalConfExample motd sudoers sudoersAdmin;
+    inherit gate gateFileList sshdConfig nixosPin nixosSystem zoneinitJson nixLocalConfExample motd sudoers sudoersAdmin;
     seedDb = "${seed}/repository.db";
     seedVarManifests = "${seed}/var/svc/manifest";
     siteProfile = ./site.xml;
@@ -409,7 +430,8 @@ pkgs.runCommand "illumos-zone-root"
     l ${profileLink}/etc/nix/nix.conf etc/nix/nix.conf
     l ${profileLink}/etc/ssl/certs/ca-bundle.crt etc/ssl/certs/ca-bundle.crt
     l ca-bundle.crt etc/ssl/certs/ca-certificates.crt
-    for n in nixpkgs-illumos.nix pkgs.nix; do f 0644 "$nixosExample/$n" "etc/nixos/$n"; done
+    f 0644 "$nixosPin" etc/nixos/nixpkgs-illumos.nix
+    f 0644 "$nixosExample/pkgs.nix" etc/nixos/pkgs.nix
     f 0644 "$nixosSystem" etc/nixos/system.nix
 
     mkdir -p "$out"
