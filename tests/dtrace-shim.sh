@@ -5,7 +5,9 @@
 # names $dtrace<key>.<function> with key = ftok(object): the object's inode) at the same path in turn, as two builds
 # would. Through platformDtrace the two results are the same file, and name neither this host (uname -n) nor its
 # platform (uname -v); $DTRACE_SHIM_VERSION is the version they name instead. The platform's own dtrace gives two
-# different files naming both (so the test shows something).
+# different files naming both (so the test shows something). And a ustack helper (as node's v8ustack.d) compiled by
+# dtrace -C -G five times: the platform's dtrace, under the address space layout randomization processes here get,
+# lays its DOF out differently from one run to the next; through platformDtrace the five are the same.
 #
 # usage: dtrace-shim.sh PKGS-FILE   (on illumos, for dtrace; nix-build on PATH)
 
@@ -67,6 +69,42 @@ if ! grep -qF "$host" shim1.o && ! grep -qF "$version" shim1.o && grep -qF joyen
     ok "platformDtrace: neither the host nor its platform, but DTRACE_SHIM_VERSION"
 else
     bad "platformDtrace: names the host or its platform, or not DTRACE_SHIM_VERSION"
+fi
+
+cat >h.d <<'EOF'
+dtrace:helper:ustack:
+{
+	this->a = copyin(arg1, 8);
+	this->c = *(uint32_t *)this->a + 8;
+	this->s = strjoin("frame ", lltostr(this->c));
+	this->t = this->c > 4 ? strjoin(this->s, " big") : strjoin(this->s, " small");
+}
+dtrace:helper:ustack:
+/this->c == 7/
+{
+	this->t = strjoin(this->t, " seven");
+}
+dtrace:helper:ustack:
+{
+	substr(this->t, 0, 20)
+}
+EOF
+# h DTRACE: the distinct objects five runs of dtrace -C -G on h.d give
+h() {
+    for i in 1 2 3 4 5; do
+        rm -f h.o
+        "$1" -32 -C -G -s h.d -o h.o 2>h.err && cksum <h.o
+    done | sort -u | wc -l
+}
+if [ "$(h /usr/sbin/dtrace)" -gt 1 ]; then
+    ok "the platform's dtrace: a ustack helper's DOF differs from run to run"
+else
+    bad "the platform's dtrace gives one ustack helper DOF: the test shows nothing"; cat h.err
+fi
+if [ "$(h "$dtraceDir/bin/dtrace")" = 1 ]; then
+    ok "platformDtrace: a ustack helper's DOF is the same in every run"
+else
+    bad "platformDtrace: a ustack helper's DOF differs from run to run"; cat h.err
 fi
 
 echo "$pass passed, $fail failed"

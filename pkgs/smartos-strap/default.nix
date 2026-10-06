@@ -96,13 +96,15 @@ lib.makeScope newScope (self: {
   # The platform's dtrace, which perl and node run at build time (dtrace -h, -G) as they do in illumos-extra: an
   # input from the build host, outside the store. It runs with ./dtrace-shim.c preloaded, so that the objects
   # dtrace -G writes name neither the build host nor its platform (the DOF's utsname: nodename "illumos", version
-  # $DTRACE_SHIM_VERSION or "joyent") and do not depend on inode numbers (the $dtrace<key> aliases).
+  # $DTRACE_SHIM_VERSION or "joyent") and do not depend on inode numbers (the $dtrace<key> aliases); and without
+  # address space layout randomization, under which the DOF dtrace -G writes for a D program (a ustack helper: node's)
+  # is laid out differently from one run to the next.
   platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
     mkdir -p $out/bin $out/lib
     ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c}
     cat >$out/bin/dtrace <<EOF
     #!/bin/sh
-    LD_PRELOAD_64=$out/lib/dtrace-shim.so exec /usr/sbin/dtrace "\$@"
+    LD_PRELOAD_64=$out/lib/dtrace-shim.so exec /usr/bin/psecflags -s current,-aslr -e /usr/sbin/dtrace "\$@"
     EOF
     chmod +x $out/bin/dtrace
   '';
