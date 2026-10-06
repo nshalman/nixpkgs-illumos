@@ -76,18 +76,22 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
+    # NSPR's build time (_BUILD_STRING, _BUILD_TIME in microseconds), which pr/src/Makefile takes from date and
+    # config/now (time()), as SOURCE_DATE_EPOCH gives it
+    nsprDate=$(TZ=UTC date -d "@$SOURCE_DATE_EPOCH" '+%Y-%m-%d %T')
+    nsprNow=''${SOURCE_DATE_EPOCH}000000
     (cd ${ver}-32${suffix}/nss && ${cleanEnv} PATH="$PATH" STRAP=${suffix} DESTDIR=${makeDestdir} PKG_CONFIG_LIBDIR= \
       make BUILD_OPT=1 BUILD_SUN_PKG=1 NS_USE_GCC=1 NO_MDUPDATE=1 \
       NSPR_CONFIGURE_ENV="CC=\"${gcc} -m32\" CXX=\"\"" \
       CC="${gcc} -m32" CXX="${gxx} -m32" AS="${gcc} -m32" \
       CPPFLAGS="${includeFlags}" XCFLAGS="${xcflags}" LDFLAGS="${ldflags 32}" \
-      NSS_DISABLE_GTESTS=1 nss_build_all)
+      SH_DATE="$nsprDate" SH_NOW="$nsprNow" NSS_DISABLE_GTESTS=1 nss_build_all)
     (cd ${ver}-64${suffix}/nss && ${cleanEnv} PATH="$PATH" STRAP=${suffix} DESTDIR=${makeDestdir} PKG_CONFIG_LIBDIR= \
       make USE_64=1 BUILD_OPT=1 BUILD_SUN_PKG=1 NS_USE_GCC=1 \
       NSPR_CONFIGURE_ENV="CC=\"${gcc} -m64\" CXX=\"\"" \
       CC="${gcc} -m64" CXX="${gxx} -m64" AS="${gcc} -m64" \
       CPPFLAGS="${includeFlags}" XCFLAGS="${xcflags}" LDFLAGS="${ldflags 64}" \
-      NSS_DISABLE_GTESTS=1 NO_MDUPDATE=1 nss_build_all)
+      SH_DATE="$nsprDate" SH_NOW="$nsprNow" NSS_DISABLE_GTESTS=1 NO_MDUPDATE=1 nss_build_all)
     runHook postBuild
   '';
 
