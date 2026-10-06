@@ -10,6 +10,7 @@
 # it wait for openssl3 and libidn; the platform's wget links OpenSSL and zlib (no IDN: wget 1.25 looks for libidn2
 # through pkg-config, and PKG_CONFIG_LIBDIR is empty), so those two are given.
 {
+  cleanEnv,
   mkAutoconf,
   perl,
   autoconf,
@@ -40,7 +41,7 @@ mkAutoconf {
   ];
   frob = ''
     test -f $d/m4/pkg.m4 || cp pkg.m4 $d/m4/pkg.m4
-    (cd $d && env -i PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf)
+    (cd $d && ${cleanEnv} PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf)
   '';
   cflags = "-O2 -gdwarf-2 -fno-inline-functions -fno-inline-functions-called-once -fno-inline-small-functions";
   # $(BASE)/mapfile_noexstk: the illumos-extra directory, one above the build directory
@@ -55,7 +56,7 @@ mkAutoconf {
     mkdir -p $out/usr/bin $out/usr/share/man/man1
     install -m 0555 wget-1.25.0-32${suffix}/src/wget $out/usr/bin/wget
     install -m 0444 wget-1.25.0-32${suffix}/doc/wget.1 $out/usr/share/man/man1
-    env -i PATH="$PATH" DESTDIR=$out CTFCONVERT=${ctfconvert} CTFCONVERTFLAGS= \
+    ${cleanEnv} PATH="$PATH" DESTDIR=$out CTFCONVERT=${ctfconvert} CTFCONVERTFLAGS= \
       bash ../tools/make-ctf wget-1.25.0-32${suffix} ctfobjects-32${suffix} wget-1.25.0 /usr/bin/wget
   '';
 }

@@ -15,6 +15,7 @@
 # as theirs does with their proto; CPPFLAGS and LDFLAGS name it after this package's output, LDFLAGS with GENLDFLAGS
 # (-zassert-deflib -zfatal-warnings); the build directories lose their suffix.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -75,13 +76,13 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd ${ver}-32${suffix}/nss && env -i PATH="$PATH" STRAP=${suffix} DESTDIR=${makeDestdir} PKG_CONFIG_LIBDIR= \
+    (cd ${ver}-32${suffix}/nss && ${cleanEnv} PATH="$PATH" STRAP=${suffix} DESTDIR=${makeDestdir} PKG_CONFIG_LIBDIR= \
       make BUILD_OPT=1 BUILD_SUN_PKG=1 NS_USE_GCC=1 NO_MDUPDATE=1 \
       NSPR_CONFIGURE_ENV="CC=\"${gcc} -m32\" CXX=\"\"" \
       CC="${gcc} -m32" CXX="${gxx} -m32" AS="${gcc} -m32" \
       CPPFLAGS="${includeFlags}" XCFLAGS="${xcflags}" LDFLAGS="${ldflags 32}" \
       NSS_DISABLE_GTESTS=1 nss_build_all)
-    (cd ${ver}-64${suffix}/nss && env -i PATH="$PATH" STRAP=${suffix} DESTDIR=${makeDestdir} PKG_CONFIG_LIBDIR= \
+    (cd ${ver}-64${suffix}/nss && ${cleanEnv} PATH="$PATH" STRAP=${suffix} DESTDIR=${makeDestdir} PKG_CONFIG_LIBDIR= \
       make USE_64=1 BUILD_OPT=1 BUILD_SUN_PKG=1 NS_USE_GCC=1 \
       NSPR_CONFIGURE_ENV="CC=\"${gcc} -m64\" CXX=\"\"" \
       CC="${gcc} -m64" CXX="${gxx} -m64" AS="${gcc} -m64" \

@@ -7,6 +7,7 @@
 # illumosProto, the proto area of the illumos build, where theirs has smartos-live's proto, with GENLDFLAGS
 # (-zassert-deflib -zfatal-warnings: nothing may come from the build host's /lib or /usr/lib) and no RUNPATH.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -59,7 +60,7 @@ stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     for bits in 32 64; do
-      (cd zlib-1.3.1-''${bits}${suffix} && env -i PATH="$PATH" CC="${gcc} -m$bits ${includeFlags}" ./configure --prefix=/usr --shared)
+      (cd zlib-1.3.1-''${bits}${suffix} && ${cleanEnv} PATH="$PATH" CC="${gcc} -m$bits ${includeFlags}" ./configure --prefix=/usr --shared)
     done
     runHook postConfigure
   '';
@@ -69,7 +70,7 @@ stdenv.mkDerivation {
     for bits in 32 64; do
       if [ $bits = 32 ]; then libs="${libDirFlags 32 "-L" protoDirs}"; runpath="${lib.optionalString strap (libDirFlags 32 "-R" protoDirs)}"
       else libs="${libDirFlags 64 "-L" protoDirs}"; runpath="${lib.optionalString strap (libDirFlags 64 "-R" protoDirs)}"; fi
-      (cd zlib-1.3.1-''${bits}${suffix} && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 \
+      (cd zlib-1.3.1-''${bits}${suffix} && ${cleanEnv} PATH="$PATH" make -j$NIX_BUILD_CORES V=1 \
         LDSHARED="${gcc} -m$bits -shared -Wl,-h,libz.so.1 -Wl,-zdefs -Wl,-ztext -Wl,-zcombreloc -Wl,-M,../mapfile${genLdFlags} $libs $runpath -lc" \
         LDFLAGS="$libs${genLdFlags} -L. -lc")
     done

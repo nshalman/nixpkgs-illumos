@@ -13,6 +13,7 @@
 # into the platform perl's library, whose path it is given. autoreconf is nixpkgs' autoconf, automake and libtool
 # (theirs: pkgsrc's).
 {
+  cleanEnv,
   mkAutoconf,
   autoconf,
   automake,
@@ -46,7 +47,7 @@ mkAutoconf {
     automake
     libtool
   ];
-  frob = ''(cd $d && env -i PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
+  frob = ''(cd $d && ${cleanEnv} PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
   cflags = "-O2 -gdwarf-2 -fno-inline-functions -fno-inline-functions-called-once -fno-inline-small-functions";
   configureEnv = f: ''LD_OPTIONS="${f.ldflags}"'';
   configureFlags = [
@@ -74,11 +75,11 @@ mkAutoconf {
   install = suffix: ''
     mkdir -p $out/usr/share/man
     ln -s share/man $out/usr/man
-    (cd ntp-4.2.8p15-32${suffix} && env -i PATH="$PATH" make DESTDIR=$out install)
-    env -i PATH="$PATH" DESTDIR=$out CTFCONVERT=${ctfconvert} CTFCONVERTFLAGS= \
+    (cd ntp-4.2.8p15-32${suffix} && ${cleanEnv} PATH="$PATH" make DESTDIR=$out install)
+    ${cleanEnv} PATH="$PATH" DESTDIR=$out CTFCONVERT=${ctfconvert} CTFCONVERTFLAGS= \
       bash ../tools/make-ctf ntp-4.2.8p15-32${suffix} ctfobjects-32${suffix} ntp-4.2.8p15 \
       ${toString (map (p: "/usr/sbin/${p}") programs)}
-    env -i PATH="$PATH" DESTDIR=$out bash -e ./install-ntp
+    ${cleanEnv} PATH="$PATH" DESTDIR=$out bash -e ./install-ntp
     rm $out/usr/man
   '';
 }

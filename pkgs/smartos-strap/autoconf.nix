@@ -15,6 +15,7 @@
 # -zfatal-warnings) after the library directories. A package's pname "smartos-strap-X" becomes "smartos-extra-X"
 # (other names are kept), and its `install` may be a function of the directories' suffix ("strap" or "").
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -155,7 +156,7 @@ stdenv.mkDerivation (
     ''
     + forBits (
       b: f: ''
-        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR= \
+        (cd ${ver}-${toString b}${suffix} && ${cleanEnv} PATH="$PATH" PKG_CONFIG_LIBDIR= \
           CC="${f.cc}${lib.optionalString cppInCC " ${cppFlags}"}" CPPFLAGS="${cppFlags}" CXX="${f.cxx}" \
           ${lib.optionalString passCflags "CFLAGS=\"${f.cflags}\""} ${lib.optionalString passLdflags "LDFLAGS=\"${f.ldflags}\""} \
           LIBS="${f.libs}"${envWords f} ./configure --prefix=${prefix} ${lib.escapeShellArgs f.configureFlags})
@@ -170,7 +171,7 @@ stdenv.mkDerivation (
     ''
     + forBits (
       b: _: ''
-        (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make${jobs} V=1${makeWords})
+        (cd ${ver}-${toString b}${suffix} && ${cleanEnv} PATH="$PATH" make${jobs} V=1${makeWords})
       ''
     )
     + ''
@@ -182,7 +183,7 @@ stdenv.mkDerivation (
       ${
         if install == null then
           forBits (b: _: ''
-            (cd ${ver}-${toString b}${suffix} && env -i PATH="$PATH" make V=1${makeWords} DESTDIR=$out install)
+            (cd ${ver}-${toString b}${suffix} && ${cleanEnv} PATH="$PATH" make V=1${makeWords} DESTDIR=$out install)
           '')
         else if lib.isFunction install then
           install suffix

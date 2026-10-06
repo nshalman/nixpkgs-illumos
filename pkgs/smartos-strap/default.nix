@@ -60,6 +60,10 @@ lib.makeScope newScope (self: {
   # with -fno-aggressive-loop-optimizations, "as we ship some rather downrev software".
   gcc = "${gcc10-illumos}/bin/gcc -fno-aggressive-loop-optimizations";
   gxx = "${gcc10-illumos}/bin/g++ -fno-aggressive-loop-optimizations";
+
+  # The empty environment Makefile.defs runs configure, make and install in (`env -`), to which each build adds its
+  # PATH and the variables illumos-extra gives it.
+  cleanEnv = "env -i";
   inherit gcc10-illumos;
 
   # What a strap build finds first on PATH, $(STRAPPROTO)/usr/bin, holds the links gcc-strapfix makes as soon as the

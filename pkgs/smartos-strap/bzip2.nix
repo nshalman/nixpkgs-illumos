@@ -13,6 +13,7 @@
 # `env -` STRAP is empty, so its `ifneq ($(STRAP),strap)` holds in both builds, and GENLDFLAGS, set only in
 # Makefile.defs, is empty. Nor does the build name the proto area: it compiles against the compiler's own headers.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -62,8 +63,8 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd ${dir}/i386 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m32")
-    (cd ${dir}/amd64 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m64")
+    (cd ${dir}/i386 && ${cleanEnv} PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m32")
+    (cd ${dir}/amd64 && ${cleanEnv} PATH="$PATH" make -j$NIX_BUILD_CORES V=1 CC="${gcc} -m64")
     runHook postBuild
   '';
 

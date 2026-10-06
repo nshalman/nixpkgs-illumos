@@ -13,6 +13,7 @@
 # autoreconf is nixpkgs' autoconf, automake and libtool (theirs: pkgsrc's). nixpkgs' aclocal finds macros
 # through ACLOCAL_PATH, which is kept through `env -`.
 {
+  cleanEnv,
   mkStrapAutoconf,
   autoconf,
   automake,
@@ -35,7 +36,7 @@ mkStrapAutoconf {
     libtool
     pkg-config
   ];
-  frob = ''(cd $d && env -i PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
+  frob = ''(cd $d && ${cleanEnv} PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
   cppInCC = true;
   passCflags = false;
   passLdflags = false;

@@ -17,6 +17,7 @@
 # and LDFLAGS name the proto area (illumosProto, after this package's output), LDFLAGS with GENLDFLAGS; Configure and
 # make see an empty STRAP and their DESTDIR, the proto area; the build directory loses its suffix.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -69,7 +70,7 @@ let
         -e "s;@@NEXTPROTO@@;${thisProto};g" \
         -e "s;@@NATIVE_SHARED_LDFLAGS@@;-G ${nativeLdflags};g" \
         -e "s;@@SHARED_LDFLAGS@@;-G ${ldflags};g"'';
-  strapEnv = ''env -i PATH="$PATH" STRAP=${suffix} DESTDIR=${envDestdir} PKG_CONFIG_LIBDIR='';
+  strapEnv = ''${cleanEnv} PATH="$PATH" STRAP=${suffix} DESTDIR=${envDestdir} PKG_CONFIG_LIBDIR='';
 in
 stdenv.mkDerivation {
   pname = if strap then "smartos-strap-perl" else "smartos-extra-perl";

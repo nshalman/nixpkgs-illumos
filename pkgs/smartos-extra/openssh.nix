@@ -8,6 +8,7 @@
 # /opt/local/bin/xauth, a path ssh records, as theirs. The top Makefile makes it wait for openssl3; the platform's
 # programs link OpenSSL and zlib, so both are given. autoreconf is nixpkgs' autoconf and automake (theirs: pkgsrc's).
 {
+  cleanEnv,
   mkAutoconf,
   autoconf,
   automake,
@@ -52,7 +53,7 @@ mkAutoconf {
     platformDtrace
     hostTools
   ];
-  frob = ''(cd $d && env -i PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
+  frob = ''(cd $d && ${cleanEnv} PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
   cflags = toString [
     "-O2 -gdwarf-2 -fno-inline-functions -fno-inline-functions-called-once -fno-inline-small-functions"
     "-DSET_USE_PAM -DDEPRECATE_SUNSSH_OPT -DKRB5_BUILD_FIX -DDTRACE_SFTP -DDISABLE_BANNER -DPAM_ENHANCEMENT"
@@ -84,9 +85,9 @@ mkAutoconf {
     "--with-xauth=/opt/local/bin/xauth"
   ];
   install = suffix: ''
-    (cd openssh-10.5p1-32${suffix} && env -i PATH="$PATH" make V=1 install DESTDIR=$out)
+    (cd openssh-10.5p1-32${suffix} && ${cleanEnv} PATH="$PATH" make V=1 install DESTDIR=$out)
     rm openssh-10.5p1-32${suffix}/sftp_provider.o
-    env -i PATH="$PATH" DESTDIR=$out CTFCONVERT=${ctfconvert} CTFCONVERTFLAGS= \
+    ${cleanEnv} PATH="$PATH" DESTDIR=$out CTFCONVERT=${ctfconvert} CTFCONVERTFLAGS= \
       bash ../tools/make-ctf openssh-10.5p1-32${suffix} ctfobjects-32${suffix} openssh-10.5p1 ${toString programs}
   '';
 }

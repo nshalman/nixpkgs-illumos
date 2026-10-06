@@ -3,6 +3,7 @@
 # GENLDFLAGS) on make's command line; it links libbz2, from bzip2, installed before it in their proto area. The
 # program and its manual installed.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -48,7 +49,7 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd pbzip2-1.1.6-32 && env -i PATH="$PATH" make -j$NIX_BUILD_CORES \
+    (cd pbzip2-1.1.6-32 && ${cleanEnv} PATH="$PATH" make -j$NIX_BUILD_CORES \
       CC="${gcc} -m32" CXX="${gxx} -m32" \
       CPPFLAGS="${lib.concatMapStringsSep " " (d: "-isystem ${d}/usr/include") protoDirs}" \
       LDFLAGS="${libDirFlags 32 "-L" protoDirs} -Wl,-zassert-deflib -Wl,-zfatal-warnings")

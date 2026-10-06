@@ -6,7 +6,7 @@
 # nawk, else gawk, else awk). It runs with their PATH order, the strap's usr/bin then the build host's /usr/bin, so
 # the lines name /usr/bin/perl and /usr/bin/nawk, as the platform's do; with the build's PATH alone they would name
 # no perl and nixpkgs' gawk, a store path. Only the paths are looked up; /usr/bin/perl has to exist on the build host.
-{ mkAutoconf, strapBin }:
+{ mkAutoconf, strapBin, cleanEnv }:
 
 mkAutoconf {
   pname = "smartos-extra-vim";
@@ -27,6 +27,6 @@ mkAutoconf {
     "--without-x"
   ];
   install = suffix: ''
-    (cd vim-9.2-64${suffix} && env -i PATH="${strapBin}/bin:/usr/bin:$PATH" make V=1 DESTDIR=$out install)
+    (cd vim-9.2-64${suffix} && ${cleanEnv} PATH="${strapBin}/bin:/usr/bin:$PATH" make V=1 DESTDIR=$out install)
   '';
 }

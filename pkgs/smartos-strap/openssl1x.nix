@@ -18,6 +18,7 @@
 # proto area (illumosProto, after this package's output), LDFLAGS carries GENLDFLAGS (-zassert-deflib
 # -zfatal-warnings) instead of the strap RUNPATH, and the build directories lose their suffix.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -104,9 +105,9 @@ stdenv.mkDerivation {
     runHook preConfigure
     opts="--prefix=/usr --openssldir=/etc/openssl --install_prefix=$out no-rc3 no-rc5 no-mdc2 no-idea no-hw_4758_cca no-hw_aep no-hw_atalla no-hw_chil
       no-hw_gmp no-hw_ncipher no-hw_nuron no-hw_padlock no-hw_sureware no-hw_ubsec no-hw_cswift enable-md2 threads shared"
-    (cd ${ver}-32${suffix} && env -i PATH="$PATH" ./configure $opts smartos-x86-gcc)
+    (cd ${ver}-32${suffix} && ${cleanEnv} PATH="$PATH" ./configure $opts smartos-x86-gcc)
     # AUTOCONF_ENV.64
-    (cd ${ver}-64${suffix} && env -i PATH="$PATH" PKG_CONFIG_LIBDIR="" CC="${gcc} -m64" CXX="${gxx} -m64" \
+    (cd ${ver}-64${suffix} && ${cleanEnv} PATH="$PATH" PKG_CONFIG_LIBDIR="" CC="${gcc} -m64" CXX="${gxx} -m64" \
       CPPFLAGS="${cppflags}" \
       CFLAGS="-O3 -Wall -Werror -DPK11_LIB_LOCATION=\\"/usr/lib/64/libpkcs11.so.1\\" -Wno-stringop-truncation -Wno-stringop-overflow" \
       LDFLAGS="${ldflags64}" LIBS="" \
@@ -117,7 +118,7 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     for bits in 32 64; do
-      (cd ${ver}-''${bits}${suffix} && env -i PATH="$PATH" make V=1)
+      (cd ${ver}-''${bits}${suffix} && ${cleanEnv} PATH="$PATH" make V=1)
     done
     bash ./tools/checksyms.bash \
       ${ver}-32${suffix}/libsunw_crypto.so.1.0.0 ${ver}-32${suffix}/libsunw_ssl.so.1.0.0 \

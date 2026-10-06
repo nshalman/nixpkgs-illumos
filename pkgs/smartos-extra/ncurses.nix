@@ -9,6 +9,7 @@
 # those names while ncurses' own are built. The proto area here is read-only: the build is given a view of it without
 # those links instead.
 {
+  cleanEnv,
   lib,
   runCommand,
   mkAutoconfAgainst,
@@ -64,8 +65,8 @@ in
   ldflags = "-R/usr/gnu/lib";
   ldflags64 = "-R/usr/gnu/lib/amd64";
   install = suffix: ''
-    (cd ncurses-5.7-64${suffix} && env -i PATH=/usr/bin:$PATH make DESTDIR=$out install)
-    (cd ncurses-5.7-32${suffix} && env -i PATH=/usr/bin:$PATH make DESTDIR=$out install)
+    (cd ncurses-5.7-64${suffix} && ${cleanEnv} PATH=/usr/bin:$PATH make DESTDIR=$out install)
+    (cd ncurses-5.7-32${suffix} && ${cleanEnv} PATH=/usr/bin:$PATH make DESTDIR=$out install)
     mkdir -p $out/usr/bin $out/usr/include
     for p in infocmp tic toe tput tset; do mv $out/usr/gnu/bin/$p $out/usr/bin/g$p; done
     rm -rf $out/usr/include/ncurses

@@ -11,6 +11,7 @@
 # initialised, which `git describe --dirty` does not count as a change. git is on PATH, as on their build host, for the release target's version tag (`git describe` of the
 # tarball's own .git: "release, from cbec173" in theirs).
 {
+  cleanEnv,
   lib,
   stdenv,
   fetchFromGitHub,
@@ -69,7 +70,7 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd ${ver} && env -i PKG_CONFIG_LIBDIR= CC="${gcc}" CXX="${gxx}" \
+    (cd ${ver} && ${cleanEnv} PKG_CONFIG_LIBDIR= CC="${gcc}" CXX="${gxx}" \
       CPPFLAGS="${lib.concatMapStringsSep " " (d: "-isystem ${d}/usr/include") protoDirs}" CFLAGS="-gdwarf-2" \
       LDFLAGS="${libDirFlags 32 "-L" protoDirs} -Wl,-zassert-deflib -Wl,-zfatal-warnings" LIBS="" \
       CFLAGS_ARCH=-gdwarf-2 PATH="$PATH" make -o deps/illumos-libavl/.git V=1 release)

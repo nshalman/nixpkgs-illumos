@@ -21,6 +21,7 @@
 # are followed by the proto area (illumosProto), LDFLAGS carries GENLDFLAGS (-zassert-deflib -zfatal-warnings) and
 # neither the strap RUNPATH nor the $ORIGIN one, and the build directory loses its suffix.
 {
+  cleanEnv,
   lib,
   stdenv,
   strapBin,
@@ -115,7 +116,7 @@ stdenv.mkDerivation {
   configurePhase = ''
     runHook preConfigure
     ${hostCC} -Wall -Wextra -Werror -O2 -o wrapper wrapper.c
-    (cd ${d} && env -i PATH="$PATH" "''${vars[@]}" ./configure --prefix=/usr --with-dtrace \
+    (cd ${d} && ${cleanEnv} PATH="$PATH" "''${vars[@]}" ./configure --prefix=/usr --with-dtrace \
       --without-snapshot --shared-openssl --shared-openssl-includes=${openssl1x}/opt/1x \
       --shared-openssl-libpath=${openssl1x}/lib --shared-openssl-libname=sunw1x_crypto,sunw1x_ssl --shared-zlib \
       --shared-zlib-libpath=${libz}/lib --shared-zlib-includes=${libz}/usr/include --prefix=/usr/node/0.10)
@@ -124,13 +125,13 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    (cd ${d} && env -i PATH="$PATH" make -j$NIX_BUILD_CORES V=1 "''${vars[@]}")
+    (cd ${d} && ${cleanEnv} PATH="$PATH" make -j$NIX_BUILD_CORES V=1 "''${vars[@]}")
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    (cd ${d} && env -i PATH="$PATH" make V=1 "''${vars[@]}" DESTDIR=$out install)
+    (cd ${d} && ${cleanEnv} PATH="$PATH" make V=1 "''${vars[@]}" DESTDIR=$out install)
     nodeRoot=$out/usr/node/0.10
     ${hostCC} -o genversionjs -include $nodeRoot/include/node/node_version.h genversionjs.c
     mkdir -p $nodeRoot/node_modules

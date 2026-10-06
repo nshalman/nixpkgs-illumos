@@ -3,7 +3,7 @@
 #
 # illumos-extra bug, reproduced (probably an oversight): the Makefile sets no CFLAGS, and Makefile.defs passes
 # CFLAGS="" to configure, so idnkit is compiled without optimization.
-{ mkStrapAutoconf }:
+{ mkStrapAutoconf, cleanEnv }:
 
 mkStrapAutoconf {
   pname = "smartos-strap-idnkit";
@@ -12,6 +12,6 @@ mkStrapAutoconf {
   ver = "idnkit-2.3";
   tarball = "idnkit-2.3.tar.bz2";
   install = ''
-    (cd idnkit-2.3-32strap && env -i PATH="$PATH" make V=1 DESTDIR=$out install)
+    (cd idnkit-2.3-32strap && ${cleanEnv} PATH="$PATH" make V=1 DESTDIR=$out install)
   '';
 }

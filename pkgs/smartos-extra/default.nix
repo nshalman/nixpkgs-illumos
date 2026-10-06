@@ -71,6 +71,7 @@ lib.makeScope newScope (self: {
     gcc
     gxx
     libDirFlags
+    cleanEnv
     ;
 
   # the strap's autoconf packages, built the non-strap way, against the illumos proto area or (mkAutoconfAgainst) a
