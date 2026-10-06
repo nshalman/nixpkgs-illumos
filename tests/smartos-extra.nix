@@ -275,7 +275,10 @@ in
     grep -x three f >/dev/null
     ${extra.vim}/usr/bin/vim --version | head -1 | grep '^VIM - Vi IMproved 9\.2 ' >/dev/null
     echo abc | ${extra.vim}/usr/bin/xxd -p | grep -x 6162630a >/dev/null
-    echo "ok   vim edits, xxd dumps"
+    # its link line names no directory of the build host's (configure adds /usr/local/lib where the host has one:
+    # only a host with one tells)
+    if ${extra.vim}/usr/bin/vim --version | grep -e '-L/usr/local/lib'; then echo "FAIL vim links with the host's /usr/local/lib"; exit 1; fi
+    echo "ok   vim edits, xxd dumps, links with nothing of the host's"
     touch $out
   '';
 
