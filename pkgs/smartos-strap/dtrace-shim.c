@@ -5,12 +5,17 @@
  *     host's: dtrace records its utsname in the DOF it writes (libdtrace dt_open.c, the DOF's utsname section);
  *   - ftok() gives a key made of the path alone (FNV-1a): libdtrace dt_link.c names the alias of a probe's static
  *     function $dtrace<key>.<function>, key = ftok(object, 0), which is made of the object's inode and device.
- * The key only has to tell apart the objects linked together, which a build names by distinct paths.
+ *     The key only has to tell apart the objects linked together, which a build names by distinct paths.
+ *   - dtrace_program_link(), which links each object dtrace -G writes, zeroes the dofa_uargs of the actions in it
+ *     afterwards (./dof-zero-uarg.c): heap addresses of the dtrace process, which differ between build hosts'
+ *     dtraces (and from one run to the next under ASLR). It is given the very file dtrace names, whichever way the
+ *     command line names it (-o, X.d's X.o, d.out).
  */
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/utsname.h>
 #include <dlfcn.h>
+#include <dtrace.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,4 +50,21 @@ ftok(const char *path, int id)
 	}
 	h ^= (uint32_t)(id & 0xff);
 	return ((key_t)(h & 0x7fffffff));
+}
+
+extern int dof_zero_uarg(const char *);
+
+int
+dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags, const char *file, int objc,
+    char *const objv[])
+{
+	static int (*real)(dtrace_hdl_t *, dtrace_prog_t *, uint_t, const char *, int, char *const []);
+	int r;
+
+	if (real == NULL)
+		real = (int (*)(dtrace_hdl_t *, dtrace_prog_t *, uint_t, const char *, int, char *const []))
+		    dlsym(RTLD_NEXT, "dtrace_program_link");
+	if ((r = real(dtp, pgp, dflags, file, objc, objv)) != 0)
+		return (r);
+	return (dof_zero_uarg(file));
 }

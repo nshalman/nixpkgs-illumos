@@ -119,12 +119,13 @@ lib.makeScope newScope (self: {
   # differs from one run to the next: each action's dofa_uarg is the heap address of the dtrace process's statement
   # (libdtrace's dtrace_stmt_action()). The illumos built here writes zero there instead
   # (../smartos-illumos/libdtrace-dof-uarg.patch); the build host's dtrace does not. Without ASLR the addresses are
-  # the same from one run to the next, but not between build hosts of different platforms: so the object dtrace -G
-  # writes is zeroed there afterwards (./dof-zero-uarg.c, which ./platform-dtrace.sh runs on it).
+  # the same from one run to the next, but not between build hosts of different platforms: so the shim zeroes them
+  # in each object as dtrace_program_link() writes it (./dof-zero-uarg.c; libexec/dof-zero-uarg is the same as a
+  # command, for tests/dtrace-shim.sh).
   platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
     mkdir -p $out/bin $out/lib $out/libexec
-    ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c}
-    ${gcc10-illumos}/bin/gcc -m64 -O2 -o $out/libexec/dof-zero-uarg ${./dof-zero-uarg.c} -lelf
+    ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c} ${./dof-zero-uarg.c} -lelf
+    ${gcc10-illumos}/bin/gcc -m64 -O2 -DDOF_ZERO_UARG_MAIN -o $out/libexec/dof-zero-uarg ${./dof-zero-uarg.c} -lelf
     substitute ${./platform-dtrace.sh} $out/bin/dtrace --subst-var out
     chmod +x $out/bin/dtrace
   '';

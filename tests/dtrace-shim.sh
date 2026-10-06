@@ -205,10 +205,15 @@ if [ "$p" = changed ] && [ "$s" = same ]; then
 else
     bad "platformDtrace with -o after the objects: dof-zero-uarg on the platform's object: $p, on platformDtrace's: $s"
 fi
-if ! "$dtraceDir/bin/dtrace" -32 -G -n 'dtrace:helper:ustack: { "@x" }' 2>noout.err && grep -q 'cannot be zeroed' noout.err; then
-    ok "platformDtrace: dtrace -G on a program not from a script is refused (its object, d.out, is not zeroed)"
+# a program not from a script (-n): dtrace -G names its object d.out
+rm -f d.out && /usr/sbin/dtrace -32 -G -n 'dtrace:helper:ustack: { "@x" }' && cp d.out plain.o && "$zero" d.out
+p=$(cmp -s d.out plain.o && echo same || echo changed)
+rm -f d.out && "$dtraceDir/bin/dtrace" -32 -G -n 'dtrace:helper:ustack: { "@x" }' && cp d.out shim.o && "$zero" d.out
+s=$(cmp -s d.out shim.o && echo same || echo changed)
+if [ "$p" = changed ] && [ "$s" = same ]; then
+    ok "platformDtrace: a program not from a script (-n): its object, d.out, is zeroed"
 else
-    bad "platformDtrace: dtrace -G on a program not from a script is not refused"
+    bad "platformDtrace with -n: dof-zero-uarg on the platform's d.out: $p, on platformDtrace's: $s"
 fi
 rm -f d.out
 
