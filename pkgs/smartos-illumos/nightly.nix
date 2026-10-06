@@ -21,6 +21,7 @@
   setup,
   msgcc,
   openjdk11-illumos,
+  smartos-strap,
   commitTime,
   buildstamp ? commitTime.stamp,
   # a DEBUG build only, as smartos-live's configure -d (ILLUMOS_ENABLE_DEBUG=exclusive) makes it: NIGHTLY_OPTIONS
@@ -53,6 +54,9 @@ mkBldenvStep {
     "out"
     "log"
   ];
+
+  # the proto area's archives (libssp_ns.a) the same from one build to the next
+  extra.nativeBuildInputs = [ smartos-strap.normalizeArchives ];
 
   # The build host's /usr/bin/perl: nightly sets its own PATH (onbld, /usr/ccs/bin, /usr/bin, ...) and the build runs
   # perl from it, and runs its perl generators by their #!/usr/bin/perl (sbdgenerr, ao_gendisp, fm's topology maps,

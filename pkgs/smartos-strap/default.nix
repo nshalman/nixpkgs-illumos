@@ -21,6 +21,7 @@
   newScope,
   fetchurl,
   runCommand,
+  makeSetupHook,
   gcc10-illumos,
   # nixpkgs' perl, for the builds that run perl (the build host's /usr/bin/perl there); inside the scope `perl` is the
   # strap perl 5.12, which the other packages do not use
@@ -68,6 +69,22 @@ lib.makeScope newScope (self: {
   cleanEnv = ''env -i SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH"'';
   inherit gcc10-illumos;
 
+  # A setup hook that makes the archives a package installs the same from one build to the next
+  # (./normalize-archives.pl: their member headers' times and owners, which the platform's ar takes from the files);
+  # finishPackage gives it to each package of the strap.
+  normalizeArchives = makeSetupHook {
+    name = "normalize-archives-hook";
+    substitutions = {
+      perl = "${perl}/bin/perl";
+      script = ./normalize-archives.pl;
+    };
+  } ./normalize-archives-hook.sh;
+  finishPackage =
+    pkg:
+    pkg.overrideAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ self.normalizeArchives ];
+    });
+
   # What a strap build finds first on PATH, $(STRAPPROTO)/usr/bin, holds the links gcc-strapfix makes as soon as the
   # primary compiler is installed: gcc, g++ and cpp. A build that runs plain `gcc` (OpenSSL's Configure) gets the
   # strap compiler, as there, and never the stdenv's.
@@ -111,18 +128,18 @@ lib.makeScope newScope (self: {
 
   mkStrapAutoconf = self.callPackage ./autoconf.nix { };
 
-  libz = self.callPackage ./libz.nix { };
-  libexpat = self.callPackage ./libexpat.nix { };
-  libidn = self.callPackage ./libidn.nix { inherit perl; };
-  idnkit = self.callPackage ./idnkit.nix { };
-  bzip2 = self.callPackage ./bzip2.nix { };
-  cpp = self.callPackage ./cpp.nix { };
-  libxml = self.callPackage ./libxml.nix { };
-  openssl1x = self.callPackage ./openssl1x.nix { inherit perl; };
-  openssl3 = self.callPackage ./openssl3.nix { inherit perl; };
-  nss-nspr = self.callPackage ./nss-nspr.nix { inherit perl; };
-  perl = self.callPackage ./perl.nix { };
-  node = self.callPackage ./node.nix { };
+  libz = self.finishPackage (self.callPackage ./libz.nix { });
+  libexpat = self.finishPackage (self.callPackage ./libexpat.nix { });
+  libidn = self.finishPackage (self.callPackage ./libidn.nix { inherit perl; });
+  idnkit = self.finishPackage (self.callPackage ./idnkit.nix { });
+  bzip2 = self.finishPackage (self.callPackage ./bzip2.nix { });
+  cpp = self.finishPackage (self.callPackage ./cpp.nix { });
+  libxml = self.finishPackage (self.callPackage ./libxml.nix { });
+  openssl1x = self.finishPackage (self.callPackage ./openssl1x.nix { inherit perl; });
+  openssl3 = self.finishPackage (self.callPackage ./openssl3.nix { inherit perl; });
+  nss-nspr = self.finishPackage (self.callPackage ./nss-nspr.nix { inherit perl; });
+  perl = self.finishPackage (self.callPackage ./perl.nix { });
+  node = self.finishPackage (self.callPackage ./node.nix { });
 
   # the whole of proto.strap
   proto = self.callPackage ./proto.nix { };

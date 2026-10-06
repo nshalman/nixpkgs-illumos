@@ -94,11 +94,15 @@ lib.makeScope newScope (self: {
 
   # What is done to each package below: perl on PATH, as their build host has /usr/bin/perl on PATH for every package
   # (configure scripts check for it, manuals are made with it: bind, coreutils, curl, wget); then, with
-  # mapStorePaths, the store paths mapped away after the install.
+  # mapStorePaths, the store paths mapped away after the install; then its archives made the same from one build to
+  # the next (smartos-strap.normalizeArchives).
   finishPackage =
     pkg:
     pkg.overrideAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ perl ];
+      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+        perl
+        smartos-strap.normalizeArchives
+      ];
       postInstall =
         (old.postInstall or "")
         + lib.optionalString self.mapStorePaths ''
