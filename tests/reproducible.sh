@@ -2,8 +2,9 @@
 #
 # Whether packages build the same again on this host, and name neither the host nor a build user: for each
 # attribute, (1) `nix-build --check` builds it again (at another time, perhaps as another build user) and Nix compares
-# the result with the output it has; (2) no file of the output contains this host's node name (uname -n) or a build
-# user's name (nixbld<N>: any "nixbld"), which a build on another host or as another user would give differently. A
+# the result with the output it has; (2) no file of the output contains this host's node name (uname -n), its
+# platform (uname -v, in any case: perl lowercases it) or a build user's name (nixbld<N>: any "nixbld"), which a
+# build on another host or as another user would give differently. A
 # difference --check finds is kept beside the output (<output>.check) for comparison. Without a sandbox --check builds
 # into a scratch output path and writes the real one back afterwards, which a checksum over a file naming its own
 # output (an ELF DT_CHECKSUM over its RUNPATH) does not survive: files that are the same once their DT_CHECKSUMs are
@@ -15,7 +16,7 @@ set -uo pipefail
 
 pkgsFile=${1:?usage: $0 PKGS-FILE ATTR...}
 shift
-host=$(uname -n)
+host=$(uname -n) platform=$(uname -v)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -58,8 +59,8 @@ for attr in "$@"; do
         fi
     fi
     for out in $outs; do
-        for pat in "$host" nixbld; do
-            if grep -rlF "$pat" "$out" >"$tmp/named" 2>/dev/null; then
+        for pat in "$host" "$platform" nixbld; do
+            if grep -rliF "$pat" "$out" >"$tmp/named" 2>/dev/null; then
                 bad "$attr: $(wc -l <"$tmp/named") files of $out name $pat, e.g. $(head -1 "$tmp/named")"
             else
                 ok "$attr: $out names no $pat"
