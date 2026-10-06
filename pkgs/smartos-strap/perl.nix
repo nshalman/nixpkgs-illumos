@@ -109,6 +109,9 @@ stdenv.mkDerivation {
     # the dtrace that the build's dtrace -G runs: the platform's, through platformDtrace (its objects do not name the
     # build host, nor depend on inode numbers)
     echo "dtrace='${platformDtrace}/bin/dtrace'" >>${d}/config.over
+    # myuname, the build host's `uname -a` (lowercased), which config.h ("Target system") and `perl -V` carry: its
+    # node name and version made fixed ones, as platformDtrace's
+    echo "myuname='sunos illumos 5.11 joyent i86pc i386 i86pc solaris'" >>${d}/config.over
     (cd ${d} && ${strapEnv} ./Configure -des -Dcc="${cc}" -Duse64bitint)
     (cd ${d} && /usr/sbin/dtrace -h -s perldtrace.d -o perldtrace.h)
     runHook postConfigure
