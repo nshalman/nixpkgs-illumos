@@ -62,8 +62,10 @@ lib.makeScope newScope (self: {
   gxx = "${gcc10-illumos}/bin/g++ -fno-aggressive-loop-optimizations";
 
   # The empty environment Makefile.defs runs configure, make and install in (`env -`), to which each build adds its
-  # PATH and the variables illumos-extra gives it.
-  cleanEnv = "env -i";
+  # PATH and the variables illumos-extra gives it. It keeps the stdenv's SOURCE_DATE_EPOCH, the time the compilers
+  # (__DATE__, __TIME__), OpenSSL's build information and other tools give for when they ran, so that what is built
+  # does not depend on when (theirs carries the time of its build).
+  cleanEnv = ''env -i SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH"'';
   inherit gcc10-illumos;
 
   # What a strap build finds first on PATH, $(STRAPPROTO)/usr/bin, holds the links gcc-strapfix makes as soon as the
