@@ -44,7 +44,9 @@ for v in a b; do
     (cd $v && "$jdk/jar" --create --file out/t.jar -C classes . &&
         "$jdk/jmod" create --class-path classes out/t.jmod >/dev/null &&
         (cd classes && "$zip" -qr ../out/t.zip .))
-    sleep 1
+    # jmod dates its entries, and jar those it writes itself (META-INF/, directories), with the time it runs, to two
+    # seconds (a DOS time): b's at least that much later
+    sleep 2
 done
 echo 'not an archive' >a/out/text.jar
 cp a/out/text.jar text.jar.orig
@@ -54,7 +56,7 @@ same() { cmp -s a/out/$1 b/out/$1; }
 if ! same t.jar && ! same t.jmod && ! same t.zip; then
     ok "the jar, jmod and zip differ before normalizing"
 else
-    bad "a pair is the same before normalizing: the test shows nothing"
+    bad "a pair is the same before normalizing: the test shows nothing"; for f in t.jar t.jmod t.zip; do same $f && echo "    same: $f"; done
 fi
 
 if (unset SOURCE_DATE_EPOCH; ! $norm a 2>err) && grep -q SOURCE_DATE_EPOCH err; then
