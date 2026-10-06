@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+#
+# build-smartos [--flavor default|debug] [--pkgs FILE] [OUTPUT-DIR]: a SmartOS platform and its USB image from this
+# checkout, in one step, as root on a host that can make them (a builder-brand zone with lofi, UFS and pcfs mounts):
+#   - the builder tools of the flavor (pkgs/smartos-live: smartos-live, or smartos-live-debug) built from the package
+#     set FILE (default this checkout's illumos.nix), kept as OUTPUT-DIR/builder-tools-FLAVOR;
+#   - the platform, OUTPUT-DIR/platform-STAMP (build-image), and its USB image, OUTPUT-DIR/platform-STAMP.usb.gz
+#     (build-usb, with their defaults: the console on ttya).
+# OUTPUT-DIR defaults to /var/tmp/build-smartos.
+#
+# The build stamp says what was built (pkgs/smartos-live/identity.nix): a clean checkout's is its commit's time (a
+# release's, its release's), one with changed tracked files is dirty and stamped with the time of the build. Nix
+# reads the tree as it is, untracked files too, where the identity sees only what git tracks; so a checkout with
+# untracked files that are not ignored is refused, before anything is built.
+
+set -euo pipefail
+
+top="$(cd "$(dirname "$0")" && pwd)"
+
+usage() {
+    echo "usage: $0 [--flavor default|debug] [--pkgs FILE] [OUTPUT-DIR]" >&2
+    exit 2
+}
+fail() {
+    echo "build-smartos: $*" >&2
+    exit 1
+}
+
+flavor=default pkgs=$top/illumos.nix
+while [ $# -gt 0 ]; do
+    case $1 in
+        --flavor) [ $# -ge 2 ] || usage; flavor=$2; shift 2 ;;
+        --pkgs) [ $# -ge 2 ] || usage; pkgs=$2; shift 2 ;;
+        -*) usage ;;
+        *) break ;;
+    esac
+done
+[ $# -le 1 ] || usage
+out=${1:-/var/tmp/build-smartos}
+case $flavor in
+    default) attr=smartos-live ;;
+    debug) attr=smartos-live-debug ;;
+    *) usage ;;
+esac
+
+state=unknown
+if git -C "$top" rev-parse --git-dir >/dev/null 2>&1; then
+    untracked=$(git -C "$top" ls-files --others --exclude-standard)
+    if [ -n "$untracked" ]; then
+        echo "build-smartos: untracked files, which the build would use but its stamp could not tell:" >&2
+        echo "$untracked" | head -20 | sed 's/^/    /' >&2
+        fail "add them to git (or to .gitignore), or remove them"
+    fi
+    if git -C "$top" diff --quiet HEAD --; then state=clean; else state=dirty; fi
+fi
+[ "$(id -u)" = 0 ] || fail "build-image and build-usb need root"
+
+mkdir -p "$out"
+out=$(cd "$out" && pwd)
+nix-build "$pkgs" -A "$attr.builderTools" -o "$out/builder-tools-$flavor" >/dev/null
+tools=$out/builder-tools-$flavor/bin
+
+"$tools/build-image" "$out" 2>&1 | tee "$out/build-image.log"
+stamp=$(sed -n 's/^build-image: build stamp //p' "$out/build-image.log")
+platform=$out/platform-$stamp
+[ -n "$stamp" ] && [ -d "$platform" ] || fail "build-image made no platform-STAMP in $out"
+
+"$tools/build-usb" "$platform" "$out"
+
+echo
+echo "build-smartos: $flavor, $state checkout, build stamp $stamp"
+echo "  platform:      $platform"
+echo "  USB image:     $platform.usb.gz"
+echo "  root password: $platform/root.password"
