@@ -116,7 +116,8 @@ stdenv.mkDerivation (
       mkdir -p proto
 
       # smartos-live configure's generate_env, as illumos.sh; GATE as build_illumos sets it, from the illumos-joyent
-      # commit here rather than a build time
+      # commit here rather than a build time. RELEASE_DATE, the month and year in every ELF file's illumos ident,
+      # which bldenv and nightly otherwise take from the clock, is the commit's too.
       cat >illumos/illumos.sh <<EOF
       NIGHTLY_OPTIONS="-CiLmMNnt";			export NIGHTLY_OPTIONS
       GATE="joyent_${src.rev or "unknown"}";		export GATE
@@ -136,6 +137,7 @@ stdenv.mkDerivation (
       NATIVE_ADJUNCT="${nativeAdjunct}";		export NATIVE_ADJUNCT
       SRC="\$CODEMGR_WS/usr/src";			export SRC
       VERSION="\$GATE";				export VERSION
+      RELEASE_DATE="${commitTime.monthName} ${toString commitTime.year}";	export RELEASE_DATE
       PARENT_ROOT="$PWD/proto";			export PARENT_ROOT
       MAKEFLAGS=ek;					export MAKEFLAGS
       UT_NO_USAGE_TRACKING="1";			export UT_NO_USAGE_TRACKING

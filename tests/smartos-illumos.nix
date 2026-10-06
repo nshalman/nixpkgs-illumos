@@ -2,13 +2,30 @@
 #   runpath: no ELF object in the nightly's proto area names the store in its RUNPATH or RPATH, and gcc 10's
 #            RUNPATH is illumos-extra's, /usr/gcc/10/lib (amd64 for 64-bit), as on the SmartOS platform (its
 #            /usr/bin/ls).
+#   idents:  every illumos ident (@(#)illumos joyent_<commit> <Month> <Year>, which the gate adds to each ELF file's
+#            .comment) in the tools, msgcc and the nightly names the pinned commit's month (pins.json's date, as GNU
+#            date gives it), not the month the build ran in.
 #   nix-build tests/smartos-illumos.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
 { pkgs }:
 
 let
   nightly = pkgs.smartos-illumos.nightly;
+  pin = (import ../pins)."illumos-joyent";
 in
 {
+  idents = pkgs.runCommand "smartos-illumos-idents" { } ''
+    want="@(#)illumos joyent_${pin.rev} $(TZ=UTC LC_ALL=C date -d @${toString pin.date} '+%B %Y')"
+    echo "want: $want"
+    for p in ${pkgs.smartos-illumos.tools} ${pkgs.smartos-illumos.msgcc} ${nightly}; do
+      grep -rhao '@(#)illumos joyent_[0-9a-z]* [A-Za-z]* [0-9]*' $p | sort | uniq -c | sed "s|^|$p: |"
+    done >$TMPDIR/idents
+    cat $TMPDIR/idents
+    # each output has idents, and they are all the one wanted
+    test "$(wc -l <$TMPDIR/idents)" = 3 || exit 1
+    test "$(grep -cF " $want" $TMPDIR/idents)" = 3 || exit 1
+    echo ok >$out
+  '';
+
   runpath = pkgs.runCommand "smartos-illumos-nightly-runpath" { } ''
     cd ${nightly}/proto
     objects=0 store=0 gcc=0
