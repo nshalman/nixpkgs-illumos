@@ -1,7 +1,7 @@
 # illumos-joyent built as smartos-live's tools/build_illumos builds it: `dmake setup` and the tools under bldenv (as
 # ./setup.nix), then `nightly illumos.sh` in the same tree, with NIGHTLY_OPTIONS -CiLmMNnt (an incremental,
-# non-DEBUG build that builds and uses its own tools). The output is the proto area ROOT (proto) and nightly's logs
-# (log).
+# non-DEBUG build that builds and uses its own tools). The output is the proto area ROOT (proto); nightly's logs are
+# the log output, apart, since their directory names carry the time of the build.
 #
 # illumos.sh has what smartos-live's configure adds for the nightly beyond the earlier steps': JAVA_ROOT, the JDK 11
 # that builds illumos' Java components (../openjdk11-illumos, where smartos-live has pkgsrc's openjdk11); ASTBINDIR,
@@ -49,6 +49,11 @@ mkBldenvStep {
 
   extra.postUnpack = setup.postUnpack;
 
+  extra.outputs = [
+    "out"
+    "log"
+  ];
+
   # The build host's /usr/bin/perl: nightly sets its own PATH (onbld, /usr/ccs/bin, /usr/bin, ...) and the build runs
   # perl from it, and runs its perl generators by their #!/usr/bin/perl (sbdgenerr, ao_gendisp, fm's topology maps,
   # ...). On the SmartOS platform /usr/bin/perl is a link to /opt/local/bin/perl (illumos-joyent's manifest), pkgsrc's
@@ -68,7 +73,7 @@ mkBldenvStep {
     runHook preInstall
     mkdir -p $out
     cp -r proto $out/proto
-    cp -r illumos/log $out/log
+    cp -r illumos/log $log
     runHook postInstall
   '';
 

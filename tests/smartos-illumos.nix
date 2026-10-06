@@ -5,6 +5,8 @@
 #   idents:  every illumos ident (@(#)illumos joyent_<commit> <Month> <Year>, which the gate adds to each ELF file's
 #            .comment) in the tools, msgcc and the nightly names the pinned commit's month (pins.json's date, as GNU
 #            date gives it), not the month the build ran in.
+#   log:     the nightly's logs, whose directory names carry the time of the build, are in its log output; its out
+#            output, the one later stages use, has the proto area alone.
 #   nix-build tests/smartos-illumos.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
 { pkgs }:
 
@@ -23,6 +25,15 @@ in
     # each output has idents, and they are all the one wanted
     test "$(wc -l <$TMPDIR/idents)" = 3 || exit 1
     test "$(grep -cF " $want" $TMPDIR/idents)" = 3 || exit 1
+    echo ok >$out
+  '';
+
+  log = pkgs.runCommand "smartos-illumos-nightly-log" { } ''
+    ls -A ${nightly} >$TMPDIR/out
+    cat $TMPDIR/out
+    test "$(cat $TMPDIR/out)" = proto || exit 1
+    test -s ${nightly.log or "no-log-output"}/latest/nightly.log || exit 1
+    grep NIGHTLY_OPTIONS= ${nightly.log or "no-log-output"}/latest/nightly.log | head -1
     echo ok >$out
   '';
 
