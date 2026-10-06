@@ -118,14 +118,14 @@ lib.makeScope newScope (self: {
   # address space layout randomization, under which the DOF dtrace -G writes for a D program (a ustack helper: node's)
   # differs from one run to the next: each action's dofa_uarg is the heap address of the dtrace process's statement
   # (libdtrace's dtrace_stmt_action()). The illumos built here writes zero there instead
-  # (../smartos-illumos/libdtrace-dof-uarg.patch); the build host's dtrace does not.
+  # (../smartos-illumos/libdtrace-dof-uarg.patch); the build host's dtrace does not. Without ASLR the addresses are
+  # the same from one run to the next, but not between build hosts of different platforms: so the object dtrace -G
+  # writes is zeroed there afterwards (./dof-zero-uarg.c, which ./platform-dtrace.sh runs on it).
   platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
-    mkdir -p $out/bin $out/lib
+    mkdir -p $out/bin $out/lib $out/libexec
     ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c}
-    cat >$out/bin/dtrace <<EOF
-    #!/bin/sh
-    LD_PRELOAD_64=$out/lib/dtrace-shim.so exec /usr/bin/psecflags -s current,-aslr -e /usr/sbin/dtrace "\$@"
-    EOF
+    ${gcc10-illumos}/bin/gcc -m64 -O2 -o $out/libexec/dof-zero-uarg ${./dof-zero-uarg.c} -lelf
+    substitute ${./platform-dtrace.sh} $out/bin/dtrace --subst-var out
     chmod +x $out/bin/dtrace
   '';
 

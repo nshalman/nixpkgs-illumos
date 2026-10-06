@@ -153,5 +153,41 @@ else
     bad "platformDtrace: a ustack helper's DOF differs from run to run"; cat h.err
 fi
 
+# What differs from one run to the next under ASLR, and between build hosts' dtraces with it off, is each action's
+# dofa_uarg (the heap address of the dtrace process's statement); dof-zero-uarg zeroes them. The platform's dtrace
+# with ASLR on: five objects, the same once zeroed. platformDtrace's object: already zeroed (dof-zero-uarg leaves
+# it as it is, where it changes the platform's).
+zero=$dtraceDir/libexec/dof-zero-uarg
+z() {
+    for i in 1 2 3 4 5; do
+        rm -f h.o
+        /usr/bin/psecflags -s current,aslr -e /usr/sbin/dtrace -32 -C -G -s h.d -o h.o 2>h.err && "$zero" h.o && cksum <h.o
+    done | sort -u | wc -l
+}
+if [ -x "$zero" ] && [ "$(z)" = 1 ]; then
+    ok "dof-zero-uarg: five ustack helper objects of the platform's dtrace, under ASLR, are the same once zeroed"
+else
+    bad "dof-zero-uarg: the platform's ustack helper objects differ once zeroed, or no $zero"; cat h.err
+fi
+rm -f h.o && /usr/sbin/dtrace -32 -C -G -s h.d -o h.o && cp h.o plain.o && "$zero" h.o
+p=$(cmp -s h.o plain.o && echo same || echo changed)
+rm -f h.o && "$dtraceDir/bin/dtrace" -32 -C -G -s h.d -o h.o && cp h.o shim.o && "$zero" h.o
+s=$(cmp -s h.o shim.o && echo same || echo changed)
+if [ "$p" = changed ] && [ "$s" = same ]; then
+    ok "platformDtrace: its object's dofa_uargs are zero (dof-zero-uarg changes the platform's, not its)"
+else
+    bad "platformDtrace: dof-zero-uarg on the platform's object: $p, on platformDtrace's: $s"
+fi
+if "$zero" t.c && "$zero" prov.d; then
+    ok "dof-zero-uarg leaves what is not an ELF object with DOF alone"
+else
+    bad "dof-zero-uarg fails on what is not an ELF object with DOF"
+fi
+if ! "$dtraceDir/bin/dtrace" -G -64 -s prov.d obj.o 2>noout.err && grep -q -- '-o' noout.err; then
+    ok "platformDtrace: dtrace -G without -o is refused (the object it would write is not zeroed)"
+else
+    bad "platformDtrace: dtrace -G without -o is not refused"
+fi
+
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
