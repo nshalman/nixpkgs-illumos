@@ -7,9 +7,10 @@
 # each program, a script X.d's basename(X).o (in the current directory), or d.out; and with several programs and -o,
 # the -o file too, which joins them. Programs other than scripts (-n, -P, -m, -f, -i) and d.out are refused.
 #
-# The options are read as dtrace's getopt() reads them (DTRACE_OPTSTR "3:6:aAb:Bc:CD:ef:FGhHi:I:lL:m:n:o:p:P:qs:SU:
-# vVwx:X:Z": -32 and -64 are -3 and -6 with a value), up to the first operand.
-obj= link= other= scripts= n=0 want=
+# The options are read as dtrace's main() reads them: getopt() with DTRACE_OPTSTR ("3:6:aAb:Bc:CD:ef:FGhHi:I:lL:m:n:o:
+# p:P:qs:SU:vVwx:X:Z": -32 and -64 are -3 and -6 with a value) up to an operand, then on again from the word after it
+# (node's build gives -o after its objects); the word after -- is an operand.
+obj= link= other= scripts= n=0 want= operand=
 take() {
 	case $1 in
 	o) obj=$2 ;;
@@ -20,10 +21,11 @@ take() {
 }
 for a in "$@"; do
 	if [ -n "$want" ]; then take "$want" "$a"; want=; continue; fi
+	if [ -n "$operand" ]; then operand=; continue; fi
 	case $a in
-	--) break ;;
+	--) operand=1; continue ;;
 	-?*) ;;
-	*) break ;;
+	*) continue ;;
 	esac
 	cl=${a#-}
 	while [ -n "$cl" ]; do

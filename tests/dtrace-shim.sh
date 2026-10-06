@@ -194,6 +194,17 @@ if [ "$p" = changed ] && [ "$s" = same ]; then
 else
     bad "platformDtrace without -o: dof-zero-uarg on the platform's object: $p, on platformDtrace's: $s"
 fi
+# -o after the objects, as node's build gives it (dtrace reads options after operands too): an object without probes
+"$cc" -m64 -c -o plainobj.o u.c || { bad "cannot compile u.c"; exit 1; }
+rm -f late.o && /usr/sbin/dtrace -64 -C -G -s ./h.d plainobj.o -o late.o && cp late.o plain.o && "$zero" late.o
+p=$(cmp -s late.o plain.o && echo same || echo changed)
+rm -f late.o && "$dtraceDir/bin/dtrace" -64 -C -G -s ./h.d plainobj.o -o late.o && cp late.o shim.o && "$zero" late.o
+s=$(cmp -s late.o shim.o && echo same || echo changed)
+if [ "$p" = changed ] && [ "$s" = same ]; then
+    ok "platformDtrace: with -o after the objects, that object is zeroed"
+else
+    bad "platformDtrace with -o after the objects: dof-zero-uarg on the platform's object: $p, on platformDtrace's: $s"
+fi
 if ! "$dtraceDir/bin/dtrace" -32 -G -n 'dtrace:helper:ustack: { "@x" }' 2>noout.err && grep -q 'cannot be zeroed' noout.err; then
     ok "platformDtrace: dtrace -G on a program not from a script is refused (its object, d.out, is not zeroed)"
 else
