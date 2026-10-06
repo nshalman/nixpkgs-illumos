@@ -28,6 +28,9 @@
 # And the stdenv compiler's sysroot (illumos 2021) has no audio headers, which libjsound includes (OmniOS builds with
 # its system/header/header-audio): sys/audio.h, sys/audioio.h and sys/mixer.h from the illumos-joyent this overlay
 # builds.
+# What it records of when it was built is the stdenv's SOURCE_DATE_EPOCH: jdk11u's --with-source-date for what its
+# makefiles date, and its jmods', jars' and zips' entries made so afterwards (smartos-strap.normalizeZips), as its jar
+# and jmod tools take no time.
 {
   lib,
   path,
@@ -49,6 +52,7 @@
   cups,
   fontconfig,
   smartos-illumos,
+  smartos-strap,
 }:
 
 let
@@ -109,6 +113,7 @@ in
     nativeBuildInputs = lib.filter (p: (p.name or "") != "auto-patchelf-hook") old.nativeBuildInputs ++ [
       cpio
       file
+      smartos-strap.normalizeZips
     ];
 
     buildInputs = [
@@ -132,6 +137,12 @@ in
       for f in -std=gnu++98 -fno-lifetime-dse -fno-delete-null-pointer-checks; do
         grep -e "$f" build/*/spec.gmk >/dev/null || { echo "configure dropped $f"; exit 1; }
       done
+    '';
+
+    # jdk11u's reproducible build: its makefiles take the time of the build from --with-source-date, here the
+    # stdenv's SOURCE_DATE_EPOCH, where without it they export the time they run at (libjvm's "built on")
+    preConfigure = old.preConfigure + ''
+      configureFlags+=("--with-source-date=$SOURCE_DATE_EPOCH")
     '';
 
     configureFlags =
@@ -162,7 +173,12 @@ in
     # (os_solaris.cpp: fatal(dlerror())); Tribblix builds it without that hardening
     hardeningDisable = (old.hardeningDisable or [ ]) ++ [ "format" ];
 
-    installPhase = lib.replaceStrings [ "$out/include/linux/" ] [ "$out/include/solaris/" ] old.installPhase;
+    # nixpkgs' installPhase runs no postInstall hooks, which normalizeZips is
+    installPhase =
+      lib.replaceStrings [ "$out/include/linux/" ] [ "$out/include/solaris/" ] old.installPhase
+      + ''
+        runHook postInstall
+      '';
 
     postFixup = "";
 
