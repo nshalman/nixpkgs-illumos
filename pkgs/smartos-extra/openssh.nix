@@ -4,8 +4,9 @@
 # wrappers from the proto area, CFLAGS for CTF and the patches' feature macros, LDFLAGS -B direct -z nolazyload and
 # ASLR; installed by `make install`, then CTF for its programs by tools/make-ctf.
 #
-# The patches run the platform's dtrace at build time (dtrace -G), as for illumos-extra. --with-xauth names pkgsrc's
-# /opt/local/bin/xauth, a path ssh records, as theirs. The top Makefile makes it wait for openssl3; the platform's
+# The patches run the platform's dtrace at build time (dtrace -G), as for illumos-extra, here through platformDtrace
+# (their Makefile.in names /usr/sbin/dtrace). --with-xauth names pkgsrc's /opt/local/bin/xauth, a path ssh records,
+# as theirs. The top Makefile makes it wait for openssl3; the platform's
 # programs link OpenSSL and zlib, so both are given. autoreconf is nixpkgs' autoconf and automake (theirs: pkgsrc's).
 {
   cleanEnv,
@@ -53,7 +54,10 @@ mkAutoconf {
     platformDtrace
     hostTools
   ];
-  frob = ''(cd $d && ${cleanEnv} PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)'';
+  frob = ''
+    substituteInPlace $d/Makefile.in --replace-fail /usr/sbin/dtrace ${platformDtrace}/bin/dtrace
+    (cd $d && ${cleanEnv} PATH="$PATH" ACLOCAL_PATH="$ACLOCAL_PATH" autoreconf -fi)
+  '';
   cflags = toString [
     "-O2 -gdwarf-2 -fno-inline-functions -fno-inline-functions-called-once -fno-inline-small-functions"
     "-DSET_USE_PAM -DDEPRECATE_SUNSSH_OPT -DKRB5_BUILD_FIX -DDTRACE_SFTP -DDISABLE_BANNER -DPAM_ENHANCEMENT"

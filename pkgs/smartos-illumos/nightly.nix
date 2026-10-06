@@ -9,7 +9,9 @@
 # smartos-build-tools); and the default MAKE, the tools proto's dmake, which nightly runs since build_illumos
 # unexports MAKE before it. Not set: BUILDVERSION_EXEC (smartos-live's build_etcrelease, for the buildversion
 # module; unset, cmd/nsadmin skips it). BANNER_YEAR, which build_illumos takes from the clock, is the year of the
-# pinned illumos-joyent commit.
+# pinned illumos-joyent commit. DTRACE (Makefile.master's /usr/sbin/dtrace -xnolibs, which MAKEFLAGS=ek lets the
+# environment replace) is the platform's dtrace through smartos-strap.platformDtrace, so that the DOF dtrace -G
+# writes names neither the build host nor its platform (but GATE) and its aliases do not depend on inode numbers.
 #
 # BUILDSTAMP: smartos-live's Makefile writes the platform's build stamp to proto/buildstamp before the illumos build
 # ($BUILDSTAMP, or the time), and cmd/Adm/sun builds /etc/motd and /etc/issue from it. Here it is the pinned
@@ -41,6 +43,8 @@ mkBldenvStep {
     MAKE="\$SRC/tools/proto/root_i386-nd/opt/onbld/bin/i386/dmake";	export MAKE
     fi
     ASTBINDIR=${msgcc}/usr/ast/bin;		export ASTBINDIR
+    DTRACE="${smartos-strap.platformDtrace}/bin/dtrace -xnolibs";	export DTRACE
+    DTRACE_SHIM_VERSION="\$GATE";			export DTRACE_SHIM_VERSION
   ''
   + lib.optionalString debug ''
     NIGHTLY_OPTIONS="-CiLmMNntDF";			export NIGHTLY_OPTIONS

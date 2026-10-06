@@ -18,6 +18,7 @@
 # make see an empty STRAP and their DESTDIR, the proto area; the build directory loses its suffix.
 {
   cleanEnv,
+  platformDtrace,
   lib,
   stdenv,
   strapBin,
@@ -105,6 +106,9 @@ stdenv.mkDerivation {
     ${xform} <config.over.in >${d}/config.over
     # cf_time, when Configure ran, which it takes from the clock (perlbug's config_tag), as SOURCE_DATE_EPOCH gives it
     echo "cf_time='$(LC_ALL=C date -u -d "@$SOURCE_DATE_EPOCH")'" >>${d}/config.over
+    # the dtrace that the build's dtrace -G runs: the platform's, through platformDtrace (its objects do not name the
+    # build host, nor depend on inode numbers)
+    echo "dtrace='${platformDtrace}/bin/dtrace'" >>${d}/config.over
     (cd ${d} && ${strapEnv} ./Configure -des -Dcc="${cc}" -Duse64bitint)
     (cd ${d} && /usr/sbin/dtrace -h -s perldtrace.d -o perldtrace.h)
     runHook postConfigure
