@@ -117,7 +117,11 @@ stdenv.mkDerivation (
 
       # smartos-live configure's generate_env, as illumos.sh; GATE as build_illumos sets it, from the illumos-joyent
       # commit here rather than a build time. RELEASE_DATE, the month and year in every ELF file's illumos ident,
-      # which bldenv and nightly otherwise take from the clock, is the commit's too.
+      # which bldenv and nightly otherwise take from the clock, is the commit's too. LOCKNAME as theirs, the build
+      # user and the directory the build is in (theirs: the smartos-live checkout), so that two builds at once, as of
+      # the default and debug nightlies, do not take the same lock; the user from id -un, as the platform has no
+      # whoami (theirs is pkgsrc's).
+      lprefix=$(echo $PWD | tr / _)
       cat >illumos/illumos.sh <<EOF
       NIGHTLY_OPTIONS="-CiLmMNnt";			export NIGHTLY_OPTIONS
       GATE="joyent_${src.rev or "unknown"}";		export GATE
@@ -127,7 +131,7 @@ stdenv.mkDerivation (
       PARENT_WS="";					export PARENT_WS
       STAFFER="nobody";				export STAFFER
       BUILD_PROJECT="";				export BUILD_PROJECT
-      LOCKNAME="nix_nightly.lock";			export LOCKNAME
+      LOCKNAME="\`id -un\`_''${lprefix}_nightly.lock";	export LOCKNAME
       ATLOG="\$CODEMGR_WS/log";			export ATLOG
       LOGFILE="\$ATLOG/nightly.log";			export LOGFILE
       MACH=\`uname -p\`;				export MACH
