@@ -23,6 +23,7 @@
   runCommand,
   makeSetupHook,
   gcc10-illumos,
+  illumos-sysroot,
   # nixpkgs' perl, for the builds that run perl (the build host's /usr/bin/perl there); inside the scope `perl` is the
   # strap perl 5.12, which the other packages do not use
   perl,
@@ -57,10 +58,23 @@ lib.makeScope newScope (self: {
         p: _: rel p == "install.subr" || lib.any (d: rel p == d || lib.hasPrefix "${d}/" (rel p)) dirs;
     };
 
+  # The C runtime's start files (crt1.o, crti.o, crtn.o, gcrt1.o, values-*.o) the compilers link programs and
+  # libraries with: the pinned illumos sysroot's, where theirs are the build host's /usr/lib, whose files carry the
+  # host platform's ident (@(#)illumos joyent_<its build stamp>) into everything linked. Laid out as gcc looks under
+  # a -B prefix: the 64-bit files at the top, the 32-bit in 32/ (its multilib directories, not illumos' amd64).
+  startFiles = runCommand "smartos-strap-startfiles" { } ''
+    mkdir -p $out/32
+    for f in crt1.o crti.o crtn.o gcrt1.o values-Xa.o values-Xc.o values-Xs.o values-Xt.o values-xpg4.o \
+             values-xpg6.o; do
+      cp ${illumos-sysroot}/usr/lib/amd64/$f $out/$f
+      cp ${illumos-sysroot}/usr/lib/$f $out/32/$f
+    done
+  '';
+
   # The compilers as illumos-extra's Makefile.defs names them in a strap build (GCCBIN, GXXBIN): the strap gcc
-  # with -fno-aggressive-loop-optimizations, "as we ship some rather downrev software".
-  gcc = "${gcc10-illumos}/bin/gcc -fno-aggressive-loop-optimizations";
-  gxx = "${gcc10-illumos}/bin/g++ -fno-aggressive-loop-optimizations";
+  # with -fno-aggressive-loop-optimizations, "as we ship some rather downrev software"; and the start files above.
+  gcc = "${gcc10-illumos}/bin/gcc -fno-aggressive-loop-optimizations -B${self.startFiles}/";
+  gxx = "${gcc10-illumos}/bin/g++ -fno-aggressive-loop-optimizations -B${self.startFiles}/";
 
   # The empty environment Makefile.defs runs configure, make and install in (`env -`), to which each build adds its
   # PATH and the variables illumos-extra gives it. It keeps the stdenv's SOURCE_DATE_EPOCH, the time the compilers
@@ -87,10 +101,14 @@ lib.makeScope newScope (self: {
 
   # What a strap build finds first on PATH, $(STRAPPROTO)/usr/bin, holds the links gcc-strapfix makes as soon as the
   # primary compiler is installed: gcc, g++ and cpp. A build that runs plain `gcc` (OpenSSL's Configure) gets the
-  # strap compiler, as there, and never the stdenv's.
+  # strap compiler, as there, and never the stdenv's; gcc and g++ here with the start files above.
   strapBin = runCommand "smartos-strap-usr-bin" { } ''
     mkdir -p $out/bin
-    for f in gcc g++ cpp; do ln -s ${gcc10-illumos}/bin/$f $out/bin/$f; done
+    for f in gcc g++; do
+      printf '#!/bin/sh\nexec %s -B%s/ "$@"\n' ${gcc10-illumos}/bin/$f ${self.startFiles} >$out/bin/$f
+      chmod +x $out/bin/$f
+    done
+    ln -s ${gcc10-illumos}/bin/cpp $out/bin/cpp
   '';
 
   # The platform's dtrace, which perl and node run at build time (dtrace -h, -G) as they do in illumos-extra: an

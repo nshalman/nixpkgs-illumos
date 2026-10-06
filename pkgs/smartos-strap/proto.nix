@@ -13,11 +13,13 @@
 #   - gcc: usr/gcc/10 joins gcc10-illumos's two outputs (the compiler, and its runtime libraries in lib and
 #     lib/amd64). gcc-strapfix's edits of the runtime libraries' RUNPATHs do not apply: those libraries are in the
 #     store and already name their own directory. gcclibs.tar.gz holds them as they are;
-#   - usr/bin/{gcc,g++,cpp} point at this tree's usr/gcc/10/bin, as gcc-strapfix's do at theirs.
+#   - usr/bin/{gcc,g++,cpp} point at this tree's usr/gcc/10/bin, as gcc-strapfix's do at theirs;
+#   - usr/gcc/10/bin/{gcc,g++} link with the pinned start files (./default.nix, startFiles), not the build host's.
 {
   runCommand,
   binutils-strap,
   gcc10-illumos,
+  startFiles,
   adjunct,
   cpp,
   bzip2,
@@ -85,6 +87,14 @@ runCommand "smartos-strap-proto"
     link_tree ${gcc10-illumos.lib} $c
     find $c/lib -name 'libstdc++.so*-gdb.py' -delete
     [ -L $c/lib/64 ] || ln -s amd64 $c/lib/64
+    # gcc and g++ link with the pinned start files (startFiles), as the scope's compilers do: the illumos build's
+    # cw runs them (PRIMARY_CC), and links the shared objects it builds without -nostdlib (rcm modules, perl
+    # extensions) with them; the smartos-live projects compile with usr/bin/gcc
+    for f in gcc g++; do
+      rm $c/bin/$f
+      printf '#!/bin/sh\nexec %s -B%s/ "$@"\n' ${gcc10-illumos}/bin/$f ${startFiles} >$c/bin/$f
+      chmod +x $c/bin/$f
+    done
     mkdir -p $out/usr/bin
     for f in gcc g++ cpp; do ln -sf $c/bin/$f $out/usr/bin/$f; done
     (cd ${gcc10-illumos.lib}/lib && tar -czf $out/gcclibs.tar.gz lib{ssp,gcc_s,stdc++}.so* amd64/lib{ssp,gcc_s,stdc++}.so*)
