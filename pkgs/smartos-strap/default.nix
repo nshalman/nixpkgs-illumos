@@ -124,8 +124,8 @@ lib.makeScope newScope (self: {
   # command, for tests/dtrace-shim.sh).
   platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
     mkdir -p $out/bin $out/lib $out/libexec
-    ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c} ${./dof-zero-uarg.c} -lelf
-    ${gcc10-illumos}/bin/gcc -m64 -O2 -DDOF_ZERO_UARG_MAIN -o $out/libexec/dof-zero-uarg ${./dof-zero-uarg.c} -lelf
+    ${gcc10-illumos}/bin/gcc -m64 -B${self.startFiles}/ -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c} ${./dof-zero-uarg.c} -lelf
+    ${gcc10-illumos}/bin/gcc -m64 -B${self.startFiles}/ -O2 -DDOF_ZERO_UARG_MAIN -o $out/libexec/dof-zero-uarg ${./dof-zero-uarg.c} -lelf
     substitute ${./platform-dtrace.sh} $out/bin/dtrace --subst-var out
     chmod +x $out/bin/dtrace
   '';
