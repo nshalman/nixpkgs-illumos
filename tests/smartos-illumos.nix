@@ -7,6 +7,8 @@
 #            date gives it), not the month the build ran in.
 #   log:     the nightly's logs, whose directory names carry the time of the build, are in its log output; its out
 #            output, the one later stages use, has the proto area alone.
+#   times:   what the build writes of when it ran is the pinned commit's time (SOURCE_DATE_EPOCH): .pyc files are checked
+#            by their sources' hashes, not times; __TIME__ (libzdoor) is the commit's; every jar entry is dated then.
 #   dofUarg: the nightly's libdtrace writes the same object for a D program each time dtrace -G runs, with address
 #            space layout randomization on (pkgs/smartos-illumos/libdtrace-dof-uarg.patch): the build host's dtrace,
 #            run five times on a ustack helper with that library in place of its own.
@@ -54,6 +56,32 @@ in
     done >sums
     cat sums
     test "$(sort -u sums | wc -l)" = 1
+    echo ok >$out
+  '';
+
+  times = pkgs.runCommand "smartos-illumos-times" { nativeBuildInputs = [ pkgs.unzip ]; } ''
+    # .pyc files: checked by a hash of their source (flags, bytes 4-7, not 0), not by its time
+    n=0 bytime=0
+    for f in $(find ${pkgs.smartos-illumos.tools} ${nightly}/proto -name '*.pyc'); do
+      n=$((n + 1))
+      if [ "$(od -An -tu4 -j4 -N4 "$f" | tr -d ' ')" = 0 ]; then echo "by its source's time: $f"; bytime=$((bytime + 1)); fi
+    done
+    echo "$n .pyc files, $bytime checked by their sources' times"
+    test $n -gt 0
+    test $bytime = 0
+    # __TIME__ (libzdoor's messages): the commit's
+    want=$(TZ=UTC date -d @${toString pin.date} +%T)
+    grep -qaF "$want" ${nightly}/proto/lib/amd64/libzdoor.so.1 || { echo "libzdoor: no $want"; exit 1; }
+    echo "libzdoor: $want"
+    # jars: every entry at the commit's time (a DOS time: to 2 seconds)
+    dos=$(TZ=UTC date -d @$(( ${toString pin.date} / 2 * 2 )) +%Y%m%d.%H%M%S)
+    j=0
+    for f in $(find ${nightly}/proto -name '*.jar'); do
+      j=$((j + 1))
+      if unzip -Z -T "$f" | grep '^[-dl]' | grep -v " $dos " | grep -q .; then echo "not all at $dos: $f"; exit 1; fi
+    done
+    echo "$j jars, every entry at $dos"
+    test $j -gt 0
     echo ok >$out
   '';
 

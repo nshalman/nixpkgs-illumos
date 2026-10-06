@@ -59,8 +59,12 @@ mkBldenvStep {
     "log"
   ];
 
-  # the proto area's archives (libssp_ns.a) the same from one build to the next
-  extra.nativeBuildInputs = [ smartos-strap.normalizeArchives ];
+  # the proto area's archives (libssp_ns.a) and jars (the jar tool takes no SOURCE_DATE_EPOCH) the same from one build
+  # to the next
+  extra.nativeBuildInputs = [
+    smartos-strap.normalizeArchives
+    smartos-strap.normalizeZips
+  ];
 
   # The build host's /usr/bin/perl: nightly sets its own PATH (onbld, /usr/ccs/bin, /usr/bin, ...) and the build runs
   # perl from it, and runs its perl generators by their #!/usr/bin/perl (sbdgenerr, ao_gendisp, fm's topology maps,

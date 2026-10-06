@@ -1,6 +1,6 @@
-# A time in seconds since 1970 (a pin's date) as a UTC date: the year, month, day, hour, minute and second as
-# numbers; stamp, YYYYMMDDTHHMMSSZ, SmartOS's build stamp form; date, YYYY-MM-DD; monthName, the month in English (as
-# `LC_ALL=C date +%B` gives it). Days to a civil date as in Howard Hinnant's days_from_civil inverse
+# A time in seconds since 1970 (a pin's date) as a UTC date: seconds, as given; the year, month, day, hour, minute
+# and second as numbers; stamp, YYYYMMDDTHHMMSSZ, SmartOS's build stamp form; date, YYYY-MM-DD; monthName, the month
+# in English (as `LC_ALL=C date +%B` gives it). Days to a civil date as in Howard Hinnant's days_from_civil inverse
 # (https://howardhinnant.github.io/date_algorithms.html#civil_from_days), for times from 1970 on.
 seconds:
 
@@ -27,6 +27,7 @@ in
 assert seconds >= 0;
 {
   inherit
+    seconds
     year
     month
     day

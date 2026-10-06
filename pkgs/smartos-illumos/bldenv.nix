@@ -110,6 +110,11 @@ stdenv.mkDerivation (
     # the gate compiles with its own flag set, through cw; nixpkgs' hardening flags are not part of that
     hardeningDisable = [ "all" ];
 
+    # The time the build's tools give for when they ran (gcc's __DATE__ and __TIME__, python's .pyc files, which
+    # with it are checked by their sources' hashes, the archives normalized afterwards): the commit's, like
+    # RELEASE_DATE, in place of the stdenv's 1980. It goes through the empty environments below.
+    SOURCE_DATE_EPOCH = commitTime.seconds;
+
     buildPhase = ''
       runHook preBuild
       ws=$PWD/illumos
@@ -182,13 +187,13 @@ stdenv.mkDerivation (
       # beyond what that shell would have, because illumos.sh's MAKEFLAGS=ek lets the environment override the
       # makefiles' macros, and the stdenv exports CC=gcc, AR, NM, STRIP and more.
       cd illumos
-      env -i HOME="$HOME" PATH=/usr/bin:/usr/sbin SHELL=/usr/bin/bash MAKE=${dmake-bootstrap}/bin/dmake \
+      env -i HOME="$HOME" SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" PATH=/usr/bin:/usr/sbin SHELL=/usr/bin/bash MAKE=${dmake-bootstrap}/bin/dmake \
       /usr/bin/ksh93 ./usr/src/tools/scripts/bldenv illumos.sh \
         "cd \$CODEMGR_WS/${dir} && export PATH=\"\$PATH:${toolPath}\" && ${command}"
       ${lib.optionalString (afterBldenv != null) ''
         # build_illumos then unexports MAKE and runs nightly with this PATH (/opt/onbld/bin and /opt/SUNWspro/bin are
         # absent here)
-        env -i HOME="$HOME" PATH=/opt/onbld/bin:/sbin:/usr/sbin:/usr/bin:/usr/ccs/bin:/opt/SUNWspro/bin:${toolPath} \
+        env -i HOME="$HOME" SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" PATH=/opt/onbld/bin:/sbin:/usr/sbin:/usr/bin:/usr/ccs/bin:/opt/SUNWspro/bin:${toolPath} \
           SHELL=/usr/bin/bash ${afterBldenv}
       ''}cd ..
       runHook postBuild
