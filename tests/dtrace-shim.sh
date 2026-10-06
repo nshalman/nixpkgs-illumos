@@ -41,11 +41,12 @@ EOF
 
 # g DTRACE OUT: dtrace -G on a fresh copy (a new inode) of t.o at the same path, writing dof.o (a build gives it the
 # same name each time, which it records): the object it writes (the DOF) in OUT, the input it rewrites (the probe
-# sites, and the aliases) in OUT.in
+# sites, and the aliases) in OUT.in. The copy before is kept, under another name: removed, its inode could be the
+# new copy's (tmpfs reuses them).
+used=0
 g() {
-    rm -f obj.o
+    if [ -e obj.o ]; then used=$((used + 1)); mv obj.o used-$used.o; fi
     cp t.o obj.o
-    cp t.o keep-inode-$RANDOM.o   # takes the inode the next copy would have reused
     rm -f dof.o
     "$1" -G -64 -s prov.d -o dof.o obj.o 2>"$2.err" && cp dof.o "$2" && cp obj.o "$2.in"
 }
