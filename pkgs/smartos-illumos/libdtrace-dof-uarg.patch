@@ -1,0 +1,81 @@
+libdtrace: dtrace -G writes zero in dofa_uarg
+
+dtrace_program_link() (dtrace -G) put each action's dtad_uarg, the heap
+address of the dtrace process's dtrace_stmtdesc_t, into the DOF it links
+into an object, so the object differs from one run to the next under ASLR.
+Helper DOF never uses the value. Live enablings and dtrace -A keep it.
+
+Not yet in illumos-gate; the issue as drafted is ./libdtrace-dof-uarg.md.
+The three files it changes are the same in illumos-gate master (b57f407).
+
+diff --git a/usr/src/lib/libdtrace/common/dt_dof.c b/usr/src/lib/libdtrace/common/dt_dof.c
+index 2c51734..a8b0b66 100644
+--- a/usr/src/lib/libdtrace/common/dt_dof.c
++++ b/usr/src/lib/libdtrace/common/dt_dof.c
+@@ -625,8 +625,18 @@ dof_hdr(dtrace_hdl_t *dtp, uint8_t dofversion, dof_hdr_t *hp)
+ 	return (0);
+ }
+ 
++/*
++ * Create the DOF for a program.  Each action's dtad_uarg is the address of
++ * the statement that created it (see dtrace_stmt_action()), which this
++ * consumer uses to interpret the records the action produces; DOF carries it
++ * in dofa_uarg when 'uarg' is set.  The DOF that dtrace_program_link() puts
++ * into an object is never enabled by this consumer, so it gets zero instead:
++ * there the address means nothing, and it would make the object differ from
++ * one run to the next (e.g. under ASLR).
++ */
+ void *
+-dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
++dt_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags,
++    boolean_t uarg)
+ {
+ 	dt_dof_t *ddo = &dtp->dt_dof;
+ 
+@@ -799,7 +809,7 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
+ 
+ 			dofa[i].dofa_kind = ap->dtad_kind;
+ 			dofa[i].dofa_ntuple = ap->dtad_ntuple;
+-			dofa[i].dofa_uarg = ap->dtad_uarg;
++			dofa[i].dofa_uarg = uarg ? ap->dtad_uarg : 0;
+ 		}
+ 
+ 		if (i > 0) {
+@@ -911,6 +921,12 @@ dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
+ 	return (dt_buf_claim(dtp, &dof));
+ }
+ 
++void *
++dtrace_dof_create(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t flags)
++{
++	return (dt_dof_create(dtp, pgp, flags, B_TRUE));
++}
++
+ void
+ dtrace_dof_destroy(dtrace_hdl_t *dtp, void *dof)
+ {
+diff --git a/usr/src/lib/libdtrace/common/dt_dof.h b/usr/src/lib/libdtrace/common/dt_dof.h
+index ab438dd..a9b5c65 100644
+--- a/usr/src/lib/libdtrace/common/dt_dof.h
++++ b/usr/src/lib/libdtrace/common/dt_dof.h
+@@ -56,6 +56,7 @@ typedef struct dt_dof {
+ 
+ extern void dt_dof_init(dtrace_hdl_t *);
+ extern void dt_dof_fini(dtrace_hdl_t *);
++extern void *dt_dof_create(dtrace_hdl_t *, dtrace_prog_t *, uint_t, boolean_t);
+ 
+ #ifdef	__cplusplus
+ }
+diff --git a/usr/src/lib/libdtrace/common/dt_link.c b/usr/src/lib/libdtrace/common/dt_link.c
+index b8b75d8..8fffdb9 100644
+--- a/usr/src/lib/libdtrace/common/dt_link.c
++++ b/usr/src/lib/libdtrace/common/dt_link.c
+@@ -1536,7 +1536,7 @@ dtrace_program_link(dtrace_hdl_t *dtp, dtrace_prog_t *pgp, uint_t dflags,
+ 	if (eprobes && pgp->dp_dofversion < DOF_VERSION_2)
+ 		pgp->dp_dofversion = DOF_VERSION_2;
+ 
+-	if ((dof = dtrace_dof_create(dtp, pgp, dflags)) == NULL)
++	if ((dof = dt_dof_create(dtp, pgp, dflags, B_FALSE)) == NULL)
+ 		return (-1); /* errno is set for us */
+ 
+ 	/*

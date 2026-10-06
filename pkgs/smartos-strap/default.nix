@@ -117,7 +117,8 @@ lib.makeScope newScope (self: {
   # $DTRACE_SHIM_VERSION or "joyent") and do not depend on inode numbers (the $dtrace<key> aliases); and without
   # address space layout randomization, under which the DOF dtrace -G writes for a D program (a ustack helper: node's)
   # differs from one run to the next: each action's dofa_uarg is the heap address of the dtrace process's statement
-  # (libdtrace's dtrace_stmt_action()).
+  # (libdtrace's dtrace_stmt_action()). The illumos built here writes zero there instead
+  # (../smartos-illumos/libdtrace-dof-uarg.patch); the build host's dtrace does not.
   platformDtrace = runCommand "smartos-strap-platform-dtrace" { } ''
     mkdir -p $out/bin $out/lib
     ${gcc10-illumos}/bin/gcc -m64 -shared -fPIC -O2 -o $out/lib/dtrace-shim.so ${./dtrace-shim.c}

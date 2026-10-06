@@ -7,6 +7,9 @@
 #            date gives it), not the month the build ran in.
 #   log:     the nightly's logs, whose directory names carry the time of the build, are in its log output; its out
 #            output, the one later stages use, has the proto area alone.
+#   dofUarg: the nightly's libdtrace writes the same object for a D program each time dtrace -G runs, with address
+#            space layout randomization on (pkgs/smartos-illumos/libdtrace-dof-uarg.patch): the build host's dtrace,
+#            run five times on a ustack helper with that library in place of its own.
 #   nix-build tests/smartos-illumos.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
 { pkgs }:
 
@@ -34,6 +37,23 @@ in
     test "$(cat $TMPDIR/out)" = proto || exit 1
     test -s ${nightly.log or "no-log-output"}/latest/nightly.log || exit 1
     grep NIGHTLY_OPTIONS= ${nightly.log or "no-log-output"}/latest/nightly.log | head -1
+    echo ok >$out
+  '';
+
+  dofUarg = pkgs.runCommand "smartos-illumos-dof-uarg" { } ''
+    mkdir lib
+    ln -s ${nightly}/proto/usr/lib/amd64/libdtrace.so.1 lib/libdtrace.so.1
+    # the library loaded is the nightly's (/usr/sbin/dtrace is 64-bit)
+    loaded=$(LD_LIBRARY_PATH_64=$PWD/lib /usr/bin/ldd /usr/sbin/dtrace | awk '$1 == "libdtrace.so.1" { print $3 }')
+    echo "libdtrace.so.1 => $loaded"
+    test "$loaded" = $PWD/lib/libdtrace.so.1
+    printf 'dtrace:helper:ustack:\n{\n\t"@helped"\n}\n' >h.d
+    for i in 1 2 3 4 5; do
+      LD_LIBRARY_PATH_64=$PWD/lib /usr/bin/psecflags -s current,aslr -e /usr/sbin/dtrace -G -s h.d -o h.o
+      cksum <h.o
+    done >sums
+    cat sums
+    test "$(sort -u sums | wc -l)" = 1
     echo ok >$out
   '';
 

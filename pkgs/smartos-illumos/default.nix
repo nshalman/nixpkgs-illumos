@@ -3,6 +3,7 @@
 {
   lib,
   newScope,
+  applyPatches,
   fetchFromGitHub,
 }:
 
@@ -11,14 +12,21 @@ let
 in
 lib.makeScope newScope (self: {
   # illumos-joyent, SmartOS's illumos (smartos-live's projects/illumos), at a master commit of 2026-09-11 (an
-  # illumos-gate merge). Pinned in ../../pins, and bumped deliberately.
-  src = fetchFromGitHub {
-    inherit (pin)
-      owner
-      repo
-      rev
-      hash
-      ;
+  # illumos-gate merge). Pinned in ../../pins, and bumped deliberately. With the patches below, each with the
+  # reason in its header; src.rev stays the pinned commit's (GATE, the illumos idents).
+  src = applyPatches {
+    src = fetchFromGitHub {
+      inherit (pin)
+        owner
+        repo
+        rev
+        hash
+        ;
+    };
+    patches = [
+      # dtrace -G objects the same each run under ASLR; not yet in illumos-gate (./libdtrace-dof-uarg.md)
+      ./libdtrace-dof-uarg.patch
+    ];
   };
 
   # the pinned commit's time as a UTC date (../../pins/utc.nix): the build's date, where illumos and smartos-live
