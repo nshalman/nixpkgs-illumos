@@ -1,14 +1,18 @@
 # nixpkgs (the illumos-26.05 branch) for x86_64-solaris on its own stdenv, pkgs/stdenv/illumos, given this repo's
 # bootstrap files and toolchain packages. ./bridge.nix is how those bootstrap files were first made.
 #   nix-build illumos.nix -A hello
-# Every input is pinned to where it is published (tests/pins.sh); a local checkout of illumos-26.05 can stand in:
+# Every input is pinned to where it is published (tests/pins.sh), nixpkgs and the Nix source in ./pins (bumped by
+# pins/update.sh); a local checkout of illumos-26.05 can stand in:
 #   nix-build illumos.nix --arg nixpkgs /path/to/illumos-26.05 -A hello
 # bootstrapUrl is the directory of a release not hosted yet; see bootstrap/files.nix.
+let
+  pins = import ./pins;
+in
 {
+  # the illumos-26.05 branch of github.com/nshalman/nixpkgs
   nixpkgs ? builtins.fetchTarball {
-    # the illumos-26.05 branch of github.com/nshalman/nixpkgs
-    url = "https://github.com/nshalman/nixpkgs/archive/4eee97ee70a159d8d78a47df7b1a8500c38e2652.tar.gz";
-    sha256 = "1is5fz8ym2z68vyk1ywh9ilipa3y9fw49b8dci539q84wx76d7m7";
+    url = pins.nixpkgs.archive;
+    sha256 = pins.nixpkgs.hash;
   },
   bootstrapUrl ? null,
   bootstrapFiles ? import ./bootstrap/files.nix { baseUrl = bootstrapUrl; },
@@ -17,8 +21,8 @@
   nixSrc ? builtins.fetchTarball {
     # a GitHub archive of the illumos-support-2.35 commit: the tree a checkout has (nix-src has no export-ignore),
     # fetched without git
-    url = "https://github.com/nshalman/nix-src/archive/55b532f45b2ba5f4a0e66037f062a72d5c4a2faa.tar.gz";
-    sha256 = "0rnf0665i24m7rvixv6dgqhw0bsl0jsarij13jjb1f3kpm0h8fy6";
+    url = pins.nix-src.archive;
+    sha256 = pins.nix-src.hash;
   },
 }:
 

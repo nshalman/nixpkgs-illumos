@@ -29,6 +29,16 @@
     "hash": "sha256-tLZxsW84JskhioRhZ519DORlsCKnDPSOoMy+X7j0Ehc=",
     "rev": "b5f9dc8437c2be3824bd7f86cb2ca0edc70aea4e"
   },
+  "nix-src": {
+    "date": 1790258742,
+    "hash": "sha256-xjsEQb1zuLCkHEHGrLQEVC/AIX7N7B53PpWIWIwBzmY=",
+    "rev": "55b532f45b2ba5f4a0e66037f062a72d5c4a2faa"
+  },
+  "nixpkgs": {
+    "date": 1790617303,
+    "hash": "sha256-p55mTucE4TRKZA2tRLhLfqgbaUyQ+zD9RuaL6tF3Rcc=",
+    "rev": "4eee97ee70a159d8d78a47df7b1a8500c38e2652"
+  },
   "rust-bhyve": {
     "date": 1790777655,
     "hash": "sha256-gXVArLI6v+8sLuSoU6sLBxNmJZwXN5mPL1H0Wl4uwjc=",
