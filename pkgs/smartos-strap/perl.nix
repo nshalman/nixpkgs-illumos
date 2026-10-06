@@ -90,10 +90,27 @@ stdenv.mkDerivation {
     cd ie/perl
     mkdir .unpack32
     tar xzf ${ver}.tar.gz -C .unpack32 --no-same-owner
+    # The time of the build, as the stdenv's unpackPhase gives it: the newest file of the release (before the
+    # patches, which give theirs the time now)
+    SOURCE_DATE_EPOCH=$(find .unpack32/${ver} -type f -printf '%T@\n' | sort -n | tail -1 | cut -d. -f1)
+    export SOURCE_DATE_EPOCH
     for p in CVE-2022-37434.patch dtrace.patch native.patch fix-gcc-errno.patch; do
       echo "Applying $p"
       patch -d .unpack32/${ver} -p1 <"$p"
     done
+    # What would differ from one build to the next: Devel::PPPort writes its sources from parts/inc in readdir's
+    # order (later versions sort it); mktables stamps its list with the time; Pod::Man dates a page by its source's
+    # modification time, the build's for a source the build writes (Devel::PPPort's): not after SOURCE_DATE_EPOCH
+    substituteInPlace .unpack32/${ver}/cpan/Devel-PPPort/parts/ppptools.pl \
+      --replace-fail 'my @files = grep { !-d && !/^\./ } readdir DIR;' \
+                     'my @files = sort grep { !-d && !/^\./ } readdir DIR;'
+    substituteInPlace .unpack32/${ver}/lib/unicore/mktables \
+      --replace-fail '@{[scalar localtime]}' '@{[scalar gmtime($ENV{SOURCE_DATE_EPOCH})]}'
+    substituteInPlace .unpack32/${ver}/cpan/podlators/lib/Pod/Man.pm \
+      --replace-fail '        $time = (stat $input)[9] || time;' \
+                     '        $time = (stat $input)[9] || time;
+        $time = $ENV{SOURCE_DATE_EPOCH}
+            if defined $ENV{SOURCE_DATE_EPOCH} && $time > $ENV{SOURCE_DATE_EPOCH};'
     mv .unpack32/${ver} ${d}
     rmdir .unpack32
     chmod 755 ${d}/Configure
