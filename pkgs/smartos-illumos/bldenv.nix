@@ -21,6 +21,7 @@
   symlinkJoin,
   writeShellScriptBin,
   src,
+  commitTime,
   dmake-bootstrap,
   smartos-strap,
   flex,
@@ -86,7 +87,7 @@ in
 stdenv.mkDerivation (
   {
     inherit pname;
-    version = "0-unstable-2026-09-11";
+    version = "0-unstable-${commitTime.date}";
 
     inherit src;
 

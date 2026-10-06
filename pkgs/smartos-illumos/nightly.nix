@@ -21,7 +21,8 @@
   setup,
   msgcc,
   openjdk11-illumos,
-  buildstamp ? "20260911T185107Z",
+  commitTime,
+  buildstamp ? commitTime.stamp,
   # a DEBUG build only, as smartos-live's configure -d (ILLUMOS_ENABLE_DEBUG=exclusive) makes it: NIGHTLY_OPTIONS
   # with D (DEBUG) and F (no non-DEBUG build); the proto area is the same one (MULTI_PROTO no)
   debug ? false,
@@ -44,7 +45,7 @@ mkBldenvStep {
     NIGHTLY_OPTIONS="-CiLmMNntDF";			export NIGHTLY_OPTIONS
   '';
 
-  afterBldenv = "BANNER_YEAR=2026 ./usr/src/tools/scripts/nightly illumos.sh";
+  afterBldenv = "BANNER_YEAR=${toString commitTime.year} ./usr/src/tools/scripts/nightly illumos.sh";
 
   extra.postUnpack = setup.postUnpack;
 

@@ -15,11 +15,12 @@
   lib,
   stdenv,
   src,
+  commitTime,
 }:
 
 stdenv.mkDerivation {
   pname = "illumos-dmake-bootstrap";
-  version = "0-unstable-2026-09-11";
+  version = "0-unstable-${commitTime.date}";
 
   inherit src;
   # only usr/src/cmd/make, not the whole tree

@@ -6,21 +6,24 @@
   fetchFromGitHub,
 }:
 
+let
+  pin = (import ../../pins)."illumos-joyent";
+in
 lib.makeScope newScope (self: {
   # illumos-joyent, SmartOS's illumos (smartos-live's projects/illumos), at a master commit of 2026-09-11 (an
   # illumos-gate merge). Pinned in ../../pins, and bumped deliberately.
-  src =
-    let
-      pin = (import ../../pins)."illumos-joyent";
-    in
-    fetchFromGitHub {
-      inherit (pin)
-        owner
-        repo
-        rev
-        hash
-        ;
-    };
+  src = fetchFromGitHub {
+    inherit (pin)
+      owner
+      repo
+      rev
+      hash
+      ;
+  };
+
+  # the pinned commit's time as a UTC date (../../pins/utc.nix): the build's date, where illumos and smartos-live
+  # take one from the clock
+  commitTime = import ../../pins/utc.nix pin.date;
 
   # A make to build make with: the gate's tools stage builds its own dmake with dmake.
   dmake-bootstrap = self.callPackage ./dmake-bootstrap.nix { };
