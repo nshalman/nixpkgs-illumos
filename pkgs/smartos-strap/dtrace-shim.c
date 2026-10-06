@@ -26,6 +26,9 @@ uname(struct utsname *u)
 		real = (int (*)(struct utsname *))dlsym(RTLD_NEXT, "uname");
 	if ((r = real(u)) < 0)
 		return (r);
+	/* the DOF holds each field whole: none of the host's string may be left after ours */
+	(void) memset(u->nodename, 0, sizeof (u->nodename));
+	(void) memset(u->version, 0, sizeof (u->version));
 	(void) strlcpy(u->nodename, "illumos", sizeof (u->nodename));
 	(void) strlcpy(u->version, version != NULL ? version : "joyent", sizeof (u->version));
 	return (r);
