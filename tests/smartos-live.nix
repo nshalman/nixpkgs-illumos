@@ -412,6 +412,32 @@ in
       done
       touch $out
     '';
+  # the SMF repositories the same from one build to the next: each manifest hash's first half is that of the image's
+  # file (owner root:sys, 0 and 3; its size; SOURCE_DATE_EPOCH as its time), not of the copy the import read; and the
+  # seed names no process's temporary file (build_seeds' /tmp/build_seeds.$$)
+  smfStable =
+    let
+      svccfg = "${pkgs.smartos-illumos.tools}/opt/onbld/bin/i386/svccfg";
+    in
+    pkgs.runCommand "smartos-live-smf-stable-check" { } ''
+      cp ${live.smfRepository}/etc/svc/repository.db repo.db && chmod u+w repo.db
+      SVCCFG_REPOSITORY=$PWD/repo.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd ${svccfg} -s smf/manifest listprop >props
+      n=0 bad=0
+      while read -r pg file; do
+        hash=$(awk -v p="$pg/md5sum" '$1 == p { print $3 }' props)
+        want=$(printf '%x%x%x%x' 0 3 $(stat -c %s ${live.smfRepository.root}$file) $SOURCE_DATE_EPOCH | md5sum | cut -c1-32)
+        n=$((n + 1))
+        [ "''${hash:0:32}" = "$want" ] || { echo "$file: $hash, not $want..."; bad=$((bad + 1)); }
+      done < <(awk '$1 ~ /\/manifestfile$/ { sub("/manifestfile$", "", $1); print $1, $3 }' props)
+      echo "$n manifest hashes, $bad not of the image's file"
+      test $n -gt 100
+      test $bad = 0
+      if grep -aq 'tmp_build_seeds_[0-9]' ${live.smfSeed}/usr/lib/brand/joyent-minimal/repository.db; then
+        echo "the seed names build_seeds' temporary file with its process ID"; exit 1
+      fi
+      echo "ok   repository hashes of the image's files; the seed names no process ID"
+      touch $out
+    '';
   # the whatis databases, made from the image's manual pages
   whatis =
     compare "whatis" live.whatis "printf '%s\\n' usr/share/man/whatis smartdc/man/whatis" ""

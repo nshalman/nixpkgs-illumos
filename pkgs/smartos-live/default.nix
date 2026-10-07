@@ -347,13 +347,26 @@ lib.makeScope newScope (self: {
   # few properties set; svc.configd is the build host's, as theirs is); smfSeed, joyent-minimal's seed repository
   # (tools/build_seeds, with the onbld svc.configd, and the build host's nawk, from /usr/bin on their PATH), whose last
   # step, owning it as root, is the root step's here.
+  #
+  # Differences from theirs, so that the repositories are the same from one build to the next: svccfg imports the
+  # manifests in order of name (theirs: of the directory, as nftw finds them, in the order the file system gives, which
+  # changes the snapshots it takes); each manifest hash's first half, an MD5 of the file's owner, size and time, is
+  # made that of the image's file (root:sys, SOURCE_DATE_EPOCH: the import reads a copy, the build user's, made at
+  # the time of the build; theirs, the image's files themselves); build_seeds' temporary file is named without its
+  # process ID, which the seed records (/tmp/build_seeds, under a PKG_INSTALL_ROOT of its own that svccfg leaves out).
+  # What they hold is then the same from one build to the next (their .dump), but not their bytes: sqlite 2 writes what
+  # was in memory into the pages' unused space, and a random schema cookie.
   smfTree = runCommand "smartos-live-smf-tree" { } ''
     mkdir -p $out/tools $out/projects/illumos/usr/src/tools/proto
     cp ${self.smartosLive}/tools/smf_import ${self.smartosLive}/tools/build_seeds $out/tools/
-    chmod u+w $out/tools/build_seeds
+    chmod u+w $out/tools/build_seeds $out/tools/smf_import
     substituteInPlace $out/tools/build_seeds \
       --replace-fail 'chown root:root $ROOT/usr/lib/brand/joyent-minimal/repository.db' \
-        ': chown root:root $ROOT/usr/lib/brand/joyent-minimal/repository.db'
+        ': chown root:root $ROOT/usr/lib/brand/joyent-minimal/repository.db' \
+      --replace-fail 'TMPFILE="/tmp/$(basename $0).$$"' 'TMPFILE="$PKG_INSTALL_ROOT/tmp/$(basename $0)"'
+    substituteInPlace $out/tools/smf_import \
+      --replace-fail "\''${SVCCFG} -v import \''${rdmnt}/lib/svc/manifest" \
+        "find \''${rdmnt}/lib/svc/manifest -name '*.xml' | LC_ALL=C sort | sed 's/^/import /' >\''${rdmnt}/../smf-imports && \''${SVCCFG} -v -f \''${rdmnt}/../smf-imports"
     ln -s ${smartos-illumos.tools} $out/projects/illumos/usr/src/tools/proto/root_i386-nd
     mkdir $out/bin
     ln -s /usr/bin/nawk $out/bin/nawk
@@ -366,11 +379,24 @@ lib.makeScope newScope (self: {
         "usr/share/lib/xml/dtd"
       ];
     in
-    runCommand "smartos-live-smf-repository" { } ''
+    runCommand "smartos-live-smf-repository" { passthru.root = part; } ''
       cp -r ${part} root
       chmod -R u+w root
       mkdir -p root/etc/svc
       bash ${self.smfTree}/tools/smf_import $PWD/root
+      # each manifest hash's first half that of the image's file (svc/common/manifest_hash.c, MHASH_FORMAT_V2: uid,
+      # gid, size and time in hexadecimal), the second, the MD5 of its contents, kept
+      export SVCCFG_REPOSITORY=$PWD/root/etc/svc/repository.db SVCCFG_CONFIGD_PATH=/lib/svc/bin/svc.configd
+      svccfg=${self.smfTree}/projects/illumos/usr/src/tools/proto/root_i386-nd/opt/onbld/bin/i386/svccfg
+      $svccfg -s smf/manifest listprop >props
+      echo "select smf/manifest" >hashes
+      awk '$1 ~ /\/manifestfile$/ { sub("/manifestfile$", "", $1); print $1, $3 }' props | while read -r pg file; do
+        hash=$(awk -v p="$pg/md5sum" '$1 == p { print $3 }' props)
+        [ ''${#hash} = 64 ] || { echo "smf/manifest $pg: no hash"; exit 1; }
+        meta=$(printf '%x%x%x%x' 0 3 $(stat -c %s root$file) $SOURCE_DATE_EPOCH | md5sum | cut -c1-32)
+        echo "setprop $pg/md5sum = opaque: $meta''${hash:32}" >>hashes
+      done
+      $svccfg -f hashes
       install -D -m 444 root/etc/svc/repository.db $out/etc/svc/repository.db
     '';
   smfSeed =
@@ -383,6 +409,8 @@ lib.makeScope newScope (self: {
     runCommand "smartos-live-smf-seed" { } ''
       cp -r ${part} root
       chmod -R u+w root
+      mkdir -p seedroot/tmp
+      export PKG_INSTALL_ROOT=$(cd seedroot && pwd -P)
       PATH=${self.smfTree}/bin:$PATH bash ${self.smfTree}/tools/build_seeds $PWD/root
       install -D -m 444 root/usr/lib/brand/joyent-minimal/repository.db \
         $out/usr/lib/brand/joyent-minimal/repository.db
