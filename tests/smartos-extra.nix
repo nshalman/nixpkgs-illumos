@@ -267,6 +267,21 @@ in
     touch $out
   '';
 
+  # what the packages record of when they were built is the stdenv's SOURCE_DATE_EPOCH (1980-01-01): tun's version
+  # string, gnupg's manuals' dates
+  dates = pkgs.runCommand "smartos-extra-dates" { } ''
+    for d in tun tap; do
+      grep -aq 'TUN/TAP driver 1\.3\.0 01/01/1980' ${extra.tun}/usr/kernel/drv/amd64/$d ||
+        { echo "FAIL $d: $(grep -ao 'TUN/TAP driver [^ ]* [^ ]*' ${extra.tun}/usr/kernel/drv/amd64/$d)"; exit 1; }
+    done
+    for m in gpg gpgv; do
+      grep -q '^\.TH [A-Z]* 1 1980-01-01 ' ${extra.gnupg}/usr/share/man/man1/$m.1 ||
+        { echo "FAIL $m.1: $(grep '^\.TH' ${extra.gnupg}/usr/share/man/man1/$m.1)"; exit 1; }
+    done
+    echo "ok   tun and tap 01/01/1980, gpg.1 and gpgv.1 1980-01-01"
+    touch $out
+  '';
+
   vim = compare "vim" extra.vim "^usr/bin/(vim|vimtutor|xxd)$|^usr/share/vim/|^usr/share/man/man1/(vim|vimdiff|vimtutor|xxd)\\.1$";
   vim-use = pkgs.runCommand "smartos-extra-vim-run" { } ''
     export HOME=$PWD
