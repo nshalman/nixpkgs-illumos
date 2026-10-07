@@ -6,8 +6,9 @@
 # jmod and jar take them from directories, in the order the file system gives), are different archives; once
 # normalized (SOURCE_DATE_EPOCH given) they are the same file, the jar's manifest still first (where
 # JarInputStream looks for it), which unzip tests whole, lists with that time and extracts to what was put in, and
-# java reads (jar, a class from it; jmod, its contents). A file named .jar that is not an archive is left as it is,
-# as is an archive outside the directory given; without SOURCE_DATE_EPOCH it refuses.
+# java reads (jar, a class from it; jmod, its contents). So are a jar inside a zip, deflated or stored (as the JDK
+# puts jrt-fs.jar and ct.sym inside its jmods), and the jar in it. A file named .jar that is not an archive is left
+# as it is, as is an archive outside the directory given; without SOURCE_DATE_EPOCH it refuses.
 #
 # usage: normalize-zips.sh PKGS-FILE   (as root, for chown; on illumos; perl and nix-build on PATH)
 
@@ -48,7 +49,9 @@ for v in a b; do
     eval "order=\$order_$v"
     (cd $v && "$jdk/jar" --create --file out/t.jar $(for e in $order; do echo "-C classes $e"; done) &&
         "$jdk/jmod" create --class-path classes out/t.jmod >/dev/null &&
-        (cd classes && "$zip" -qr ../out/t.zip $order))
+        (cd classes && "$zip" -qr ../out/t.zip $order) &&
+        # the jar inside a zip, deflated and stored, as the JDK puts jrt-fs.jar and ct.sym inside its jmods
+        (cd out && cp t.jar inner.jar && "$zip" -q nest.zip inner.jar && "$zip" -q -0 nest0.zip inner.jar && rm inner.jar))
     # jmod dates its entries, and jar those it writes itself (META-INF/, directories), with the time it runs, to two
     # seconds (a DOS time): b's at least that much later
     sleep 2
@@ -77,13 +80,24 @@ else
     bad "normalize-zips.pl fails"
 fi
 
-for f in t.jar t.jmod t.zip; do
+for f in t.jar t.jmod t.zip nest.zip nest0.zip; do
     if same $f; then ok "$f: the same once normalized"; else bad "$f: still differs"; cmp -l a/out/$f b/out/$f | head -3; fi
 done
 if [ "$("$unzip" -Z1 a/out/t.jar | head -2 | tr '\n' ' ')" = "META-INF/ META-INF/MANIFEST.MF " ]; then
     ok "t.jar: META-INF/ and its MANIFEST.MF still first"
 else
     bad "t.jar: the manifest is not first:"; "$unzip" -Z1 a/out/t.jar | head -3
+fi
+
+# the jar inside nest.zip and nest0.zip: normalized too (every entry at SOURCE_DATE_EPOCH), the same in both, and java
+# runs a class from it; unzip tests the outer zips whole
+mkdir n && "$unzip" -p a/out/nest.zip inner.jar >n/inner.jar && "$unzip" -p a/out/nest0.zip inner.jar >n/inner0.jar
+if "$unzip" -tq a/out/nest.zip >/dev/null && "$unzip" -tq a/out/nest0.zip >/dev/null && cmp -s n/inner.jar n/inner0.jar &&
+    [ "$("$unzip" -Z -T n/inner.jar | grep '^[-d]' | grep -v -c ' 20250911\.1413[12][0-9] ')" = 0 ] &&
+    [ "$("$jdk/java" -cp n/inner.jar t.Hello)" = hello ]; then
+    ok "the jar inside a zip: normalized, the same deflated or stored, and java runs a class from it"
+else
+    bad "the jar inside a zip"; "$unzip" -Z -T n/inner.jar | head -4
 fi
 
 # unzip -t only for the zip: it rejects the empty extra field (0xCAFE) the jar tool gives META-INF/, in any jar
