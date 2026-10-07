@@ -2,8 +2,10 @@
 #
 # ../pkgs/smartos-strap/normalize-zips.pl on archives the build's tools make: openjdk 11's jar and jmod, and zip (as
 # openjdk's own build makes src.zip, with its extended timestamp and owner extra fields). The same files archived
-# twice, with other modification times and owners, are different archives; once normalized (SOURCE_DATE_EPOCH
-# given) they are the same file, which unzip tests whole, lists with that time and extracts to what was put in, and
+# twice, with other modification times and owners, and the jar and the zip with their entries in another order (as
+# jmod and jar take them from directories, in the order the file system gives), are different archives; once
+# normalized (SOURCE_DATE_EPOCH given) they are the same file, the jar's manifest still first (where
+# JarInputStream looks for it), which unzip tests whole, lists with that time and extracts to what was put in, and
 # java reads (jar, a class from it; jmod, its contents). A file named .jar that is not an archive is left as it is,
 # as is an archive outside the directory given; without SOURCE_DATE_EPOCH it refuses.
 #
@@ -29,10 +31,11 @@ norm="perl $top/pkgs/smartos-strap/normalize-zips.pl"
 cd "$tmp"
 mkdir -p src/t mod/t
 printf 'package t;\npublic class Hello { public static void main(String[] a) { System.out.println("hello"); } }\n' >src/t/Hello.java
+printf 'package t;\npublic class Two {}\n' >src/t/Two.java
 printf 'module t { exports t; }\n' >src/module-info.java
-"$jdk/javac" -d classes src/module-info.java src/t/Hello.java || { bad "cannot compile"; exit 1; }
+"$jdk/javac" -d classes src/module-info.java src/t/Hello.java src/t/Two.java || { bad "cannot compile"; exit 1; }
 
-# the same classes, archived as v at time T by owner O
+# the same classes, archived as v at time T by owner O, the jar's and the zip's entries in order E
 for v in a b; do
     mkdir -p $v/out
     cp -r classes $v/
@@ -40,10 +43,12 @@ done
 find a/classes -exec touch -t 202001010000 {} +
 find b/classes -exec touch -t 202602030405 {} +
 chown -R 12345:54321 b/classes
+order_a="module-info.class t/Hello.class t/Two.class" order_b="t/Two.class t/Hello.class module-info.class"
 for v in a b; do
-    (cd $v && "$jdk/jar" --create --file out/t.jar -C classes . &&
+    eval "order=\$order_$v"
+    (cd $v && "$jdk/jar" --create --file out/t.jar $(for e in $order; do echo "-C classes $e"; done) &&
         "$jdk/jmod" create --class-path classes out/t.jmod >/dev/null &&
-        (cd classes && "$zip" -qr ../out/t.zip .))
+        (cd classes && "$zip" -qr ../out/t.zip $order))
     # jmod dates its entries, and jar those it writes itself (META-INF/, directories), with the time it runs, to two
     # seconds (a DOS time): b's at least that much later
     sleep 2
@@ -75,6 +80,11 @@ fi
 for f in t.jar t.jmod t.zip; do
     if same $f; then ok "$f: the same once normalized"; else bad "$f: still differs"; cmp -l a/out/$f b/out/$f | head -3; fi
 done
+if [ "$("$unzip" -Z1 a/out/t.jar | head -2 | tr '\n' ' ')" = "META-INF/ META-INF/MANIFEST.MF " ]; then
+    ok "t.jar: META-INF/ and its MANIFEST.MF still first"
+else
+    bad "t.jar: the manifest is not first:"; "$unzip" -Z1 a/out/t.jar | head -3
+fi
 
 # unzip -t only for the zip: it rejects the empty extra field (0xCAFE) the jar tool gives META-INF/, in any jar
 for f in t.jar t.zip; do

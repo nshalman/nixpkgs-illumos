@@ -8,7 +8,8 @@
 #   log:     the nightly's logs, whose directory names carry the time of the build, are in its log output; its out
 #            output, the one later stages use, has the proto area alone.
 #   times:   what the build writes of when it ran is the pinned commit's time (SOURCE_DATE_EPOCH): .pyc files are checked
-#            by their sources' hashes, not times; __TIME__ (libzdoor) is the commit's; every jar entry is dated then.
+#            by their sources' hashes, not times; __TIME__ (libzdoor) is the commit's; every jar entry is dated then, and
+#            in order of name (the order the file system gives differs between hosts).
 #   dofUarg: the nightly's libdtrace writes the same object for a D program each time dtrace -G runs, with address
 #            space layout randomization on (pkgs/smartos-illumos/libdtrace-dof-uarg.patch): the build host's dtrace,
 #            run five times on a ustack helper with that library in place of its own.
@@ -79,8 +80,11 @@ in
     for f in $(find ${nightly}/proto -name '*.jar'); do
       j=$((j + 1))
       if unzip -Z -T "$f" | grep '^[-dl]' | grep -v " $dos " | grep -q .; then echo "not all at $dos: $f"; exit 1; fi
+      # in order of name, META-INF/ and its MANIFEST.MF first
+      unzip -Z1 "$f" | grep -v -x -e META-INF/ -e META-INF/MANIFEST.MF >$TMPDIR/names || true
+      LC_ALL=C sort $TMPDIR/names | cmp -s - $TMPDIR/names || { echo "not in order of name: $f"; exit 1; }
     done
-    echo "$j jars, every entry at $dos"
+    echo "$j jars, every entry at $dos, in order of name"
     test $j -gt 0
     echo ok >$out
   '';

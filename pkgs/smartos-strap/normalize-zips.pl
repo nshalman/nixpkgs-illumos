@@ -1,15 +1,19 @@
 #!/usr/bin/env perl
 #
 # normalize-zips.pl DIR...: each zip archive under the DIRs (.jar, .jmod, .zip, .sym; symbolic links not followed)
-# with the time of every entry made SOURCE_DATE_EPOCH and its owner and group 0. The jar and jmod tools of openjdk
-# 11, and zip, record each file's modification time (and zip its owner), which differ from one build to the next and
-# between build users. Only fixed-size fields change, so nothing moves:
+# with the time of every entry made SOURCE_DATE_EPOCH, its owner and group 0, and its entries in order of name. The
+# jar and jmod tools of openjdk 11, and zip, record each file's modification time (and zip its owner), which differ from
+# one build to the next and between build users, and take a directory's files in the order the file system gives,
+# which differs between hosts. In each entry:
 #   - each entry's DOS time and date, in its local header and in the central directory: SOURCE_DATE_EPOCH in UTC
 #     (DOS times start at 1980; an earlier time is 1980-01-01 00:00);
 #   - its extended timestamp extra field (0x5455, zip's), each time it holds;
 #   - its Unix owner extra field (0x7875, zip's), uid and gid.
-# The central directory is found from the end record, so data before the archive (a jmod's "JM" header) is allowed
-# for. Zip64 archives are refused. Files with these names that are not zip archives are left as they are.
+# The entries are then written again in order of name (a jar's META-INF/ and META-INF/MANIFEST.MF first), each local
+# header and its data as they were, the central directory's offsets made to match. The central directory is found from
+# the end record, so data before the archive (a jmod's "JM" header) is kept; an archive whose entries do not fill the
+# space before the central directory exactly, and a zip64 archive, are refused. Files with these names that are not
+# zip archives are left as they are.
 
 use strict;
 use warnings;
@@ -78,6 +82,7 @@ sub normalize {
     $base >= 0 or fail("central directory before the start of the file");
 
     my $pos = $base + $cdoff;
+    my @entries;
     for my $i (1 .. $entries) {
         substr($data, $pos, 4) eq "PK\1\2" or fail("no central directory entry $i at $pos");
         my ($nlen, $xlen, $clen) = unpack('v v v', substr($data, $pos + 28, 6));
@@ -91,9 +96,44 @@ sub normalize {
         substr($data, $l + 10, 4) = pack('v v', $dostime, $dosdate);
         extras(\$data, $l + 30 + $lnlen, $lxlen, 1);
 
+        # the entry's data, and its data descriptor where general purpose bit 3 says there is one (12 bytes, or 16
+        # with its signature)
+        my $flags = unpack('v', substr($data, $pos + 8, 2));
+        my $csize = unpack('V', substr($data, $pos + 20, 4));
+        my $llen = 30 + $lnlen + $lxlen + $csize;
+        $llen += substr($data, $l + $llen, 4) eq "PK\7\10" ? 16 : 12 if $flags & 8;
+        push @entries, {
+            name => substr($data, $pos + 46, $nlen),
+            cd => substr($data, $pos, 46 + $nlen + $xlen + $clen),
+            local => substr($data, $l, $llen),
+        };
         $pos += 46 + $nlen + $xlen + $clen;
     }
     $pos == $eocd or fail("central directory ends at $pos, the end record is at $eocd");
+    my $locals = 0;
+    $locals += length($_->{local}) for @entries;
+    $locals == $cdoff or fail("the entries take $locals bytes before the central directory, not $cdoff");
+
+    # the entries in order of name, as jar and jmod take them from directories in the order the file system gives;
+    # a jar's META-INF/ and MANIFEST.MF first, where JarInputStream looks for the manifest
+    my %first = ("META-INF/" => 0, "META-INF/MANIFEST.MF" => 1);
+    my $i = 0;
+    $_->{index} = $i++ for @entries;
+    @entries = sort {
+        ($first{$a->{name}} // 2) <=> ($first{$b->{name}} // 2)
+            || $a->{name} cmp $b->{name}
+            || $a->{index} <=> $b->{index}
+    } @entries;
+    my ($body, $cd) = ("", "");
+    for my $e (@entries) {
+        my $c = $e->{cd};
+        substr($c, 42, 4) = pack('V', length($body));
+        $cd .= $c;
+        $body .= $e->{local};
+    }
+    my $end = substr($data, $eocd);
+    substr($end, 16, 4) = pack('V', length($body));
+    $data = substr($data, 0, $base) . $body . $cd . $end;
 
     my $mode = (stat($path))[2] & 07777;
     chmod($mode | 0200, $path) or fail($!);
