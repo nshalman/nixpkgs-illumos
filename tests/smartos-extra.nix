@@ -278,6 +278,8 @@ in
     # its link line names no directory of the build host's (configure adds /usr/local/lib where the host has one:
     # only a host with one tells)
     if ${extra.vim}/usr/bin/vim --version | grep -e '-L/usr/local/lib'; then echo "FAIL vim links with the host's /usr/local/lib"; exit 1; fi
+    # nor the build user (configure takes $USER for "Compiled by")
+    if ${extra.vim}/usr/bin/vim --version | grep -i 'compiled by.*nixbld'; then echo "FAIL vim names its build user"; exit 1; fi
     echo "ok   vim edits, xxd dumps, links with nothing of the host's"
     touch $out
   '';

@@ -9,6 +9,8 @@
 #
 # illumos-extra bug, not reproduced: its configure adds -L/usr/local/lib to the link line where the build host has
 # that directory (and so links whatever is in it); --without-local-dir here, so that vim does not depend on the host.
+# illumos-extra bug, not reproduced: configure names the build user ($USER) as who compiled it (vim --version); here
+# --with-compiledby names this project.
 { mkAutoconf, strapBin, cleanEnv }:
 
 mkAutoconf {
@@ -29,6 +31,7 @@ mkAutoconf {
     "--with-features=huge"
     "--without-x"
     "--without-local-dir"
+    "--with-compiledby=nixpkgs-illumos"
   ];
   install = suffix: ''
     (cd vim-9.2-64${suffix} && ${cleanEnv} PATH="${strapBin}/bin:/usr/bin:$PATH" make V=1 DESTDIR=$out install)
