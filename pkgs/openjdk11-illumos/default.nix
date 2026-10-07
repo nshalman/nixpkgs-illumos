@@ -30,7 +30,7 @@
 # builds.
 # What it records of when it was built is the stdenv's SOURCE_DATE_EPOCH: jdk11u's --with-source-date for what its
 # makefiles date, and its jmods', jars' and zips' entries made so afterwards (smartos-strap.normalizeZips), as its jar
-# and jmod tools take no time.
+# and jmod tools take no time. The sources it generates (CharacterData) carry no date.
 {
   lib,
   path,
@@ -105,6 +105,10 @@ in
       substituteInPlace make/launcher/Launcher-java.base.gmk \
         --replace-fail 'LDFLAGS_solaris := -R$(OPENWIN_HOME)/lib$(OPENJDK_TARGET_CPU_ISADIR), \' \
                        'LDFLAGS_solaris := , \'
+      # the sources the build generates (java.lang.CharacterData*) without the time they were generated, which goes
+      # into src.zip
+      substituteInPlace make/jdk/src/classes/build/tools/generatecharacter/GenerateCharacter.java \
+        --replace-fail 'new java.util.Date() + commentEnd' 'commentEnd'
     ''
     + old.postPatch;
 

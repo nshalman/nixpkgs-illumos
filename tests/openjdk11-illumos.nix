@@ -2,7 +2,7 @@
 #   times: what it records of when it was built is the stdenv's SOURCE_DATE_EPOCH (1980-01-01 00:00 UTC): the VM's
 #          "built on" (libjvm.so: __DATE__ __TIME__), and every entry of its jmods, jars, src.zip and ct.sym, and of the
 #          archives inside them (jrt-fs.jar, ct.sym in the jmods); their entries are in order of name, as the order the
-#          file system gives differs between hosts.
+#          file system gives differs between hosts; and the sources it generates (CharacterData) carry no date.
 #   use:   what reads those archives still does: jlink makes a runtime of java.base from its jmods, which runs a
 #          class; javac --release 8 compiles against ct.sym; jar lists jrt-fs.jar and src.zip.
 #   nix-build tests/openjdk11-illumos.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
@@ -40,6 +40,11 @@ in
     echo "$n archives and $nested inside them, every entry at 1980-01-01 00:00, in order of name"
     test $n -gt 70
     test $nested -gt 0
+    # the sources the build generates (java.lang.CharacterData*) without the time they were generated
+    # (written out first: the builder runs with pipefail, and head would leave unzip writing to a closed pipe)
+    unzip -p lib/src.zip java.base/java/lang/CharacterDataLatin1.java >$TMPDIR/CharacterDataLatin1.java
+    head -1 $TMPDIR/CharacterDataLatin1.java | tee $TMPDIR/generated
+    grep -q 'template file *$' $TMPDIR/generated
     echo ok >$out
   '';
 

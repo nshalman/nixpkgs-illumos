@@ -52,7 +52,13 @@ mkBldenvStep {
 
   afterBldenv = "BANNER_YEAR=${toString commitTime.year} ./usr/src/tools/scripts/nightly illumos.sh";
 
-  extra.postUnpack = setup.postUnpack;
+  # libslp's jars name the time of the build as their version (IMPLVERS:sh=echo [`date`]); here SOURCE_DATE_EPOCH's,
+  # the commit's time, in the form the platform's date gives
+  extra.postUnpack = setup.postUnpack + ''
+    substituteInPlace illumos/usr/src/lib/libslp/javalib/Makefile.manifest \
+      --replace-fail 'IMPLVERS:sh=echo [`date`]' \
+                     "IMPLVERS=[$(TZ=UTC LC_ALL=C date -d @$SOURCE_DATE_EPOCH '+%a %b %-d %T %Z %Y')]"
+  '';
 
   extra.outputs = [
     "out"

@@ -9,7 +9,8 @@
 #            output, the one later stages use, has the proto area alone.
 #   times:   what the build writes of when it ran is the pinned commit's time (SOURCE_DATE_EPOCH): .pyc files are checked
 #            by their sources' hashes, not times; __TIME__ (libzdoor) is the commit's; every jar entry is dated then, and
-#            in order of name (the order the file system gives differs between hosts).
+#            in order of name (the order the file system gives differs between hosts); libslp's jars' version is the
+#            commit's time.
 #   dofUarg: the nightly's libdtrace writes the same object for a D program each time dtrace -G runs, with address
 #            space layout randomization on (pkgs/smartos-illumos/libdtrace-dof-uarg.patch): the build host's dtrace,
 #            run five times on a ustack helper with that library in place of its own.
@@ -86,6 +87,13 @@ in
     done
     echo "$j jars, every entry at $dos, in order of name"
     test $j -gt 0
+    # libslp's jars name the commit's time as their version (Implementation-Version: [`date`] in their build)
+    want="[$(TZ=UTC LC_ALL=C date -d @${toString pin.date} '+%a %b %-d %T %Z %Y')]"
+    for f in slp slpd; do
+      v=$(unzip -p ${nightly}/proto/usr/share/lib/slp/$f.jar META-INF/MANIFEST.MF | grep '^Implementation-Version:' | tr -d '\r')
+      test "$v" = "Implementation-Version: $want" || { echo "$f.jar: $v, not $want"; exit 1; }
+    done
+    echo "slp.jar, slpd.jar: $want"
     echo ok >$out
   '';
 
