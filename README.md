@@ -14,6 +14,7 @@ territory of [solnix](https://codeberg.org/gregburd/solnix); this repo aims to b
 |---|---|
 | `nshalman/nixpkgs`, branch `illumos-26.05` | Only commits fit to send upstream: `lib/systems`, the cc/bintools wrappers, the stdenv stage list, per-package `isSunOS` fixes. |
 | **this repo** | Everything else: the pinned illumos sysroot, the link-editor built from illumos-gate, the compiler, bootstrap files and their tooling, zone images, the patch series for Nix itself. |
+| `smartos.nix` (this repo, for now) | SmartOS's platform build (smartos-live, illumos-joyent, illumos-extra: `pkgs/smartos-*`, the strap toolchain, `build-smartos`) as a layer on the generic set, `illumos.nix`, which uses nothing of it (`tests/generic.nix`). |
 
 Design rules this repo follows:
 

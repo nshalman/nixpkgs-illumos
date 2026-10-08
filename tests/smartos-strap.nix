@@ -2,7 +2,7 @@
 # (tests/strap-compare.sh: the same files and links, ELF classes, SONAMEs, NEEDED entries, RUNPATHs up to where
 # they point, version definitions and exported symbols, and identical other files), and used the way the gate uses
 # them: a program built by the strap gcc against the package, 32- and 64-bit, run.
-#   nix-build tests/smartos-strap.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
+#   nix-build tests/smartos-strap.nix --arg pkgs 'import ./smartos.nix { }'
 { pkgs }:
 
 let

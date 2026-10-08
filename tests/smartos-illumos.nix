@@ -14,7 +14,7 @@
 #   dofUarg: the nightly's libdtrace writes the same object for a D program each time dtrace -G runs, with address
 #            space layout randomization on (pkgs/smartos-illumos/libdtrace-dof-uarg.patch): the build host's dtrace,
 #            run five times on a ustack helper with that library in place of its own.
-#   nix-build tests/smartos-illumos.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
+#   nix-build tests/smartos-illumos.nix --arg pkgs 'import ./smartos.nix { }'
 { pkgs }:
 
 let

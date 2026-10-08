@@ -2,7 +2,7 @@
 # commit ships of it (tests/strap-compare.sh with smartos-extra.platformReference as the reference, limited to the
 # paths the stage's manifests list as files; modes left out, since the platform takes them from the manifest), and
 # used.
-#   nix-build tests/smartos-live.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
+#   nix-build tests/smartos-live.nix --arg pkgs 'import ./smartos.nix { }'
 { pkgs }:
 
 let

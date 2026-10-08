@@ -1,5 +1,7 @@
 # nixpkgs (the illumos-26.05 branch) for x86_64-solaris on its own stdenv, pkgs/stdenv/illumos, given this repo's
-# bootstrap files and toolchain packages. ./bridge.nix is how those bootstrap files were first made.
+# bootstrap files and toolchain packages: the generic package set, what runs on any illumos distribution. ./bridge.nix
+# is how those bootstrap files were first made; ./smartos.nix builds SmartOS on it, through `overlays` and `config`,
+# which add to its own.
 #   nix-build illumos.nix -A hello
 # Every input is pinned to where it is published (tests/pins.sh), nixpkgs and the Nix source in ./pins (bumped by
 # pins/update.sh); a local checkout of illumos-26.05 can stand in:
@@ -24,6 +26,9 @@ in
     url = pins.nix-src.archive;
     sha256 = pins.nix-src.hash;
   },
+  # more overlays, after this repo's, and nixpkgs config
+  overlays ? [ ],
+  config ? { },
 }:
 
 import nixpkgs {
@@ -41,11 +46,7 @@ import nixpkgs {
         illumosPackages = import ./pkgs;
       }
     );
-  config = {
-    # SmartOS's strap node.js 0.10 (pkgs/smartos-strap/node.nix) is built with gyp, which needs python 2. Build time
-    # only: nothing installed refers to it.
-    permittedInsecurePackages = [ "python-2.7.18.12" ];
-  };
+  inherit config;
   overlays = [
     (final: prev: {
       nixVersions = prev.nixVersions.extend (
@@ -69,36 +70,13 @@ import nixpkgs {
       # to the next
       normalizeArchives = final.callPackage ./pkgs/normalize-archives { };
       normalizeZips = final.callPackage ./pkgs/normalize-zips { };
-      # The strap toolchain SmartOS builds illumos with (illumos-extra's binutils 2.34 and gcc 10), built here by
-      # this stdenv against the sysroot. Not part of the bootstrap.
-      binutils-strap = final.callPackage ./pkgs/binutils-strap { };
-      gcc10-illumos = final.callPackage ./pkgs/gcc10-illumos { };
-      # SmartOS's proto.strap: illumos-extra's strap packages built by that gcc 10.
-      smartos-strap = final.callPackage ./pkgs/smartos-strap { };
-      # illumos as SmartOS builds it (illumos-joyent), with that proto.strap.
-      smartos-illumos = final.callPackage ./pkgs/smartos-illumos { };
-      # what illumos-extra adds to SmartOS's proto area after illumos, built by the same gcc 10
-      smartos-extra = final.callPackage ./pkgs/smartos-extra { };
-      # smartos-live's own stages (src, man, ...), built against those
-      smartos-live = final.callPackage ./pkgs/smartos-live { };
-      # smartos-live's Jenkins "debug" build: the same, on a DEBUG nightly (stamp's last digit 8)
-      smartos-illumos-debug = final.smartos-illumos.overrideScope (
-        _: prev: { nightly = prev.nightly.override { debug = true; }; }
-      );
-      smartos-extra-debug = final.smartos-extra.override { smartos-illumos = final.smartos-illumos-debug; };
-      smartos-live-debug = final.smartos-live.override {
-        smartos-illumos = final.smartos-illumos-debug;
-        smartos-extra = final.smartos-extra-debug;
-        flavor = "debug";
-      };
       # a pre-built OpenJDK 11 to bootstrap OpenJDK from source
       tribblix-jdk-bin = final.callPackage ./pkgs/tribblix-jdk-bin { };
-      # OpenJDK 11 built from source with the illumos port, headless; SmartOS builds illumos' Java parts with JDK 11
+      # OpenJDK 11 built from source with the illumos port, headless (SmartOS builds illumos' Java parts with it)
       openjdk11-illumos = final.callPackage ./pkgs/openjdk11-illumos { };
       # rust-lang.org's Rust toolchain for illumos, and a rustPlatform that builds with it
       rust-illumos-bin = final.callPackage ./pkgs/rust-illumos-bin { };
-      # a bhyve VMM in Rust (rshyve, firehyve), built with it
-      rust-bhyve = final.callPackage ./pkgs/rust-bhyve { };
     })
-  ];
+  ]
+  ++ overlays;
 }

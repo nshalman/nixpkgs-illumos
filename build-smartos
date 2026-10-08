@@ -3,7 +3,7 @@
 # build-smartos [--flavor default|debug] [--pkgs FILE] [OUTPUT-DIR]: a SmartOS platform and its USB image from this
 # checkout, in one step, as root on a host that can make them (a builder-brand zone with lofi, UFS and pcfs mounts):
 #   - the builder tools of the flavor (pkgs/smartos-live: smartos-live, or smartos-live-debug) built from the package
-#     set FILE (default this checkout's illumos.nix), kept as OUTPUT-DIR/builder-tools-FLAVOR;
+#     set FILE (default this checkout's smartos.nix), kept as OUTPUT-DIR/builder-tools-FLAVOR;
 #   - the platform, OUTPUT-DIR/platform-STAMP (build-image), and its USB image, OUTPUT-DIR/platform-STAMP.usb.gz
 #     (build-usb, with their defaults: the console on ttya).
 # OUTPUT-DIR defaults to /var/tmp/build-smartos.
@@ -26,7 +26,7 @@ fail() {
     exit 1
 }
 
-flavor=default pkgs=$top/illumos.nix
+flavor=default pkgs=$top/smartos.nix
 while [ $# -gt 0 ]; do
     case $1 in
         --flavor) [ $# -ge 2 ] || usage; flavor=$2; shift 2 ;;

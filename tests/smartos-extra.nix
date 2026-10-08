@@ -2,7 +2,7 @@
 # illumos-extra commit ships of it (tests/strap-compare.sh with smartos-extra.platformReference as the reference,
 # limited to the paths illumos-extra's manifest lists as files of the package; modes left out, since the platform
 # takes them from the manifest), and used: a program built by the strap gcc against the package, run.
-#   nix-build tests/smartos-extra.nix --arg pkgs 'import /etc/nixos/pkgs.nix'
+#   nix-build tests/smartos-extra.nix --arg pkgs 'import ./smartos.nix { }'
 { pkgs }:
 
 let

@@ -4,7 +4,7 @@
 # nix-build first on PATH: it records its arguments and makes the result build-smartos asked for (-o), with fake
 # build-image and build-usb that record theirs and make what the real ones make (OUTPUT/platform-STAMP with
 # root.password; OUTPUT/platform-STAMP.usb.gz). Checks: a clean tree builds the default flavor from the repository's
-# illumos.nix into the output directory given, image then USB image, and says what it made; --flavor debug and
+# smartos.nix into the output directory given, image then USB image, and says what it made; --flavor debug and
 # --pkgs FILE reach nix-build; a changed tracked file still builds, and is said to be dirty; an untracked file stops
 # it before anything is built, and an ignored one does not; a failing build-image stops it before build-usb; a
 # flavor that is not one, or a stray argument, is refused.
@@ -57,7 +57,7 @@ export PATH="$tmp/bin:$PATH"
 git init -q -b main "$tmp/repo"
 cd "$tmp/repo"
 cp "$top/build-smartos" .
-echo '{ }: { }' >illumos.nix
+echo '{ }: { }' >smartos.nix
 echo 'scratch/' >.gitignore
 git add -A
 git commit -q -m start
@@ -77,7 +77,7 @@ show() { sed 's/^/    /' "$tmp/$1.out" "$tmp/$1.calls"; }
 
 out=$tmp/out
 if run clean "$out" &&
-    [ "$(cat "$tmp/clean.calls")" = "nix-build $tmp/repo/illumos.nix -A smartos-live.builderTools -o $out/builder-tools-default
+    [ "$(cat "$tmp/clean.calls")" = "nix-build $tmp/repo/smartos.nix -A smartos-live.builderTools -o $out/builder-tools-default
 build-image $out
 build-usb $out/platform-20261005T120000Z $out" ] &&
     grep -q "20261005T120000Z" "$tmp/clean.out" && grep -q "clean" "$tmp/clean.out" &&
@@ -89,7 +89,7 @@ else
 fi
 
 if run debug --flavor debug "$out" &&
-    grep -qx "nix-build $tmp/repo/illumos.nix -A smartos-live-debug.builderTools -o $out/builder-tools-debug" \
+    grep -qx "nix-build $tmp/repo/smartos.nix -A smartos-live-debug.builderTools -o $out/builder-tools-debug" \
         "$tmp/debug.calls"; then
     ok "--flavor debug builds smartos-live-debug's"
 else
@@ -103,13 +103,13 @@ else
     bad "--pkgs FILE"; show pkgs
 fi
 
-echo changed >>illumos.nix
+echo changed >>smartos.nix
 if run dirty "$out" && grep -q "build-usb" "$tmp/dirty.calls" && grep -q "dirty" "$tmp/dirty.out"; then
     ok "a changed tracked file: built, and said to be dirty"
 else
     bad "a changed tracked file"; show dirty
 fi
-git checkout -q -- illumos.nix
+git checkout -q -- smartos.nix
 
 echo new >untracked.nix
 if ! run untracked "$out" && [ ! -s "$tmp/untracked.calls" ] && grep -q "untracked.nix" "$tmp/untracked.out"; then
