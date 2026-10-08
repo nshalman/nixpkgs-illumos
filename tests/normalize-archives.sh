@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ../pkgs/smartos-strap/normalize-archives.pl on archives the platform's ar makes: the same two objects (one with a
+# ../pkgs/normalize-archives/normalize-archives.pl on archives the platform's ar makes: the same two objects (one with a
 # name too long for the member header, which goes to the long-name table) archived twice, with other modification
 # times and owners, are different archives; once normalized (SOURCE_DATE_EPOCH given) they are the same file, whose
 # members ar lists with that date and owner 0/0, extract to what was put in, and still link. A file named .a that is
@@ -47,7 +47,7 @@ else
 fi
 
 export SOURCE_DATE_EPOCH=315532800
-if perl "$top/pkgs/smartos-strap/normalize-archives.pl" a && perl "$top/pkgs/smartos-strap/normalize-archives.pl" b; then
+if perl "$top/pkgs/normalize-archives/normalize-archives.pl" a && perl "$top/pkgs/normalize-archives/normalize-archives.pl" b; then
     ok "normalize-archives.pl runs"
 else
     bad "normalize-archives.pl fails"

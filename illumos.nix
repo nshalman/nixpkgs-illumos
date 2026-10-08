@@ -65,6 +65,10 @@ import nixpkgs {
         nixComponents2 = final.nixVersions.nixComponents_2_35;
         withManual = false;
       };
+      # setup hooks that make the archives (ar) and zip archives (jars, jmods) a package installs the same from one build
+      # to the next
+      normalizeArchives = final.callPackage ./pkgs/normalize-archives { };
+      normalizeZips = final.callPackage ./pkgs/normalize-zips { };
       # The strap toolchain SmartOS builds illumos with (illumos-extra's binutils 2.34 and gcc 10), built here by
       # this stdenv against the sysroot. Not part of the bootstrap.
       binutils-strap = final.callPackage ./pkgs/binutils-strap { };

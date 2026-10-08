@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ../pkgs/smartos-strap/normalize-zips.pl on archives the build's tools make: openjdk 11's jar and jmod, and zip (as
+# ../pkgs/normalize-zips/normalize-zips.pl on archives the build's tools make: openjdk 11's jar and jmod, and zip (as
 # openjdk's own build makes src.zip, with its extended timestamp and owner extra fields). The same files archived
 # twice, with other modification times and owners, and the jar and the zip with their entries in another order (as
 # jmod and jar take them from directories, in the order the file system gives), are different archives; once
@@ -27,7 +27,7 @@ bad() { echo "FAIL: $1"; fail=$((fail+1)); }
 jdk=$(nix-build "$pkgsFile" -A openjdk11-illumos --no-out-link)/lib/openjdk/bin || { bad "no openjdk"; exit 1; }
 zip=$(nix-build "$pkgsFile" -A zip --no-out-link)/bin/zip || { bad "no zip"; exit 1; }
 unzip=$(nix-build "$pkgsFile" -A unzip --no-out-link)/bin/unzip || { bad "no unzip"; exit 1; }
-norm="perl $top/pkgs/smartos-strap/normalize-zips.pl"
+norm="perl $top/pkgs/normalize-zips/normalize-zips.pl"
 
 cd "$tmp"
 mkdir -p src/t mod/t

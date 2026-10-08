@@ -21,12 +21,15 @@
   newScope,
   fetchurl,
   runCommand,
-  makeSetupHook,
   gcc10-illumos,
   illumos-sysroot,
   # nixpkgs' perl, for the builds that run perl (the build host's /usr/bin/perl there); inside the scope `perl` is the
   # strap perl 5.12, which the other packages do not use
   perl,
+  # the setup hooks that make archives and zip archives the same from one build to the next (../normalize-archives,
+  # ../normalize-zips)
+  normalizeArchives,
+  normalizeZips,
 }:
 
 lib.makeScope newScope (self: {
@@ -83,25 +86,10 @@ lib.makeScope newScope (self: {
   cleanEnv = ''env -i SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH"'';
   inherit gcc10-illumos;
 
-  # A setup hook that makes the archives a package installs the same from one build to the next
-  # (./normalize-archives.pl: their member headers' times and owners, which the platform's ar takes from the files);
-  # finishPackage gives it to each package of the strap.
-  normalizeArchives = makeSetupHook {
-    name = "normalize-archives-hook";
-    substitutions = {
-      perl = "${perl}/bin/perl";
-      script = ./normalize-archives.pl;
-    };
-  } ./normalize-archives-hook.sh;
-  # The same for zip archives (./normalize-zips.pl): the jars and jmods openjdk 11's tools write, which take no
-  # SOURCE_DATE_EPOCH, for the illumos build and openjdk.
-  normalizeZips = makeSetupHook {
-    name = "normalize-zips-hook";
-    substitutions = {
-      perl = "${perl}/bin/perl";
-      script = ./normalize-zips.pl;
-    };
-  } ./normalize-zips-hook.sh;
+  # The setup hooks that make archives (../normalize-archives) and zip archives (../normalize-zips) the same from one
+  # build to the next, for the strap and the builds after it; finishPackage gives the first to each package of the
+  # strap.
+  inherit normalizeArchives normalizeZips;
   finishPackage =
     pkg:
     pkg.overrideAttrs (old: {

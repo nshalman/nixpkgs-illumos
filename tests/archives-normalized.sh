@@ -2,8 +2,8 @@
 #
 # Whether the archives the packages install are the same from one build to the next: for each attribute, every
 # member of every archive (*.a) in its outputs is dated the stdenv's epoch (SOURCE_DATE_EPOCH's default, 1980-01-01)
-# and owned by 0/0 (pkgs/smartos-strap/normalize-archives.pl), as the platform's ar lists them. An attribute without
-# archives passes, and is said to.
+# and owned by 0/0 (pkgs/normalize-archives/normalize-archives.pl), as the platform's ar lists them. An attribute
+# without archives passes, and is said to.
 #
 # usage: archives-normalized.sh PKGS-FILE ATTR...   e.g. archives-normalized.sh /work/dev-pkgs.nix smartos-strap.perl
 
