@@ -26,11 +26,11 @@
 # - the launcher's Solaris -R$(OPENWIN_HOME)/lib/amd64, which with Tribblix's patches (no /usr/openwin) is
 #   -R/lib/amd64, a directory the runtime linker searches anyway and nixpkgs' linker wrapper rejects as impure.
 # And the stdenv compiler's sysroot (illumos 2021) has no audio headers, which libjsound includes (OmniOS builds with
-# its system/header/header-audio): sys/audio.h, sys/audioio.h and sys/mixer.h from the illumos-joyent this overlay
-# builds.
+# its system/header/header-audio): sys/audio.h, sys/audioio.h and sys/mixer.h from the illumos-gate commit ../illumos-ld
+# is built from.
 # What it records of when it was built is the stdenv's SOURCE_DATE_EPOCH: jdk11u's --with-source-date for what its
-# makefiles date, and its jmods', jars' and zips' entries made so afterwards (smartos-strap.normalizeZips), as its jar
-# and jmod tools take no time. The sources it generates (CharacterData) carry no date.
+# makefiles date, and its jmods', jars' and zips' entries made so afterwards (normalizeZips, ../normalize-zips), as its
+# jar and jmod tools take no time. The sources it generates (CharacterData) carry no date.
 {
   lib,
   path,
@@ -51,8 +51,8 @@
   libxrandr,
   cups,
   fontconfig,
-  smartos-illumos,
-  smartos-strap,
+  illumos-ld,
+  normalizeZips,
 }:
 
 let
@@ -84,7 +84,7 @@ let
   audioHeaders = runCommand "openjdk-illumos-audio-headers" { } ''
     mkdir -p $out/include/sys
     for h in audio audioio mixer; do
-      cp ${smartos-illumos.src}/usr/src/uts/common/sys/$h.h $out/include/sys/
+      cp ${illumos-ld.src}/usr/src/uts/common/sys/$h.h $out/include/sys/
     done
   '';
 in
@@ -117,7 +117,7 @@ in
     nativeBuildInputs = lib.filter (p: (p.name or "") != "auto-patchelf-hook") old.nativeBuildInputs ++ [
       cpio
       file
-      smartos-strap.normalizeZips
+      normalizeZips
     ];
 
     buildInputs = [
